@@ -11,6 +11,9 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "GAME3023_F26_Roshan.h"
+#include "BatteryCapsule.h"
+#include "InputCoreTypes.h"
+#include "Engine/Engine.h"
 
 AGAME3023_F26_RoshanCharacter::AGAME3023_F26_RoshanCharacter()
 {
@@ -65,11 +68,20 @@ void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* P
 
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AGAME3023_F26_RoshanCharacter::Look);
+
+		// Interacting (Press E)
+		if (InteractAction)
+		{
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
+		}
 	}
 	else
 	{
 		UE_LOG(LogGAME3023_F26_Roshan, Error, TEXT("'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
 	}
+
+	// Direct E key fallback so interaction works immediately out of the box
+	PlayerInputComponent->BindKey(EKeys::E, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
 }
 
 void AGAME3023_F26_RoshanCharacter::Move(const FInputActionValue& Value)
@@ -131,3 +143,118 @@ void AGAME3023_F26_RoshanCharacter::DoJumpEnd()
 	// signal the character to stop jumping
 	StopJumping();
 }
+
+void AGAME3023_F26_RoshanCharacter::DoInteract()
+{
+	// 1. If currently in overlap with an interactable (e.g. BatteryCapsule)
+	if (CurrentInteractable)
+	{
+		if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(CurrentInteractable))
+		{
+			Battery->Interact(this);
+			return;
+		}
+	}
+
+	// 2. Proximity sweep fallback (radius 180 units around player)
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	const FVector TraceStart = GetActorLocation();
+	const FVector TraceEnd = TraceStart + GetActorForwardVector() * 100.0f;
+	TArray<FHitResult> HitResults;
+	FCollisionShape Sphere = FCollisionShape::MakeSphere(180.0f);
+
+	FCollisionQueryParams QueryParams;
+	QueryParams.AddIgnoredActor(this);
+
+	if (World->SweepMultiByChannel(HitResults, TraceStart, TraceEnd, FQuat::Identity, ECC_WorldDynamic, Sphere, QueryParams))
+	{
+		for (const FHitResult& Hit : HitResults)
+		{
+			if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(Hit.GetActor()))
+			{
+				if (!Battery->bIsCarried && !Battery->bIsSocketed)
+				{
+					Battery->Interact(this);
+					return;
+				}
+			}
+		}
+	}
+}
+
+bool AGAME3023_F26_RoshanCharacter::TryPickupBattery(ABatteryCapsule* Battery)
+{
+	if (!Battery) return false;
+
+	// STRICT LIVE WIRE RULE: Player can only hold ONE battery at a time
+	if (HasBattery())
+	{
+		UE_LOG(LogGAME3023_F26_Roshan, Warning, TEXT("[Live Wire] Inventory Full! Player is already carrying a Battery Capsule."));
+
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(
+				-1,
+				3.5f,
+				FColor::Red,
+				TEXT("[INVENTORY FULL] You can only hold 1 Battery Capsule at a time!"),
+				true,
+				FVector2D(1.3f, 1.3f)
+			);
+		}
+
+		return false;
+	}
+
+	CarriedBattery = Battery;
+	Battery->OnCollected(this);
+
+	if (CurrentInteractable == Battery)
+	{
+		CurrentInteractable = nullptr;
+	}
+
+	UE_LOG(LogGAME3023_F26_Roshan, Log, TEXT("[Live Wire] Battery successfully picked up into inventory!"));
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(
+			-1,
+			3.5f,
+			FColor::Green,
+			TEXT("[BATTERY COLLECTED] Battery added to inventory (Slot: 1/1)."),
+			true,
+			FVector2D(1.3f, 1.3f)
+		);
+	}
+
+	return true;
+}
+
+ABatteryCapsule* AGAME3023_F26_RoshanCharacter::DropCurrentBattery()
+{
+	if (!HasBattery()) return nullptr;
+
+	ABatteryCapsule* Dropped = CarriedBattery;
+	CarriedBattery = nullptr;
+
+	const FVector DropLocation = GetActorLocation() + GetActorForwardVector() * 120.0f;
+	Dropped->OnDropped(DropLocation);
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(
+			-1,
+			3.0f,
+			FColor::Yellow,
+			TEXT("[BATTERY DROPPED] Battery removed from inventory."),
+			true,
+			FVector2D(1.2f, 1.2f)
+		);
+	}
+
+	return Dropped;
+}
+

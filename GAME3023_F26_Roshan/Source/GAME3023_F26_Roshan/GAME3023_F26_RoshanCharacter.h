@@ -11,6 +11,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
 struct FInputActionValue;
+class ABatteryCapsule;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -49,6 +50,18 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* MouseLookAction;
 
+	/** Interact Input Action (Press E) */
+	UPROPERTY(EditAnywhere, Category="Input")
+	UInputAction* InteractAction;
+
+	/** Currently carried battery capsule in inventory (max 1) */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Inventory")
+	TObjectPtr<ABatteryCapsule> CarriedBattery;
+
+	/** Overlapping interactive actor in range */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Interaction")
+	TObjectPtr<AActor> CurrentInteractable;
+
 public:
 
 	/** Constructor */
@@ -84,6 +97,30 @@ public:
 	/** Handles jump pressed inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpEnd();
+
+	/** Handles interaction input (Press E) */
+	UFUNCTION(BlueprintCallable, Category="Interaction")
+	virtual void DoInteract();
+
+	/** Attempts to pick up a battery capsule into inventory (fails if already carrying one) */
+	UFUNCTION(BlueprintCallable, Category="Inventory")
+	bool TryPickupBattery(ABatteryCapsule* Battery);
+
+	/** Drops the currently carried battery */
+	UFUNCTION(BlueprintCallable, Category="Inventory")
+	ABatteryCapsule* DropCurrentBattery();
+
+	/** Checks if character is currently carrying a battery */
+	UFUNCTION(BlueprintPure, Category="Inventory")
+	bool HasBattery() const { return CarriedBattery != nullptr; }
+
+	/** Gets the currently carried battery */
+	UFUNCTION(BlueprintPure, Category="Inventory")
+	ABatteryCapsule* GetCarriedBattery() const { return CarriedBattery; }
+
+	/** Sets or clears current interactable actor */
+	void SetCurrentInteractable(AActor* Interactable) { CurrentInteractable = Interactable; }
+	AActor* GetCurrentInteractable() const { return CurrentInteractable; }
 
 public:
 
