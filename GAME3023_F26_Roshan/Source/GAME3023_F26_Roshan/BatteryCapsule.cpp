@@ -222,10 +222,13 @@ void ABatteryCapsule::OnSocketed(AActor* SocketActor, USceneComponent* AttachTar
 void ABatteryCapsule::OnDropped(const FVector& DropLocation)
 {
 	bIsCarried = false;
+	bIsSocketed = false;
 
 	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	SetActorLocation(DropLocation);
+	SetActorRotation(FRotator::ZeroRotator);
 	BaseLocation = DropLocation;
+	RunningTime = 0.0f;
 
 	BatteryMesh->SetRelativeScale3D(FVector(0.5f, 0.5f, 0.8f));
 	CapsuleComponent->SetCollisionProfileName(TEXT("BlockAllDynamic"));

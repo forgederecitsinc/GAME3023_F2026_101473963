@@ -139,7 +139,7 @@ void ARedPowerCylinder::OnInteractionBeginOverlap(UPrimitiveComponent* Overlappe
 						2001,
 						2.0f,
 						FColor::Silver,
-						TEXT("[Live Wire] Cylinder has a Battery. (Drop your battery with [Q] to remove it)")
+						TEXT("[Live Wire] Cylinder has a Battery. (Drop your battery with [R] to remove it)")
 					);
 				}
 				else
@@ -203,7 +203,7 @@ bool ARedPowerCylinder::Interact(AGAME3023_F26_RoshanCharacter* Player)
 					-1,
 					3.5f,
 					FColor::Red,
-					TEXT("[INVENTORY FULL] Cannot remove battery! Your hands are already full. Press [Q] to drop your current battery first."),
+					TEXT("[INVENTORY FULL] Cannot remove battery! Your hands are already full. Press [R] to drop your current battery first."),
 					true,
 					FVector2D(1.3f, 1.3f)
 				);

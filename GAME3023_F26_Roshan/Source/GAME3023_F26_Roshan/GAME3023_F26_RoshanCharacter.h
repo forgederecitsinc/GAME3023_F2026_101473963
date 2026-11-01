@@ -54,7 +54,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* InteractAction;
 
-	/** Drop Battery Input Action (Press Q) */
+	/** Drop Battery Input Action (Press R) */
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* DropAction;
 
@@ -106,7 +106,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Interaction")
 	virtual void DoInteract();
 
-	/** Handles dropping the carried battery onto the floor (Press Q) */
+	/** Handles dropping the carried battery onto the floor in front of the player (Press R) */
 	UFUNCTION(BlueprintCallable, Category="Inventory")
 	virtual void DoDropBattery();
 
