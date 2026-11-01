@@ -75,6 +75,9 @@ public:
 	void OnCollected(AGAME3023_F26_RoshanCharacter* Player);
 
 	UFUNCTION(BlueprintCallable, Category = "Battery|Actions")
+	void OnSocketed(AActor* SocketActor, USceneComponent* AttachTargetComp);
+
+	UFUNCTION(BlueprintCallable, Category = "Battery|Actions")
 	void OnDropped(const FVector& DropLocation);
 
 	UFUNCTION(BlueprintCallable, Category = "Battery|Actions")

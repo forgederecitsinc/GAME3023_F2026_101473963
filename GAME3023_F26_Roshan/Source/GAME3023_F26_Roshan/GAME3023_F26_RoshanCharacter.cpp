@@ -12,6 +12,7 @@
 #include "InputActionValue.h"
 #include "GAME3023_F26_Roshan.h"
 #include "BatteryCapsule.h"
+#include "RedPowerCylinder.h"
 #include "InputCoreTypes.h"
 #include "Engine/Engine.h"
 
@@ -146,9 +147,15 @@ void AGAME3023_F26_RoshanCharacter::DoJumpEnd()
 
 void AGAME3023_F26_RoshanCharacter::DoInteract()
 {
-	// 1. If currently in overlap with an interactable (e.g. BatteryCapsule)
+	// 1. If currently in overlap with an interactable (e.g. RedPowerCylinder or BatteryCapsule)
 	if (CurrentInteractable)
 	{
+		if (ARedPowerCylinder* RedCell = Cast<ARedPowerCylinder>(CurrentInteractable))
+		{
+			RedCell->Interact(this);
+			return;
+		}
+
 		if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(CurrentInteractable))
 		{
 			Battery->Interact(this);
@@ -170,6 +177,16 @@ void AGAME3023_F26_RoshanCharacter::DoInteract()
 
 	if (World->SweepMultiByChannel(HitResults, TraceStart, TraceEnd, FQuat::Identity, ECC_WorldDynamic, Sphere, QueryParams))
 	{
+		// Prioritize Cell interaction if player is carrying a battery
+		for (const FHitResult& Hit : HitResults)
+		{
+			if (ARedPowerCylinder* RedCell = Cast<ARedPowerCylinder>(Hit.GetActor()))
+			{
+				RedCell->Interact(this);
+				return;
+			}
+		}
+
 		for (const FHitResult& Hit : HitResults)
 		{
 			if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(Hit.GetActor()))
@@ -182,6 +199,15 @@ void AGAME3023_F26_RoshanCharacter::DoInteract()
 			}
 		}
 	}
+}
+
+ABatteryCapsule* AGAME3023_F26_RoshanCharacter::TakeCarriedBattery()
+{
+	if (!HasBattery()) return nullptr;
+
+	ABatteryCapsule* Taken = CarriedBattery;
+	CarriedBattery = nullptr;
+	return Taken;
 }
 
 bool AGAME3023_F26_RoshanCharacter::TryPickupBattery(ABatteryCapsule* Battery)

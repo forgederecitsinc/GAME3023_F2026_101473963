@@ -110,6 +110,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Inventory")
 	ABatteryCapsule* DropCurrentBattery();
 
+	/** Transfers the carried battery out of inventory (e.g. to socket into a cell) */
+	UFUNCTION(BlueprintCallable, Category="Inventory")
+	ABatteryCapsule* TakeCarriedBattery();
+
 	/** Checks if character is currently carrying a battery */
 	UFUNCTION(BlueprintPure, Category="Inventory")
 	bool HasBattery() const { return CarriedBattery != nullptr; }

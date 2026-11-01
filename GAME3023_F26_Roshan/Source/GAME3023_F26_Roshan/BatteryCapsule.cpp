@@ -139,6 +139,30 @@ void ABatteryCapsule::OnCollected(AGAME3023_F26_RoshanCharacter* Player)
 	BatteryMesh->SetRelativeScale3D(FVector(0.35f, 0.35f, 0.55f));
 }
 
+void ABatteryCapsule::OnSocketed(AActor* SocketActor, USceneComponent* AttachTargetComp)
+{
+	bIsCarried = false;
+	bIsSocketed = true;
+
+	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+
+	if (AttachTargetComp)
+	{
+		AttachToComponent(AttachTargetComp, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+	}
+	else if (SocketActor)
+	{
+		AttachToActor(SocketActor, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+	}
+
+	SetActorRelativeLocation(FVector(0.0f, 0.0f, 0.0f));
+	SetActorRelativeRotation(FRotator(0.0f, 0.0f, 0.0f));
+	SetActorRelativeScale3D(FVector(0.45f, 0.45f, 0.7f));
+
+	CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	InteractionZone->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+}
+
 void ABatteryCapsule::OnDropped(const FVector& DropLocation)
 {
 	bIsCarried = false;
