@@ -28,9 +28,23 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void OnConstruction(const FTransform& Transform) override;
 
 public:	
 	virtual void Tick(float DeltaTime) override;
+
+	// Instance-editable Color Hex Code (e.g. #FF0000 for Red, #00FF00 for Green, #0000FF for Blue)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Color Hex Code"))
+	FString ColorHexCode = TEXT("FF0000");
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> DynamicMaterial;
+
+	UFUNCTION(BlueprintCallable, Category = "LiveWire|Color")
+	void ApplyColorFromHex();
+
+	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
+	FString GetNormalizedHexCode() const;
 
 	// Physical Capsule Collision
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")

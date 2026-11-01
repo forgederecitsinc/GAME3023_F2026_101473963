@@ -7,6 +7,8 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/Engine.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "GAME3023_F26_RoshanCharacter.h"
 
 ABatteryCapsule::ABatteryCapsule()
@@ -33,11 +35,23 @@ ABatteryCapsule::ABatteryCapsule()
 		BatteryMesh->SetStaticMesh(MeshFinder.Object);
 	}
 
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BaseMatFinder(TEXT("/Game/LevelPrototyping/Materials/M_FlatCol.M_FlatCol"));
+	if (BaseMatFinder.Succeeded())
+	{
+		BatteryMesh->SetMaterial(0, BaseMatFinder.Object);
+	}
+
 	// 3. Interaction Zone (Trigger for player pressing E)
 	InteractionZone = CreateDefaultSubobject<USphereComponent>(TEXT("InteractionZone"));
 	InteractionZone->SetupAttachment(RootComponent);
 	InteractionZone->SetSphereRadius(160.0f);
 	InteractionZone->SetCollisionProfileName(TEXT("Trigger"));
+}
+
+void ABatteryCapsule::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+	ApplyColorFromHex();
 }
 
 void ABatteryCapsule::BeginPlay()
@@ -49,6 +63,48 @@ void ABatteryCapsule::BeginPlay()
 
 	InteractionZone->OnComponentBeginOverlap.AddDynamic(this, &ABatteryCapsule::OnInteractionBeginOverlap);
 	InteractionZone->OnComponentEndOverlap.AddDynamic(this, &ABatteryCapsule::OnInteractionEndOverlap);
+
+	ApplyColorFromHex();
+}
+
+FString ABatteryCapsule::GetNormalizedHexCode() const
+{
+	FString Clean = ColorHexCode.TrimStartAndEnd();
+	if (Clean.StartsWith(TEXT("#")))
+	{
+		Clean.RightChopInline(1);
+	}
+	return Clean.ToUpper();
+}
+
+void ABatteryCapsule::ApplyColorFromHex()
+{
+	if (!BatteryMesh) return;
+
+	FString CleanHex = GetNormalizedHexCode();
+	if (CleanHex.Len() < 6)
+	{
+		CleanHex = TEXT("FF0000"); // default fallback red
+	}
+	if (CleanHex.Len() == 6)
+	{
+		CleanHex += TEXT("FF");
+	}
+
+	const FColor ParsedColor = FColor::FromHex(CleanHex);
+	const FLinearColor LinearColor(ParsedColor);
+
+	if (!DynamicMaterial)
+	{
+		DynamicMaterial = BatteryMesh->CreateAndSetMaterialInstanceDynamic(0);
+	}
+
+	if (DynamicMaterial)
+	{
+		DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), LinearColor);
+		DynamicMaterial->SetVectorParameterValue(TEXT("Color"), LinearColor);
+		DynamicMaterial->SetVectorParameterValue(TEXT("Emissive"), LinearColor * 2.0f);
+	}
 }
 
 void ABatteryCapsule::Tick(float DeltaTime)

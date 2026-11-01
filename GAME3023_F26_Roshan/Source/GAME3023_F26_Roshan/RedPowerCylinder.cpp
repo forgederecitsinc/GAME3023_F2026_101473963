@@ -7,6 +7,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/Engine.h"
 #include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "BatteryCapsule.h"
 #include "GAME3023_F26_RoshanCharacter.h"
 #include "GAME3023_F26_Roshan.h"
@@ -31,11 +32,10 @@ ARedPowerCylinder::ARedPowerCylinder()
 		CylinderMesh->SetStaticMesh(MeshFinder.Object);
 	}
 
-	// Default unpowered material (Gray from project)
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> GrayMatFinder(TEXT("/Game/_Materials/M_gray.M_gray"));
-	if (GrayMatFinder.Succeeded())
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BaseMatFinder(TEXT("/Game/LevelPrototyping/Materials/M_FlatCol.M_FlatCol"));
+	if (BaseMatFinder.Succeeded())
 	{
-		UnpoweredMaterial = GrayMatFinder.Object;
+		CylinderMesh->SetMaterial(0, BaseMatFinder.Object);
 	}
 
 	// 3. Battery Socket (Where the battery sits visually on top of the cylinder)
@@ -50,6 +50,12 @@ ARedPowerCylinder::ARedPowerCylinder()
 	InteractionZone->SetCollisionProfileName(TEXT("Trigger"));
 }
 
+void ARedPowerCylinder::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+	ApplyColorFromHex();
+}
+
 void ARedPowerCylinder::BeginPlay()
 {
 	Super::BeginPlay();
@@ -57,7 +63,59 @@ void ARedPowerCylinder::BeginPlay()
 	InteractionZone->OnComponentBeginOverlap.AddDynamic(this, &ARedPowerCylinder::OnInteractionBeginOverlap);
 	InteractionZone->OnComponentEndOverlap.AddDynamic(this, &ARedPowerCylinder::OnInteractionEndOverlap);
 
-	UpdateVisualState();
+	ApplyColorFromHex();
+}
+
+FString ARedPowerCylinder::GetNormalizedHexCode() const
+{
+	FString Clean = ColorHexCode.TrimStartAndEnd();
+	if (Clean.StartsWith(TEXT("#")))
+	{
+		Clean.RightChopInline(1);
+	}
+	return Clean.ToUpper();
+}
+
+void ARedPowerCylinder::ApplyColorFromHex()
+{
+	if (!CylinderMesh) return;
+
+	FString CleanHex = GetNormalizedHexCode();
+	if (CleanHex.Len() < 6)
+	{
+		CleanHex = TEXT("FF0000"); // default red
+	}
+	if (CleanHex.Len() == 6)
+	{
+		CleanHex += TEXT("FF");
+	}
+
+	const FColor ParsedColor = FColor::FromHex(CleanHex);
+	const FLinearColor LinearColor(ParsedColor);
+
+	if (!DynamicMaterial)
+	{
+		DynamicMaterial = CylinderMesh->CreateAndSetMaterialInstanceDynamic(0);
+	}
+
+	if (DynamicMaterial)
+	{
+		if (bIsPowered)
+		{
+			// Bright, fully powered color + emissive glow
+			DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), LinearColor);
+			DynamicMaterial->SetVectorParameterValue(TEXT("Color"), LinearColor);
+			DynamicMaterial->SetVectorParameterValue(TEXT("Emissive"), LinearColor * 3.0f);
+		}
+		else
+		{
+			// Dim, offline unpowered shade of the assigned color
+			const FLinearColor DimColor = LinearColor * 0.35f;
+			DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), DimColor);
+			DynamicMaterial->SetVectorParameterValue(TEXT("Color"), DimColor);
+			DynamicMaterial->SetVectorParameterValue(TEXT("Emissive"), FLinearColor::Black);
+		}
+	}
 }
 
 void ARedPowerCylinder::Tick(float DeltaTime)
@@ -73,32 +131,47 @@ void ARedPowerCylinder::OnInteractionBeginOverlap(UPrimitiveComponent* Overlappe
 
 		if (GEngine)
 		{
-			if (bIsPowered)
+			if (bHasBattery)
 			{
-				GEngine->AddOnScreenDebugMessage(
-					2001,
-					2.0f,
-					FColor::Cyan,
-					TEXT("[Live Wire] Red Power Cylinder: ONLINE (100% Power)")
-				);
-			}
-			else if (Player->HasBattery())
-			{
-				GEngine->AddOnScreenDebugMessage(
-					2001,
-					2.0f,
-					FColor::Yellow,
-					TEXT("[Live Wire] Press [E] to Insert Battery & Power On Red Cell")
-				);
+				if (Player->HasBattery())
+				{
+					GEngine->AddOnScreenDebugMessage(
+						2001,
+						2.0f,
+						FColor::Silver,
+						TEXT("[Live Wire] Cylinder has a Battery. (Drop your battery with [Q] to remove it)")
+					);
+				}
+				else
+				{
+					GEngine->AddOnScreenDebugMessage(
+						2001,
+						2.0f,
+						FColor::Yellow,
+						TEXT("[Live Wire] Press [E] to Remove Battery from Cylinder")
+					);
+				}
 			}
 			else
 			{
-				GEngine->AddOnScreenDebugMessage(
-					2001,
-					2.0f,
-					FColor::Orange,
-					TEXT("[Live Wire] Red Power Cylinder: OFFLINE (Requires Battery)")
-				);
+				if (Player->HasBattery())
+				{
+					GEngine->AddOnScreenDebugMessage(
+						2001,
+						2.0f,
+						FColor::Yellow,
+						TEXT("[Live Wire] Press [E] to Insert Battery & Power On Cell")
+					);
+				}
+				else
+				{
+					GEngine->AddOnScreenDebugMessage(
+						2001,
+						2.0f,
+						FColor::Orange,
+						TEXT("[Live Wire] Red Power Cylinder: OFFLINE (Requires Battery)")
+					);
+				}
 			}
 		}
 	}
@@ -119,24 +192,50 @@ bool ARedPowerCylinder::Interact(AGAME3023_F26_RoshanCharacter* Player)
 {
 	if (!Player) return false;
 
-	// Already powered
-	if (bIsPowered)
+	// Case 1: Cylinder ALREADY HAS a battery -> Player wants to REMOVE it
+	if (bHasBattery)
 	{
-		if (GEngine)
+		if (Player->HasBattery())
 		{
-			GEngine->AddOnScreenDebugMessage(
-				-1,
-				3.0f,
-				FColor::Cyan,
-				TEXT("[CELL ONLINE] Red Power Cylinder is already running at 100% power!"),
-				true,
-				FVector2D(1.2f, 1.2f)
-			);
+			if (GEngine)
+			{
+				GEngine->AddOnScreenDebugMessage(
+					-1,
+					3.5f,
+					FColor::Red,
+					TEXT("[INVENTORY FULL] Cannot remove battery! Your hands are already full. Press [Q] to drop your current battery first."),
+					true,
+					FVector2D(1.3f, 1.3f)
+				);
+			}
+			return false;
+		}
+
+		// Player has empty hands: extract battery and give to player
+		ABatteryCapsule* Extracted = RemoveBattery();
+		if (Extracted)
+		{
+			Player->TryPickupBattery(Extracted);
+
+			if (GEngine)
+			{
+				GEngine->AddOnScreenDebugMessage(
+					-1,
+					4.0f,
+					FColor::Yellow,
+					TEXT("[BATTERY REMOVED] Battery removed from Cylinder! Red Power Cylinder is now OFFLINE."),
+					true,
+					FVector2D(1.3f, 1.3f)
+				);
+			}
+
+			UE_LOG(LogGAME3023_F26_Roshan, Log, TEXT("[Live Wire] RedPowerCylinder %s: Battery removed by player. Powered OFF."), *GetName());
+			return true;
 		}
 		return false;
 	}
 
-	// Player has battery: socket it!
+	// Case 2: Cylinder is EMPTY -> Player wants to INSERT a battery
 	if (Player->HasBattery())
 	{
 		ABatteryCapsule* BatteryToSocket = Player->TakeCarriedBattery();
@@ -144,7 +243,7 @@ bool ARedPowerCylinder::Interact(AGAME3023_F26_RoshanCharacter* Player)
 	}
 	else
 	{
-		// Player has no battery: show error
+		// Empty cylinder and player has no battery
 		if (GEngine)
 		{
 			GEngine->AddOnScreenDebugMessage(
@@ -162,34 +261,76 @@ bool ARedPowerCylinder::Interact(AGAME3023_F26_RoshanCharacter* Player)
 	}
 }
 
+ABatteryCapsule* ARedPowerCylinder::RemoveBattery()
+{
+	if (!bHasBattery || !InsertedBattery) return nullptr;
+
+	ABatteryCapsule* Extracted = InsertedBattery;
+
+	InsertedBattery = nullptr;
+	bHasBattery = false;
+	bIsPowered = false;
+
+	UpdateVisualState();
+
+	return Extracted;
+}
+
 bool ARedPowerCylinder::InsertBattery(ABatteryCapsule* Battery)
 {
 	if (!Battery) return false;
 
 	InsertedBattery = Battery;
 	bHasBattery = true;
-	bIsPowered = true;
 
-	// Attach battery to cylinder's socket
+	// Always attach the battery to the cylinder socket
 	Battery->OnSocketed(this, BatterySocket);
 
-	UpdateVisualState();
+	const FString CylinderHex = GetNormalizedHexCode();
+	const FString BatteryHex = Battery->GetNormalizedHexCode();
 
-	// Success Debug Print
-	if (GEngine)
+	// EXACT HEX MATCH CHECK: Only capsules with the matching hex code power the cylinder ON
+	if (CylinderHex.Equals(BatteryHex, ESearchCase::IgnoreCase))
 	{
-		GEngine->AddOnScreenDebugMessage(
-			-1,
-			4.5f,
-			FColor::Green,
-			TEXT("[RED CELL POWERED] Battery socketed! Red Power Cylinder is now ONLINE & POWERED!"),
-			true,
-			FVector2D(1.4f, 1.4f)
-		);
-	}
+		bIsPowered = true;
+		UpdateVisualState();
 
-	UE_LOG(LogGAME3023_F26_Roshan, Log, TEXT("[Live Wire] RedPowerCylinder %s: Successfully powered ON by %s!"), *GetName(), *Battery->GetName());
-	return true;
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(
+				-1,
+				4.5f,
+				FColor::Green,
+				FString::Printf(TEXT("[HEX MATCH: #%s] Battery attached & Cylinder POWERED ON!"), *CylinderHex),
+				true,
+				FVector2D(1.4f, 1.4f)
+			);
+		}
+
+		UE_LOG(LogGAME3023_F26_Roshan, Log, TEXT("[Live Wire] RedPowerCylinder %s: Hex MATCH (#%s == #%s). Powered ON!"), *GetName(), *CylinderHex, *BatteryHex);
+		return true;
+	}
+	else
+	{
+		// Mismatched Hex Code: Attaches, but cylinder DOES NOT power on
+		bIsPowered = false;
+		UpdateVisualState();
+
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(
+				-1,
+				5.0f,
+				FColor::Orange,
+				FString::Printf(TEXT("[HEX MISMATCH] Battery (#%s) attached, but Cylinder (#%s) WON'T POWER ON!"), *BatteryHex, *CylinderHex),
+				true,
+				FVector2D(1.4f, 1.4f)
+			);
+		}
+
+		UE_LOG(LogGAME3023_F26_Roshan, Warning, TEXT("[Live Wire] RedPowerCylinder %s: Hex MISMATCH (Battery #%s != Cylinder #%s). Attached but NOT powered!"), *GetName(), *BatteryHex, *CylinderHex);
+		return false;
+	}
 }
 
 void ARedPowerCylinder::UpdateVisualState()
@@ -199,9 +340,13 @@ void ARedPowerCylinder::UpdateVisualState()
 	if (bIsPowered && PoweredMaterial)
 	{
 		CylinderMesh->SetMaterial(0, PoweredMaterial);
+		return;
 	}
-	else if (!bIsPowered && UnpoweredMaterial)
+	if (!bIsPowered && UnpoweredMaterial)
 	{
 		CylinderMesh->SetMaterial(0, UnpoweredMaterial);
+		return;
 	}
+
+	ApplyColorFromHex();
 }

@@ -75,14 +75,21 @@ void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* P
 		{
 			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
 		}
+
+		// Dropping (Press Q)
+		if (DropAction)
+		{
+			EnhancedInputComponent->BindAction(DropAction, ETriggerEvent::Started, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
+		}
 	}
 	else
 	{
 		UE_LOG(LogGAME3023_F26_Roshan, Error, TEXT("'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
 	}
 
-	// Direct E key fallback so interaction works immediately out of the box
+	// Direct E (Interact) and Q (Drop) key fallbacks so they work immediately out of the box
 	PlayerInputComponent->BindKey(EKeys::E, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
+	PlayerInputComponent->BindKey(EKeys::Q, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
 }
 
 void AGAME3023_F26_RoshanCharacter::Move(const FInputActionValue& Value)
@@ -259,6 +266,26 @@ bool AGAME3023_F26_RoshanCharacter::TryPickupBattery(ABatteryCapsule* Battery)
 	return true;
 }
 
+void AGAME3023_F26_RoshanCharacter::DoDropBattery()
+{
+	if (HasBattery())
+	{
+		DropCurrentBattery();
+	}
+	else
+	{
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(
+				-1,
+				2.0f,
+				FColor::Silver,
+				TEXT("[INVENTORY] No battery in inventory to drop.")
+			);
+		}
+	}
+}
+
 ABatteryCapsule* AGAME3023_F26_RoshanCharacter::DropCurrentBattery()
 {
 	if (!HasBattery()) return nullptr;
@@ -266,7 +293,21 @@ ABatteryCapsule* AGAME3023_F26_RoshanCharacter::DropCurrentBattery()
 	ABatteryCapsule* Dropped = CarriedBattery;
 	CarriedBattery = nullptr;
 
-	const FVector DropLocation = GetActorLocation() + GetActorForwardVector() * 120.0f;
+	// Place battery cleanly in front of character on the floor
+	const FVector ForwardOffset = GetActorForwardVector() * 120.0f;
+	FVector DropLocation = GetActorLocation() + ForwardOffset;
+
+	// Floor trace so dropped battery rests cleanly on the ground surface
+	FHitResult FloorHit;
+	FCollisionQueryParams TraceParams;
+	TraceParams.AddIgnoredActor(this);
+	TraceParams.AddIgnoredActor(Dropped);
+
+	if (GetWorld()->LineTraceSingleByChannel(FloorHit, DropLocation + FVector(0.f, 0.f, 50.f), DropLocation - FVector(0.f, 0.f, 300.f), ECC_WorldStatic, TraceParams))
+	{
+		DropLocation.Z = FloorHit.ImpactPoint.Z + 45.0f;
+	}
+
 	Dropped->OnDropped(DropLocation);
 
 	if (GEngine)
@@ -275,7 +316,7 @@ ABatteryCapsule* AGAME3023_F26_RoshanCharacter::DropCurrentBattery()
 			-1,
 			3.0f,
 			FColor::Yellow,
-			TEXT("[BATTERY DROPPED] Battery removed from inventory."),
+			TEXT("[BATTERY DROPPED] Battery dropped onto ground (Press E to pick up again)."),
 			true,
 			FVector2D(1.2f, 1.2f)
 		);

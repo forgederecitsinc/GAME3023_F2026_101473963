@@ -54,6 +54,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* InteractAction;
 
+	/** Drop Battery Input Action (Press Q) */
+	UPROPERTY(EditAnywhere, Category="Input")
+	UInputAction* DropAction;
+
 	/** Currently carried battery capsule in inventory (max 1) */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Inventory")
 	TObjectPtr<ABatteryCapsule> CarriedBattery;
@@ -101,6 +105,10 @@ public:
 	/** Handles interaction input (Press E) */
 	UFUNCTION(BlueprintCallable, Category="Interaction")
 	virtual void DoInteract();
+
+	/** Handles dropping the carried battery onto the floor (Press Q) */
+	UFUNCTION(BlueprintCallable, Category="Inventory")
+	virtual void DoDropBattery();
 
 	/** Attempts to pick up a battery capsule into inventory (fails if already carrying one) */
 	UFUNCTION(BlueprintCallable, Category="Inventory")
