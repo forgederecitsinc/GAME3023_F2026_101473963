@@ -1,6 +1,6 @@
 // roshan - 101473963 - game3023 game engines 3
-// battery capsule implementation
-// handles the mesh, idle bobbing, color change from hex, and attaching to character/cylinder
+// battery capsule cpp
+// using 4-digit id instead of hex now, way easier to match with cylinders
 
 #include "BatteryCapsule.h"
 #include "Components/CapsuleComponent.h"
@@ -15,37 +15,34 @@
 
 ABatteryCapsule::ABatteryCapsule()
 {
-	// need tick enabled for the bobbing/spinning animation
 	PrimaryActorTick.bCanEverTick = true;
 
-	// root collision capsule so it doesn't fall through floor
+	// root collision capsule
 	CapsuleComponent = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CapsuleComponent"));
 	RootComponent = CapsuleComponent;
 	CapsuleComponent->InitCapsuleSize(35.0f, 55.0f);
 	CapsuleComponent->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 	CapsuleComponent->SetGenerateOverlapEvents(true);
 
-	// battery 3d model - scaled cylinder shape for now until we get 3d art
+	// battery cylinder mesh
 	BatteryMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BatteryMesh"));
 	BatteryMesh->SetupAttachment(RootComponent);
-	BatteryMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); // mesh has no collision, root capsule handles it
+	BatteryMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	BatteryMesh->SetRelativeScale3D(FVector(0.5f, 0.5f, 0.8f));
 
-	// grab basic engine cylinder so we dont need to import fbx
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> MeshFinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	if (MeshFinder.Succeeded())
 	{
 		BatteryMesh->SetStaticMesh(MeshFinder.Object);
 	}
 
-	// flat color material so we can tint it dynamically
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BaseMatFinder(TEXT("/Game/LevelPrototyping/Materials/M_FlatCol.M_FlatCol"));
 	if (BaseMatFinder.Succeeded())
 	{
 		BatteryMesh->SetMaterial(0, BaseMatFinder.Object);
 	}
 
-	// trigger zone for pressing E
+	// interaction sphere for E prompt
 	InteractionZone = CreateDefaultSubobject<USphereComponent>(TEXT("InteractionZone"));
 	InteractionZone->SetupAttachment(RootComponent);
 	InteractionZone->SetSphereRadius(160.0f);
@@ -55,68 +52,63 @@ ABatteryCapsule::ABatteryCapsule()
 void ABatteryCapsule::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
-	// update color right in editor viewport when changing hex code
-	ApplyColorFromHex();
+	// apply color whenever we change the ID in editor
+	ApplyColorFromID();
 }
 
 void ABatteryCapsule::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	// remember where it spawned for reset or respawn
 	SpawnOrigin = GetActorLocation();
 	BaseLocation = SpawnOrigin;
 
-	// bind overlap events for interaction prompt
 	InteractionZone->OnComponentBeginOverlap.AddDynamic(this, &ABatteryCapsule::OnInteractionBeginOverlap);
 	InteractionZone->OnComponentEndOverlap.AddDynamic(this, &ABatteryCapsule::OnInteractionEndOverlap);
 
-	// set initial material color
-	ApplyColorFromHex();
+	ApplyColorFromID();
 }
 
-FString ABatteryCapsule::GetNormalizedHexCode() const
+FLinearColor ABatteryCapsule::GetColorForID(int32 InID) const
 {
-	// clean up user input - strip spaces and hashtag
-	FString Clean = ColorHexCode.TrimStartAndEnd();
-	if (Clean.StartsWith(TEXT("#")))
+	// handy presets for quick testing in level
+	switch (InID)
 	{
-		Clean.RightChopInline(1);
+		case 1001: return FLinearColor(0.95f, 0.1f, 0.1f);  // red
+		case 1002: return FLinearColor(0.1f, 0.9f, 0.15f); // green
+		case 1003: return FLinearColor(0.1f, 0.45f, 1.0f); // blue
+		case 1004: return FLinearColor(1.0f, 0.85f, 0.1f); // yellow
+		case 1005: return FLinearColor(1.0f, 0.4f, 0.05f); // orange
+		case 1006: return FLinearColor(0.8f, 0.15f, 1.0f); // purple
+		case 1007: return FLinearColor(0.1f, 0.9f, 0.9f);  // cyan
+		case 1008: return FLinearColor(1.0f, 0.15f, 0.6f); // magenta
+		default:
+		{
+			// for any other 4 digit number, calculate a unique hue from the ID
+			// so matching IDs will always share the exact same color!
+			const uint8 HueByte = (uint8)(FMath::Abs(InID * 53) % 256);
+			return FLinearColor::MakeFromHSV8(HueByte, 220, 240);
+		}
 	}
-	return Clean.ToUpper();
 }
 
-void ABatteryCapsule::ApplyColorFromHex()
+void ABatteryCapsule::ApplyColorFromID()
 {
 	if (!BatteryMesh) return;
 
-	FString CleanHex = GetNormalizedHexCode();
-	// fallback if hex is invalid length
-	if (CleanHex.Len() < 6)
-	{
-		CleanHex = TEXT("FF0000"); // default to red
-	}
-	if (CleanHex.Len() == 6)
-	{
-		CleanHex += TEXT("FF"); // add full alpha
-	}
+	// check if user wants custom color or auto color from ID
+	const FLinearColor ChosenColor = bUseCustomColor ? CustomColor : GetColorForID(BatteryID);
 
-	// convert hex string to unreal color
-	const FColor ParsedColor = FColor::FromHex(CleanHex);
-	const FLinearColor LinearColor(ParsedColor);
-
-	// create dynamic material instance if we don't have one yet
 	if (!DynamicMaterial)
 	{
 		DynamicMaterial = BatteryMesh->CreateAndSetMaterialInstanceDynamic(0);
 	}
 
-	// apply color and emissive glow
 	if (DynamicMaterial)
 	{
-		DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), LinearColor);
-		DynamicMaterial->SetVectorParameterValue(TEXT("Color"), LinearColor);
-		DynamicMaterial->SetVectorParameterValue(TEXT("Emissive"), LinearColor * 2.0f);
+		DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), ChosenColor);
+		DynamicMaterial->SetVectorParameterValue(TEXT("Color"), ChosenColor);
+		DynamicMaterial->SetVectorParameterValue(TEXT("Emissive"), ChosenColor * 2.0f);
 	}
 }
 
@@ -124,14 +116,12 @@ void ABatteryCapsule::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// spin and float up and down when sitting on the floor
-	// dont animate if player is holding it or if it's plugged into the cylinder
+	// floating animation on ground
 	if (!bIsCarried && !bIsSocketed && bEnableIdleAnimation)
 	{
 		AddActorLocalRotation(FRotator(0.0f, RotationSpeed * DeltaTime, 0.0f));
 
 		RunningTime += DeltaTime;
-		// simple sin wave floating formula from math class
 		const float DeltaZ = FMath::Sin(RunningTime * BobFrequency) * BobAmplitude;
 		SetActorLocation(BaseLocation + FVector(0.0f, 0.0f, DeltaZ));
 	}
@@ -139,7 +129,6 @@ void ABatteryCapsule::Tick(float DeltaTime)
 
 void ABatteryCapsule::OnInteractionBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	// ignore if already picked up or socketed
 	if (bIsCarried || bIsSocketed) return;
 
 	if (AGAME3023_F26_RoshanCharacter* Player = Cast<AGAME3023_F26_RoshanCharacter>(OtherActor))
@@ -152,7 +141,7 @@ void ABatteryCapsule::OnInteractionBeginOverlap(UPrimitiveComponent* OverlappedC
 				1001,
 				2.0f,
 				FColor::Cyan,
-				TEXT("[Live Wire] Press [E] to Collect Battery Capsule")
+				FString::Printf(TEXT("[Live Wire] Press [E] to Collect Battery (ID: %d)"), BatteryID)
 			);
 		}
 	}
@@ -176,7 +165,6 @@ bool ABatteryCapsule::Interact(AGAME3023_F26_RoshanCharacter* Player)
 		return false;
 	}
 
-	// try to put in player inventory - will fail if player already has 1
 	return Player->TryPickupBattery(this);
 }
 
@@ -186,11 +174,9 @@ void ABatteryCapsule::OnCollected(AGAME3023_F26_RoshanCharacter* Player)
 
 	bIsCarried = true;
 
-	// turn off collision so it doesnt block player movement while walking
 	CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	InteractionZone->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	// try attaching to spine bone, otherwise stick to hip
 	USkeletalMeshComponent* CharacterMesh = Player->GetMesh();
 	const FName SpineSocket(TEXT("spine_03"));
 
@@ -202,13 +188,11 @@ void ABatteryCapsule::OnCollected(AGAME3023_F26_RoshanCharacter* Player)
 	}
 	else
 	{
-		// fallback to hip if skeleton doesn't have spine_03 socket
 		AttachToComponent(Player->GetRootComponent(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 		SetActorRelativeLocation(FVector(-30.0f, 25.0f, 10.0f));
 		SetActorRelativeRotation(FRotator(0.0f, 0.0f, 0.0f));
 	}
 
-	// make it a bit smaller while on player back
 	BatteryMesh->SetRelativeScale3D(FVector(0.35f, 0.35f, 0.55f));
 }
 
@@ -217,10 +201,8 @@ void ABatteryCapsule::OnSocketed(AActor* SocketActor, USceneComponent* AttachTar
 	bIsCarried = false;
 	bIsSocketed = true;
 
-	// detach from player first
 	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 
-	// snap onto the cylinder's battery socket
 	if (AttachTargetComp)
 	{
 		AttachToComponent(AttachTargetComp, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
@@ -230,12 +212,10 @@ void ABatteryCapsule::OnSocketed(AActor* SocketActor, USceneComponent* AttachTar
 		AttachToActor(SocketActor, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 	}
 
-	// zero out transform relative to socket
 	SetActorRelativeLocation(FVector(0.0f, 0.0f, 0.0f));
 	SetActorRelativeRotation(FRotator(0.0f, 0.0f, 0.0f));
 	SetActorRelativeScale3D(FVector(0.45f, 0.45f, 0.7f));
 
-	// disable collisions so player can walk up close to cylinder
 	CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	InteractionZone->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
@@ -245,14 +225,12 @@ void ABatteryCapsule::OnDropped(const FVector& DropLocation)
 	bIsCarried = false;
 	bIsSocketed = false;
 
-	// detach from player and place on ground
 	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	SetActorLocation(DropLocation);
 	SetActorRotation(FRotator::ZeroRotator);
 	BaseLocation = DropLocation;
-	RunningTime = 0.0f; // reset bob timer
+	RunningTime = 0.0f;
 
-	// reset scale and re-enable collisions so player can pick it up again
 	BatteryMesh->SetRelativeScale3D(FVector(0.5f, 0.5f, 0.8f));
 	CapsuleComponent->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 	CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
@@ -263,7 +241,6 @@ void ABatteryCapsule::RespawnToOrigin()
 {
 	bIsCarried = false;
 
-	// if it falls off arena, put it back at spawn
 	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	SetActorLocation(SpawnOrigin);
 	BaseLocation = SpawnOrigin;

@@ -1,7 +1,7 @@
 // roshan - 101473963 - game3023 game engines 3
-// red power cylinder actor header for live wire assignment
-// this acts as a power cell that needs a battery inserted to turn on
-// if hex code matches, cell powers ON. if mismatch, stays unpowered
+// red power cylinder header
+// switched from hex to 4-digit ID for matching with battery capsule
+// if BatteryID == CellID, powers on! otherwise stays off
 
 #pragma once
 
@@ -16,7 +16,6 @@ class UMaterialInterface;
 class ABatteryCapsule;
 class AGAME3023_F26_RoshanCharacter;
 
-// power cylinder cell actor
 UCLASS()
 class GAME3023_F26_ROSHAN_API ARedPowerCylinder : public AActor
 {
@@ -32,21 +31,29 @@ protected:
 public:	
 	virtual void Tick(float DeltaTime) override;
 
-	// cylinder hex code - instance editable so i can place red, green, blue cells in level
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Color Hex Code"))
-	FString ColorHexCode = TEXT("FF0000");
+	// 4-digit ID for this cell (default 1001)
+	// instance editable in editor so i can place cells with different IDs in level
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Cell ID (4-Digit)"))
+	int32 CellID = 1001;
 
-	// runtime dynamic material for changing glow/dim state
+	// optional manual color override
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Use Custom Color Override"))
+	bool bUseCustomColor = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Custom Color", EditCondition = "bUseCustomColor"))
+	FLinearColor CustomColor = FLinearColor::Red;
+
+	// dynamic material for glow
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> DynamicMaterial;
 
-	// updates material color from hex string
+	// updates material color based on ID
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Color")
-	void ApplyColorFromHex();
+	void ApplyColorFromID();
 
-	// strips # and uppercases hex string
+	// converts any 4 digit id into a consistent color
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
-	FString GetNormalizedHexCode() const;
+	FLinearColor GetColorForID(int32 InID) const;
 
 	// scene root
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -56,7 +63,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> CylinderMesh;
 
-	// socket on top where the battery capsule snaps into
+	// socket on top where the battery snaps in
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USceneComponent> BatterySocket;
 
@@ -64,7 +71,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USphereComponent> InteractionZone;
 
-	// materials for on / off states (optional override)
+	// optional material overrides
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cell|Materials")
 	TObjectPtr<UMaterialInterface> UnpoweredMaterial;
 
@@ -78,7 +85,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cell|State")
 	bool bHasBattery = false;
 
-	// pointer to the battery capsule plugged in right now
+	// currently attached battery
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cell|State")
 	TObjectPtr<ABatteryCapsule> InsertedBattery;
 
@@ -96,13 +103,12 @@ public:
 	bool IsPowered() const { return bIsPowered; }
 
 protected:
-	// overlap events for prompts
+	// overlap events
 	UFUNCTION()
 	void OnInteractionBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
 	UFUNCTION()
 	void OnInteractionEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
-	// updates glow depending on bIsPowered
 	void UpdateVisualState();
 };

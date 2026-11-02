@@ -1,6 +1,7 @@
 // roshan - 101473963 - game3023 game engines 3
-// battery capsule actor header for live wire project
-// player can grab this, socket it into the power cylinder, or drop it with R
+// battery capsule header
+// changed from hex string to 4-digit id because hex was annoying to type in editor
+// battery id has to match the cylinder cell id to power it on
 
 #pragma once
 
@@ -13,8 +14,6 @@ class USphereComponent;
 class UStaticMeshComponent;
 class AGAME3023_F26_RoshanCharacter;
 
-// battery cell pickup actor
-// prof said only 1 battery in inventory at once
 UCLASS()
 class GAME3023_F26_ROSHAN_API ABatteryCapsule : public AActor
 {
@@ -30,36 +29,43 @@ protected:
 public:	
 	virtual void Tick(float DeltaTime) override;
 
-	// hex code for color - default red ff0000
-	// need this editable in editor so we can test different color batteries
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Color Hex Code"))
-	FString ColorHexCode = TEXT("FF0000");
+	// 4-digit ID for this battery (default 1001)
+	// can type whatever 4-digit number in the details panel
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Battery ID (4-Digit)"))
+	int32 BatteryID = 1001;
 
-	// dynamic mat instance to change color at runtime
+	// optional checkbox if prof wants us to manually pick a color
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Use Custom Color Override"))
+	bool bUseCustomColor = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Custom Color", EditCondition = "bUseCustomColor"))
+	FLinearColor CustomColor = FLinearColor::Red;
+
+	// runtime dynamic material instance
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> DynamicMaterial;
 
-	// helper to parse the hex and apply to material
+	// updates material color based on ID
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Color")
-	void ApplyColorFromHex();
+	void ApplyColorFromID();
 
-	// strips # and makes uppercase just in case i typed lowercase in editor
+	// converts any 4 digit id into a consistent color
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
-	FString GetNormalizedHexCode() const;
+	FLinearColor GetColorForID(int32 InID) const;
 
 	// collision capsule
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UCapsuleComponent> CapsuleComponent;
 
-	// the actual cylinder mesh
+	// mesh component
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> BatteryMesh;
 
-	// overlap sphere for pressing E
+	// interaction trigger zone
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USphereComponent> InteractionZone;
 
-	// floating animation settings so it looks like a real video game pickup
+	// idle bobbing and spin settings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery|Visual")
 	bool bEnableIdleAnimation = true;
 
@@ -72,7 +78,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery|Visual")
 	float BobAmplitude = 10.0f;
 
-	// state flags - keeping track of where this thing is
+	// state flags
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battery|State")
 	bool bIsCarried = false;
 
@@ -82,7 +88,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battery|State")
 	FVector SpawnOrigin;
 
-	// pickup and socket functions
+	// interaction functions
 	UFUNCTION(BlueprintCallable, Category = "Battery|Actions")
 	bool Interact(AGAME3023_F26_RoshanCharacter* Player);
 
@@ -99,7 +105,7 @@ public:
 	void RespawnToOrigin();
 
 protected:
-	// overlap events for E prompt
+	// overlap events
 	UFUNCTION()
 	void OnInteractionBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
@@ -107,7 +113,6 @@ protected:
 	void OnInteractionEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 private:
-	// timer for bob math
 	float RunningTime = 0.0f;
 	FVector BaseLocation;
 };
