@@ -1,4 +1,6 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// roshan - 101473963 - game3023 game engines 3
+// character cpp implementation
+// includes 2.5d imax top-down camera setup, wasd movement, and battery inventory management
 
 #include "GAME3023_F26_RoshanCharacter.h"
 #include "Engine/LocalPlayer.h"
@@ -18,20 +20,19 @@
 
 AGAME3023_F26_RoshanCharacter::AGAME3023_F26_RoshanCharacter()
 {
-	// Set size for collision capsule
+	// player capsule size
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 		
-	// Don't rotate when the controller rotates. Let that just affect the camera.
+	// dont rotate pawn with controller rotation
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 
-	// Configure character movement
+	// make character turn towards where they are walking
 	GetCharacterMovement()->bOrientRotationToMovement = true;
-	GetCharacterMovement()->RotationRate = FRotator(0.0f, 500.0f, 0.0f);
+	GetCharacterMovement()->RotationRate = FRotator(0.0f, 650.0f, 0.0f); // snappy rotation speed
 
-	// Note: For faster iteration times these variables, and many more, can be tweaked in the Character Blueprint
-	// instead of recompiling to adjust them
+	// movement params from template
 	GetCharacterMovement()->JumpZVelocity = 500.f;
 	GetCharacterMovement()->AirControl = 0.35f;
 	GetCharacterMovement()->MaxWalkSpeed = 500.f;
@@ -39,44 +40,130 @@ AGAME3023_F26_RoshanCharacter::AGAME3023_F26_RoshanCharacter()
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
 
-	// Create a camera boom (pulls in towards the player if there is a collision)
+	// 2.5d imax top-down camera boom
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 400.0f;
-	CameraBoom->bUsePawnControlRotation = true;
+	// locking absolute rotation so the boom NEVER rotates when player turns
+	CameraBoom->SetUsingAbsoluteRotation(true);
+	CameraBoom->TargetArmLength = CameraDistance;
+	CameraBoom->SetRelativeRotation(FRotator(CameraPitch, CameraYaw, 0.0f));
+	CameraBoom->bUsePawnControlRotation = false; // do not spin with mouse
+	CameraBoom->bInheritPitch = false;
+	CameraBoom->bInheritYaw = false;
+	CameraBoom->bInheritRoll = false;
+	// turning off collision test so the camera doesn't zoom in crazy when walking under catwalks
+	CameraBoom->bDoCollisionTest = bEnableCameraCollision;
+	CameraBoom->ProbeSize = 12.0f;
+	CameraBoom->SocketOffset = FVector(0.0f, 0.0f, 100.0f);
 
-	// Create a follow camera
+	// camera lag gives that smooth drone/crane feel
+	CameraBoom->bEnableCameraLag = true;
+	CameraBoom->CameraLagSpeed = CameraLagSpeed;
+	CameraBoom->CameraLagMaxDistance = 600.0f;
+
+	// follow camera with wide imax fov
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
+	FollowCamera->SetFieldOfView(CameraFOV);
+}
 
-	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
-	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+void AGAME3023_F26_RoshanCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+	// apply our camera settings again here so blueprint defaults don't overwrite them
+	ApplyCinematicCameraSettings();
+
+	// reset controller rotation to forward
+	if (AController* PC = GetController())
+	{
+		PC->SetControlRotation(FRotator(0.0f, CameraYaw, 0.0f));
+	}
+}
+
+void AGAME3023_F26_RoshanCharacter::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+	// applies camera distance/pitch changes in editor viewport
+	ApplyCinematicCameraSettings();
+}
+
+void AGAME3023_F26_RoshanCharacter::ApplyCinematicCameraSettings()
+{
+	// lock controller rotation
+	bUseControllerRotationPitch = false;
+	bUseControllerRotationYaw = false;
+	bUseControllerRotationRoll = false;
+
+	if (GetCharacterMovement())
+	{
+		GetCharacterMovement()->bOrientRotationToMovement = true;
+		GetCharacterMovement()->RotationRate = FRotator(0.0f, 650.0f, 0.0f);
+	}
+
+	if (CameraBoom)
+	{
+		CameraBoom->SetUsingAbsoluteRotation(true);
+		CameraBoom->SetWorldRotation(FRotator(CameraPitch, CameraYaw, 0.0f));
+		CameraBoom->TargetArmLength = CameraDistance;
+		CameraBoom->bUsePawnControlRotation = false;
+		CameraBoom->bInheritPitch = false;
+		CameraBoom->bInheritYaw = false;
+		CameraBoom->bInheritRoll = false;
+		CameraBoom->bDoCollisionTest = bEnableCameraCollision;
+		CameraBoom->ProbeSize = 12.0f;
+		CameraBoom->bEnableCameraLag = true;
+		CameraBoom->CameraLagSpeed = CameraLagSpeed;
+		CameraBoom->CameraLagMaxDistance = 600.0f;
+		CameraBoom->SocketOffset = FVector(0.0f, 0.0f, 100.0f);
+	}
+
+	if (FollowCamera)
+	{
+		FollowCamera->SetFieldOfView(CameraFOV);
+		FollowCamera->bUsePawnControlRotation = false;
+		FollowCamera->SetRelativeRotation(FRotator::ZeroRotator);
+	}
+}
+
+void AGAME3023_F26_RoshanCharacter::AddControllerYawInput(float Val)
+{
+	// empty on purpose: player cannot spin the camera with mouse or controller
+}
+
+void AGAME3023_F26_RoshanCharacter::AddControllerPitchInput(float Val)
+{
+	// empty on purpose: player cannot pitch the camera
+}
+
+void AGAME3023_F26_RoshanCharacter::AddControllerRollInput(float Val)
+{
+	// empty on purpose: no roll
 }
 
 void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
-	// Set up action bindings
+	// enhanced input bindings
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
 		
-		// Jumping
+		// jump
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 
-		// Moving
+		// wasd move
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AGAME3023_F26_RoshanCharacter::Move);
-		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AGAME3023_F26_RoshanCharacter::Look);
 
-		// Looking
+		// look actions bound to empty Look function just in case
+		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AGAME3023_F26_RoshanCharacter::Look);
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AGAME3023_F26_RoshanCharacter::Look);
 
-		// Interacting (Press E)
+		// interact (E)
 		if (InteractAction)
 		{
 			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
 		}
 
-		// Dropping (Press Q)
+		// drop (R)
 		if (DropAction)
 		{
 			EnhancedInputComponent->BindAction(DropAction, ETriggerEvent::Started, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
@@ -84,30 +171,25 @@ void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* P
 	}
 	else
 	{
-		UE_LOG(LogGAME3023_F26_Roshan, Error, TEXT("'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
+		UE_LOG(LogGAME3023_F26_Roshan, Error, TEXT("'%s' Failed to find an Enhanced Input component!"), *GetNameSafe(this));
 	}
 
-	// Direct E (Interact) and R/Q (Drop) key fallbacks so they work immediately out of the box
+	// hardcoded key fallbacks so E (interact) and R/Q (drop) work without needing to setup IMC assets
 	PlayerInputComponent->BindKey(EKeys::E, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
 	PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
-	PlayerInputComponent->BindKey(EKeys::Q, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
+	PlayerInputComponent->BindKey(EKeys::Q, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery); // Q also works as drop backup
 }
 
 void AGAME3023_F26_RoshanCharacter::Move(const FInputActionValue& Value)
 {
-	// input is a Vector2D
 	FVector2D MovementVector = Value.Get<FVector2D>();
-
-	// route the input
 	DoMove(MovementVector.X, MovementVector.Y);
 }
 
 void AGAME3023_F26_RoshanCharacter::Look(const FInputActionValue& Value)
 {
-	// input is a Vector2D
+	// do nothing - camera is fixed
 	FVector2D LookAxisVector = Value.Get<FVector2D>();
-
-	// route the input
 	DoLook(LookAxisVector.X, LookAxisVector.Y);
 }
 
@@ -115,17 +197,16 @@ void AGAME3023_F26_RoshanCharacter::DoMove(float Right, float Forward)
 {
 	if (GetController() != nullptr)
 	{
-		// find out which way is forward
-		const FRotator Rotation = GetController()->GetControlRotation();
-		const FRotator YawRotation(0, Rotation.Yaw, 0);
+		// 2.5d top-down movement:
+		// W is always screen up (+X)
+		// S is always screen down (-X)
+		// D is always screen right (+Y)
+		// A is always screen left (-Y)
+		const FRotator YawRotation(0.0f, CameraYaw, 0.0f);
 
-		// get forward vector
 		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-
-		// get right vector 
 		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
-		// add movement 
 		AddMovementInput(ForwardDirection, Forward);
 		AddMovementInput(RightDirection, Right);
 	}
@@ -133,29 +214,22 @@ void AGAME3023_F26_RoshanCharacter::DoMove(float Right, float Forward)
 
 void AGAME3023_F26_RoshanCharacter::DoLook(float Yaw, float Pitch)
 {
-	if (GetController() != nullptr)
-	{
-		// add yaw and pitch input to controller
-		AddControllerYawInput(Yaw);
-		AddControllerPitchInput(Pitch);
-	}
+	// intentionally left empty - top down camera doesn't rotate with mouse
 }
 
 void AGAME3023_F26_RoshanCharacter::DoJumpStart()
 {
-	// signal the character to jump
 	Jump();
 }
 
 void AGAME3023_F26_RoshanCharacter::DoJumpEnd()
 {
-	// signal the character to stop jumping
 	StopJumping();
 }
 
 void AGAME3023_F26_RoshanCharacter::DoInteract()
 {
-	// 1. If currently in overlap with an interactable (e.g. RedPowerCylinder or BatteryCapsule)
+	// step 1: check if we are currently inside an overlap trigger
 	if (CurrentInteractable)
 	{
 		if (ARedPowerCylinder* RedCell = Cast<ARedPowerCylinder>(CurrentInteractable))
@@ -171,7 +245,7 @@ void AGAME3023_F26_RoshanCharacter::DoInteract()
 		}
 	}
 
-	// 2. Proximity sweep fallback (radius 180 units around player)
+	// step 2: fallback sphere sweep around player just in case overlap didn't trigger
 	UWorld* World = GetWorld();
 	if (!World) return;
 
@@ -185,7 +259,7 @@ void AGAME3023_F26_RoshanCharacter::DoInteract()
 
 	if (World->SweepMultiByChannel(HitResults, TraceStart, TraceEnd, FQuat::Identity, ECC_WorldDynamic, Sphere, QueryParams))
 	{
-		// Prioritize Cell interaction if player is carrying a battery
+		// prioritize cylinder if player is holding a battery
 		for (const FHitResult& Hit : HitResults)
 		{
 			if (ARedPowerCylinder* RedCell = Cast<ARedPowerCylinder>(Hit.GetActor()))
@@ -195,6 +269,7 @@ void AGAME3023_F26_RoshanCharacter::DoInteract()
 			}
 		}
 
+		// otherwise grab nearby battery
 		for (const FHitResult& Hit : HitResults)
 		{
 			if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(Hit.GetActor()))
@@ -222,7 +297,8 @@ bool AGAME3023_F26_RoshanCharacter::TryPickupBattery(ABatteryCapsule* Battery)
 {
 	if (!Battery) return false;
 
-	// STRICT LIVE WIRE RULE: Player can only hold ONE battery at a time
+	// assignment rule: player can only carry 1 battery at a time!
+	// if already holding one, reject it and print debug message
 	if (HasBattery())
 	{
 		UE_LOG(LogGAME3023_F26_Roshan, Warning, TEXT("[Live Wire] Inventory Full! Player is already carrying a Battery Capsule."));
@@ -275,6 +351,7 @@ void AGAME3023_F26_RoshanCharacter::DoDropBattery()
 	}
 	else
 	{
+		// nothing to drop
 		if (GEngine)
 		{
 			GEngine->AddOnScreenDebugMessage(
@@ -294,11 +371,11 @@ ABatteryCapsule* AGAME3023_F26_RoshanCharacter::DropCurrentBattery()
 	ABatteryCapsule* Dropped = CarriedBattery;
 	CarriedBattery = nullptr;
 
-	// Place battery cleanly in front of character on the floor
+	// place battery in front of player
 	const FVector ForwardOffset = GetActorForwardVector() * 120.0f;
 	FVector DropLocation = GetActorLocation() + ForwardOffset;
 
-	// Floor trace so dropped battery rests cleanly on the ground surface
+	// do a line trace down so it lands on top of floor instead of floating
 	FHitResult FloorHit;
 	FCollisionQueryParams TraceParams;
 	TraceParams.AddIgnoredActor(this);
@@ -325,4 +402,3 @@ ABatteryCapsule* AGAME3023_F26_RoshanCharacter::DropCurrentBattery()
 
 	return Dropped;
 }
-

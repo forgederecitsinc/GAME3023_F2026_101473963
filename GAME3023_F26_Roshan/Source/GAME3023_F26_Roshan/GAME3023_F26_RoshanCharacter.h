@@ -1,4 +1,6 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// roshan - 101473963 - game3023 game engines 3
+// live wire player character header
+// fixed 2.5d imax top-down camera, wasd movement, and 1-slot battery inventory
 
 #pragma once
 
@@ -15,131 +17,144 @@ class ABatteryCapsule;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
-/**
- *  A simple player-controllable third person character
- *  Implements a controllable orbiting camera
- */
+// main player character for the project
 UCLASS(abstract)
 class AGAME3023_F26_RoshanCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
-	/** Camera boom positioning the camera behind the character */
+	// spring arm boom positioning the camera above the player
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	USpringArmComponent* CameraBoom;
 
-	/** Follow camera */
+	// camera component attached to boom
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FollowCamera;
 	
 protected:
 
-	/** Jump Input Action */
+	// enhanced input actions
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* JumpAction;
 
-	/** Move Input Action */
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* MoveAction;
 
-	/** Look Input Action */
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* LookAction;
 
-	/** Mouse Look Input Action */
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* MouseLookAction;
 
-	/** Interact Input Action (Press E) */
+	// interact with E
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* InteractAction;
 
-	/** Drop Battery Input Action (Press R) */
+	// drop battery with R
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* DropAction;
 
-	/** Currently carried battery capsule in inventory (max 1) */
+	// inventory: can only hold ONE battery capsule at a time (assignment rule)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Inventory")
 	TObjectPtr<ABatteryCapsule> CarriedBattery;
 
-	/** Overlapping interactive actor in range */
+	// actor we are standing close to (cylinder or battery)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Interaction")
 	TObjectPtr<AActor> CurrentInteractable;
 
 public:
+	// cinematic 2.5d imax camera settings
+	// fixed top-down angle so the player gets a huge view of the arena
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
+	float CameraPitch = -60.0f; // pitch down looking at arena
 
-	/** Constructor */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
+	float CameraYaw = 0.0f; // facing forward down x axis
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
+	float CameraDistance = 1750.0f; // arm length for wide area view
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
+	float CameraFOV = 85.0f; // wide imax field of view
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
+	float CameraLagSpeed = 4.0f; // smooth camera tracking speed
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
+	bool bEnableCameraCollision = false; // keep off so camera doesn't zoom in near catwalks
+
+	// helper to lock down all camera settings
+	UFUNCTION(BlueprintCallable, Category = "Cinematic Camera")
+	void ApplyCinematicCameraSettings();
+
+	// override controller rotation inputs so mouse look does nothing to camera
+	virtual void AddControllerYawInput(float Val) override;
+	virtual void AddControllerPitchInput(float Val) override;
+	virtual void AddControllerRollInput(float Val) override;
+
+public:
+
 	AGAME3023_F26_RoshanCharacter();	
 
 protected:
+	virtual void BeginPlay() override;
+	virtual void OnConstruction(const FTransform& Transform) override;
 
-	/** Initialize input action bindings */
+	// input bindings setup
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 protected:
 
-	/** Called for movement input */
+	// enhanced input callbacks
 	void Move(const FInputActionValue& Value);
-
-	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
 
 public:
 
-	/** Handles move inputs from either controls or UI interfaces */
+	// wasd movement handling
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoMove(float Right, float Forward);
 
-	/** Handles look inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoLook(float Yaw, float Pitch);
 
-	/** Handles jump pressed inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpStart();
 
-	/** Handles jump pressed inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpEnd();
 
-	/** Handles interaction input (Press E) */
+	// pressing E
 	UFUNCTION(BlueprintCallable, Category="Interaction")
 	virtual void DoInteract();
 
-	/** Handles dropping the carried battery onto the floor in front of the player (Press R) */
+	// pressing R - drops battery on floor in front of player
 	UFUNCTION(BlueprintCallable, Category="Inventory")
 	virtual void DoDropBattery();
 
-	/** Attempts to pick up a battery capsule into inventory (fails if already carrying one) */
+	// inventory helpers
 	UFUNCTION(BlueprintCallable, Category="Inventory")
 	bool TryPickupBattery(ABatteryCapsule* Battery);
 
-	/** Drops the currently carried battery */
 	UFUNCTION(BlueprintCallable, Category="Inventory")
 	ABatteryCapsule* DropCurrentBattery();
 
-	/** Transfers the carried battery out of inventory (e.g. to socket into a cell) */
 	UFUNCTION(BlueprintCallable, Category="Inventory")
 	ABatteryCapsule* TakeCarriedBattery();
 
-	/** Checks if character is currently carrying a battery */
+	// check if holding a battery
 	UFUNCTION(BlueprintPure, Category="Inventory")
 	bool HasBattery() const { return CarriedBattery != nullptr; }
 
-	/** Gets the currently carried battery */
 	UFUNCTION(BlueprintPure, Category="Inventory")
 	ABatteryCapsule* GetCarriedBattery() const { return CarriedBattery; }
 
-	/** Sets or clears current interactable actor */
+	// getters and setters for current interactable
 	void SetCurrentInteractable(AActor* Interactable) { CurrentInteractable = Interactable; }
 	AActor* GetCurrentInteractable() const { return CurrentInteractable; }
 
 public:
 
-	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
-
-	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 };
-

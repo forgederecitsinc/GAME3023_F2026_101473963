@@ -1,4 +1,6 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// roshan - 101473963 - game3023 game engines 3
+// battery capsule actor header for live wire project
+// player can grab this, socket it into the power cylinder, or drop it with R
 
 #pragma once
 
@@ -11,13 +13,8 @@ class USphereComponent;
 class UStaticMeshComponent;
 class AGAME3023_F26_RoshanCharacter;
 
-/**
- * Battery pickup for the "Live Wire" circuit system.
- * - Single-capacity inventory: Player can only carry 1 at a time.
- * - Press E to interact and collect.
- * - Idles with gentle rotation and vertical bobbing when placed in world.
- * - Attaches to player character when carried.
- */
+// battery cell pickup actor
+// prof said only 1 battery in inventory at once
 UCLASS()
 class GAME3023_F26_ROSHAN_API ABatteryCapsule : public AActor
 {
@@ -33,32 +30,36 @@ protected:
 public:	
 	virtual void Tick(float DeltaTime) override;
 
-	// Instance-editable Color Hex Code (e.g. #FF0000 for Red, #00FF00 for Green, #0000FF for Blue)
+	// hex code for color - default red ff0000
+	// need this editable in editor so we can test different color batteries
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Color Hex Code"))
 	FString ColorHexCode = TEXT("FF0000");
 
+	// dynamic mat instance to change color at runtime
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> DynamicMaterial;
 
+	// helper to parse the hex and apply to material
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Color")
 	void ApplyColorFromHex();
 
+	// strips # and makes uppercase just in case i typed lowercase in editor
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
 	FString GetNormalizedHexCode() const;
 
-	// Physical Capsule Collision
+	// collision capsule
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UCapsuleComponent> CapsuleComponent;
 
-	// Visible Battery Mesh
+	// the actual cylinder mesh
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> BatteryMesh;
 
-	// Interaction Trigger Zone (Radius for pressing E)
+	// overlap sphere for pressing E
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USphereComponent> InteractionZone;
 
-	// Idle Visual Animation
+	// floating animation settings so it looks like a real video game pickup
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery|Visual")
 	bool bEnableIdleAnimation = true;
 
@@ -71,7 +72,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery|Visual")
 	float BobAmplitude = 10.0f;
 
-	// State
+	// state flags - keeping track of where this thing is
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battery|State")
 	bool bIsCarried = false;
 
@@ -81,7 +82,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battery|State")
 	FVector SpawnOrigin;
 
-	// Interaction and Collection
+	// pickup and socket functions
 	UFUNCTION(BlueprintCallable, Category = "Battery|Actions")
 	bool Interact(AGAME3023_F26_RoshanCharacter* Player);
 
@@ -98,6 +99,7 @@ public:
 	void RespawnToOrigin();
 
 protected:
+	// overlap events for E prompt
 	UFUNCTION()
 	void OnInteractionBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
@@ -105,6 +107,7 @@ protected:
 	void OnInteractionEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 private:
+	// timer for bob math
 	float RunningTime = 0.0f;
 	FVector BaseLocation;
 };
