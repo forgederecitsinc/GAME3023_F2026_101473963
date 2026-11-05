@@ -18,6 +18,14 @@
 #include "InputCoreTypes.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/Engine.h"
+#include "Components/PrimitiveComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Materials/Material.h"
+#include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "UObject/UObjectGlobals.h"
+#include "UObject/Package.h"
+#include "UObject/ObjectKey.h"
 
 AGAME3023_F26_RoshanCharacter::AGAME3023_F26_RoshanCharacter()
 {
@@ -78,11 +86,43 @@ void AGAME3023_F26_RoshanCharacter::BeginPlay()
 	// apply our camera settings again here so blueprint defaults don't overwrite them
 	ApplyCinematicCameraSettings();
 
+	// initialize smoothed cutout target position to player chest
+	SmoothedOcclusionTargetPos = GetActorLocation() + FVector(0.0f, 0.0f, 35.0f);
+
+	// enable custom depth on player mesh for silhouette rendering if needed
+	if (GetMesh())
+	{
+		GetMesh()->SetRenderCustomDepth(true);
+		GetMesh()->SetCustomDepthStencilValue(1);
+	}
+
 	// reset controller rotation to forward
 	if (AController* PC = GetController())
 	{
 		PC->SetControlRotation(FRotator(0.0f, CameraYaw, 0.0f));
 	}
+}
+
+void AGAME3023_F26_RoshanCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// put back original materials on any roof meshes before ending play
+	for (auto& Pair : ActiveOccludingMeshes)
+	{
+		if (UPrimitiveComponent* Comp = Pair.Key)
+		{
+			const TArray<TObjectPtr<UMaterialInterface>>& OrigMats = Pair.Value.OriginalMaterials;
+			for (int32 i = 0; i < OrigMats.Num(); ++i)
+			{
+				if (OrigMats[i])
+				{
+					Comp->SetMaterial(i, OrigMats[i]);
+				}
+			}
+		}
+	}
+	ActiveOccludingMeshes.Empty();
+
+	Super::EndPlay(EndPlayReason);
 }
 
 void AGAME3023_F26_RoshanCharacter::Tick(float DeltaTime)
@@ -158,8 +198,164 @@ void AGAME3023_F26_RoshanCharacter::Tick(float DeltaTime)
 		}
 	}
 
+	// update smooth circular see-through cutout on any roofs or catwalks hiding the player
+	UpdateCameraOcclusionCutout(DeltaTime);
+
 	// reset flag at end of frame
 	bMovedViaEnhancedInputThisFrame = false;
+}
+
+void AGAME3023_F26_RoshanCharacter::UpdateCameraOcclusionCutout(float DeltaTime)
+{
+	if (!bEnableOcclusionCutout || !FollowCamera || !GetWorld())
+	{
+		return;
+	}
+
+	const FVector CameraLoc = FollowCamera->GetComponentLocation();
+	const FVector PlayerTargetLoc = GetActorLocation() + FVector(0.0f, 0.0f, 35.0f);
+
+	// smoothly glide the cutout lens center so it feels organic when moving fast
+	SmoothedOcclusionTargetPos = FMath::VInterpTo(SmoothedOcclusionTargetPos, PlayerTargetLoc, DeltaTime, 18.0f);
+
+	// mark all currently tracked meshes as not hit yet for this frame
+	for (auto& Pair : ActiveOccludingMeshes)
+	{
+		Pair.Value.bHitThisFrame = false;
+	}
+
+	// sweep a sphere along the sightline from the camera to the player's torso
+	// using SweepMultiByObjectType so if there are multiple overlapping roof pieces, we catch ALL of them
+	TArray<FHitResult> Hits;
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(CameraOcclusionCutout), false, this);
+	if (CarriedBattery)
+	{
+		QueryParams.AddIgnoredActor(CarriedBattery);
+	}
+
+	FCollisionObjectQueryParams ObjectParams;
+	ObjectParams.AddObjectTypesToQuery(ECC_WorldStatic);
+	ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+
+	const FCollisionShape SweepSphere = FCollisionShape::MakeSphere(35.0f);
+	GetWorld()->SweepMultiByObjectType(Hits, CameraLoc, PlayerTargetLoc, FQuat::Identity, ObjectParams, SweepSphere, QueryParams);
+
+	const float PlayerFeetZ = GetActorLocation().Z - 20.0f;
+
+	for (const FHitResult& Hit : Hits)
+	{
+		UPrimitiveComponent* HitComp = Hit.GetComponent();
+		AActor* HitActor = Hit.GetActor();
+		if (!HitComp || !HitActor || HitActor == this || HitActor == CarriedBattery)
+		{
+			continue;
+		}
+
+		// ignore gameplay pickups/cylinders so we don't accidentally mask batteries or power cells
+		if (HitActor->IsA(ABatteryCapsule::StaticClass()) || HitActor->IsA(ARedPowerCylinder::StaticClass()))
+		{
+			continue;
+		}
+
+		// skip the floor mesh that the player is standing on!
+		// only cut out meshes whose top surface is higher than the player's waist
+		const FBox CompBox = HitComp->Bounds.GetBox();
+		if (CompBox.Max.Z < (PlayerFeetZ + 60.0f))
+		{
+			continue;
+		}
+
+		FOccludingMeshData* ExistingData = ActiveOccludingMeshes.Find(HitComp);
+		if (!ExistingData)
+		{
+			// first frame this roof/catwalk is hiding the player!
+			// save its original materials and swap in our circular cutout dynamic material instances
+			FOccludingMeshData NewData;
+			NewData.CurrentAlpha = 0.0f;
+			NewData.bHitThisFrame = true;
+
+			const int32 NumMats = HitComp->GetNumMaterials();
+			NewData.OriginalMaterials.Reserve(NumMats);
+			NewData.CutoutMIDs.Reserve(NumMats);
+
+				for (int32 MatIdx = 0; MatIdx < NumMats; ++MatIdx)
+				{
+					UMaterialInterface* OrigMat = HitComp->GetMaterial(MatIdx);
+					NewData.OriginalMaterials.Add(OrigMat);
+
+					// only swap materials that actually declare the authored cutout feature, so we
+					// never touch engine content or anything that would lose its original look
+					UMaterialInstanceDynamic* CutoutMID = nullptr;
+					float StrengthCheck = 0.0f;
+					if (OrigMat && OrigMat->GetScalarParameterValue(FMaterialParameterInfo(TEXT("OcclusionStrength")), StrengthCheck))
+					{
+						// a dynamic instance OF the original material keeps every colour, grid scale
+						// and texture override it already had, so the object keeps its exact look and
+						// only the circular patch above the player fades out
+						CutoutMID = UMaterialInstanceDynamic::Create(OrigMat, this);
+						if (CutoutMID)
+						{
+							HitComp->SetMaterial(MatIdx, CutoutMID);
+						}
+					}
+					NewData.CutoutMIDs.Add(CutoutMID);
+				}
+
+			ActiveOccludingMeshes.Add(HitComp, MoveTemp(NewData));
+		}
+		else
+		{
+			ExistingData->bHitThisFrame = true;
+		}
+	}
+
+	// now smoothly interpolate the cutout alpha (0 -> 1 when hidden, 1 -> 0 when visible again)
+	for (auto It = ActiveOccludingMeshes.CreateIterator(); It; ++It)
+	{
+		UPrimitiveComponent* Comp = It.Key();
+		FOccludingMeshData& Data = It.Value();
+
+		if (!IsValid(Comp))
+		{
+			It.RemoveCurrent();
+			continue;
+		}
+
+		const float TargetAlpha = Data.bHitThisFrame ? 1.0f : 0.0f;
+		Data.CurrentAlpha = FMath::FInterpTo(Data.CurrentAlpha, TargetAlpha, DeltaTime, OcclusionFadeSpeed);
+
+		// drive the authored cutout feature on each material instance
+		const float SafeRadius = FMath::Max(OcclusionCutoutRadius, 20.0f);
+		const float SafeSoftness = FMath::Clamp(OcclusionEdgeSoftness, 10.0f, SafeRadius * 0.9f);
+
+		for (UMaterialInstanceDynamic* MID : Data.CutoutMIDs)
+		{
+			if (MID)
+			{
+				MID->SetVectorParameterValue(TEXT("OcclusionCameraPos"), FLinearColor(CameraLoc.X, CameraLoc.Y, CameraLoc.Z, 1.0f));
+				MID->SetVectorParameterValue(TEXT("OcclusionPlayerPos"), FLinearColor(SmoothedOcclusionTargetPos.X, SmoothedOcclusionTargetPos.Y, SmoothedOcclusionTargetPos.Z, 1.0f));
+				MID->SetScalarParameterValue(TEXT("OcclusionRadius"), SafeRadius);
+				MID->SetScalarParameterValue(TEXT("OcclusionSoftness"), SafeSoftness);
+				MID->SetScalarParameterValue(TEXT("OcclusionStrength"), Data.CurrentAlpha);
+				MID->SetScalarParameterValue(TEXT("OcclusionCenterOpacity"), OcclusionMinCenterOpacity);
+				MID->SetVectorParameterValue(TEXT("OcclusionRimColor"), OcclusionRimColor);
+				MID->SetScalarParameterValue(TEXT("OcclusionRimIntensity"), OcclusionRimIntensity);
+			}
+		}
+
+		// once the cutout has smoothly faded all the way back to solid, restore the original material!
+		if (!Data.bHitThisFrame && Data.CurrentAlpha <= 0.01f)
+		{
+			for (int32 MatIdx = 0; MatIdx < Data.OriginalMaterials.Num(); ++MatIdx)
+			{
+				if (Data.OriginalMaterials[MatIdx])
+				{
+					Comp->SetMaterial(MatIdx, Data.OriginalMaterials[MatIdx]);
+				}
+			}
+			It.RemoveCurrent();
+		}
+	}
 }
 
 void AGAME3023_F26_RoshanCharacter::TriggerControllerRumble(float Intensity, float Duration, bool bHeavyLeft, bool bLightRight)

@@ -14,6 +14,31 @@ class UCameraComponent;
 class UInputAction;
 struct FInputActionValue;
 class ABatteryCapsule;
+class UMaterialInterface;
+class UMaterialInstanceDynamic;
+class UMaterial;
+class UPrimitiveComponent;
+
+// struct to keep track of each roof/catwalk mesh that is currently hiding the player
+USTRUCT()
+struct FOccludingMeshData
+{
+	GENERATED_BODY()
+
+	// original materials on the mesh so we can put them back when the player walks out
+	UPROPERTY()
+	TArray<TObjectPtr<UMaterialInterface>> OriginalMaterials;
+
+	// dynamic cutout materials with the circular see-through mask
+	UPROPERTY()
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> CutoutMIDs;
+
+	// current 0..1 fade alpha (smoothly lerps up when under roof, down when leaving)
+	float CurrentAlpha = 0.0f;
+
+	// whether the camera-to-player trace hit this mesh on the current frame
+	bool bHitThisFrame = false;
+};
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -107,6 +132,28 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "DualSense Controller")
 	void TriggerControllerRumble(float Intensity = 0.6f, float Duration = 0.2f, bool bHeavyLeft = true, bool bLightRight = true);
 
+	// occlusion cutout settings (hades / diablo style circular see-through lens when player walks under catwalks or roofs)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)")
+	bool bEnableOcclusionCutout = true; // turn the roof see-through cutout on or off
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)", meta = (ClampMin = "50.0", ClampMax = "1000.0"))
+	float OcclusionCutoutRadius = 260.0f; // size of the circular hole right above the player
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)", meta = (ClampMin = "10.0", ClampMax = "600.0"))
+	float OcclusionEdgeSoftness = 140.0f; // how soft/feathered the border of the circle is
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)", meta = (ClampMin = "1.0", ClampMax = "30.0"))
+	float OcclusionFadeSpeed = 6.0f; // how smoothly the circle fades in and out when walking under a mesh
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)", meta = (ClampMin = "0.0", ClampMax = "0.8"))
+	float OcclusionMinCenterOpacity = 0.05f; // opacity right in the center above the player (0 = full cutout, 0.05 = slight glass feel)
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)")
+	FLinearColor OcclusionRimColor = FLinearColor(0.0f, 0.75f, 1.0f, 1.0f); // subtle electric cyan hue on the cutout edge like hades/tunic
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)", meta = (ClampMin = "0.0", ClampMax = "10.0"))
+	float OcclusionRimIntensity = 1.2f; // set to 0 if you want zero glow on the border
+
 	// override controller rotation inputs so mouse look does nothing to camera
 	virtual void AddControllerYawInput(float Val) override;
 	virtual void AddControllerPitchInput(float Val) override;
@@ -118,11 +165,22 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaTime) override;
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 	// tracks if enhanced input already handled movement this frame so left stick doesn't double-add
 	bool bMovedViaEnhancedInputThisFrame = false;
+
+	// smoothed world position of the cutout center so the lens glides smoothly with the player
+	FVector SmoothedOcclusionTargetPos = FVector::ZeroVector;
+
+	// map of meshes currently fading in/out above the player
+	UPROPERTY(Transient)
+	TMap<TObjectPtr<UPrimitiveComponent>, FOccludingMeshData> ActiveOccludingMeshes;
+
+	// runs every tick to check if any roof or catwalk is between the camera and player
+	void UpdateCameraOcclusionCutout(float DeltaTime);
 
 	// input bindings setup
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
