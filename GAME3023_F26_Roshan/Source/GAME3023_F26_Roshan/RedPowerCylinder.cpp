@@ -332,7 +332,19 @@ bool ARedPowerCylinder::Interact(AGAME3023_F26_RoshanCharacter* Player)
 	if (Player->HasBattery())
 	{
 		ABatteryCapsule* BatteryToSocket = Player->TakeCarriedBattery();
-		return InsertBattery(BatteryToSocket);
+		const bool bMatched = InsertBattery(BatteryToSocket);
+
+		// dualsense controller rumble feedback: big rumble if ID matched and laser fired, light buzz if mismatch
+		if (bMatched)
+		{
+			Player->TriggerControllerRumble(1.0f, 0.35f, true, true);
+		}
+		else
+		{
+			Player->TriggerControllerRumble(0.6f, 0.15f, true, false);
+		}
+
+		return bMatched;
 	}
 	else
 	{

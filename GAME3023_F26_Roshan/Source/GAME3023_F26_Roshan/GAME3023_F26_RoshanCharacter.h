@@ -87,6 +87,26 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Cinematic Camera")
 	void ApplyCinematicCameraSettings();
 
+	// dualsense / gamepad controller settings so i can play and test with my ps5 controller
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller")
+	bool bEnableDualSenseController = true; // toggle controller support on/off
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller", meta = (ClampMin = "0.05", ClampMax = "0.9"))
+	float ControllerStickDeadZone = 0.2f; // deadzone so stick drift doesn't move the character
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller")
+	bool bEnableRightStickAiming = true; // twin-stick style aiming with right analog stick
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller")
+	bool bEnableControllerVibration = true; // rumble feedback when picking up or plugging in batteries
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float VibrationIntensity = 0.75f; // how strong the controller rumble feels
+
+	// helper function to rumble the dualsense controller on actions
+	UFUNCTION(BlueprintCallable, Category = "DualSense Controller")
+	void TriggerControllerRumble(float Intensity = 0.6f, float Duration = 0.2f, bool bHeavyLeft = true, bool bLightRight = true);
+
 	// override controller rotation inputs so mouse look does nothing to camera
 	virtual void AddControllerYawInput(float Val) override;
 	virtual void AddControllerPitchInput(float Val) override;
@@ -98,7 +118,11 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaTime) override;
 	virtual void OnConstruction(const FTransform& Transform) override;
+
+	// tracks if enhanced input already handled movement this frame so left stick doesn't double-add
+	bool bMovedViaEnhancedInputThisFrame = false;
 
 	// input bindings setup
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;

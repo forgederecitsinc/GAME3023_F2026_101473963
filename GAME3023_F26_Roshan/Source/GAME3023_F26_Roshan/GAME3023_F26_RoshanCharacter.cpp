@@ -16,10 +16,14 @@
 #include "BatteryCapsule.h"
 #include "RedPowerCylinder.h"
 #include "InputCoreTypes.h"
+#include "GameFramework/PlayerController.h"
 #include "Engine/Engine.h"
 
 AGAME3023_F26_RoshanCharacter::AGAME3023_F26_RoshanCharacter()
 {
+	// enable tick so we can poll dualsense analog sticks and twin-stick aiming smoothly
+	PrimaryActorTick.bCanEverTick = true;
+
 	// player capsule size
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 		
@@ -78,6 +82,103 @@ void AGAME3023_F26_RoshanCharacter::BeginPlay()
 	if (AController* PC = GetController())
 	{
 		PC->SetControlRotation(FRotator(0.0f, CameraYaw, 0.0f));
+	}
+}
+
+void AGAME3023_F26_RoshanCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	// handle dualsense analog sticks and d-pad directly in c++ so it always works even without custom IMC assets
+	if (bEnableDualSenseController)
+	{
+		if (APlayerController* PC = Cast<APlayerController>(GetController()))
+		{
+			// 1. left analog stick + d-pad movement fallback (if enhanced input didn't already move us this frame)
+			if (!bMovedViaEnhancedInputThisFrame)
+			{
+				float StickX = PC->GetInputAnalogKeyState(EKeys::Gamepad_LeftX);
+				float StickY = PC->GetInputAnalogKeyState(EKeys::Gamepad_LeftY);
+
+				// also let the player walk around using the dualsense d-pad
+				if (PC->IsInputKeyDown(EKeys::Gamepad_DPad_Right)) StickX += 1.0f;
+				if (PC->IsInputKeyDown(EKeys::Gamepad_DPad_Left))  StickX -= 1.0f;
+				if (PC->IsInputKeyDown(EKeys::Gamepad_DPad_Up))    StickY += 1.0f;
+				if (PC->IsInputKeyDown(EKeys::Gamepad_DPad_Down))  StickY -= 1.0f;
+
+				FVector2D StickVec(StickX, StickY);
+				if (StickVec.Size() > ControllerStickDeadZone)
+				{
+					// clamp to 1.0 so diagonal d-pad or stick doesn't make us run faster
+					if (StickVec.SizeSquared() > 1.0f)
+					{
+						StickVec.Normalize();
+					}
+					DoMove(StickVec.X, StickVec.Y);
+				}
+			}
+
+			// 2. right analog stick twin-stick aiming so player can aim their character in 360 degrees
+			if (bEnableRightStickAiming)
+			{
+				const float RightX = PC->GetInputAnalogKeyState(EKeys::Gamepad_RightX);
+				const float RightY = PC->GetInputAnalogKeyState(EKeys::Gamepad_RightY);
+				const FVector2D AimVec(RightX, RightY);
+
+				if (AimVec.Size() > ControllerStickDeadZone)
+				{
+					// convert right stick direction into world space relative to our fixed camera yaw
+					const FRotator CamYawRot(0.0f, CameraYaw, 0.0f);
+					const FVector AimWorldDir =
+						FRotationMatrix(CamYawRot).GetUnitAxis(EAxis::X) * AimVec.Y +
+						FRotationMatrix(CamYawRot).GetUnitAxis(EAxis::Y) * AimVec.X;
+
+					if (!AimWorldDir.IsNearlyZero())
+					{
+						// temporarily pause orient-to-movement while holding right stick so character faces aim direction
+						if (GetCharacterMovement())
+						{
+							GetCharacterMovement()->bOrientRotationToMovement = false;
+						}
+
+						const FRotator TargetRot = AimWorldDir.Rotation();
+						const FRotator NewRot = FMath::RInterpTo(GetActorRotation(), FRotator(0.0f, TargetRot.Yaw, 0.0f), DeltaTime, 15.0f);
+						SetActorRotation(NewRot);
+					}
+				}
+				else
+				{
+					// when right stick is let go, go back to facing where we walk
+					if (GetCharacterMovement() && !GetCharacterMovement()->bOrientRotationToMovement)
+					{
+						GetCharacterMovement()->bOrientRotationToMovement = true;
+					}
+				}
+			}
+		}
+	}
+
+	// reset flag at end of frame
+	bMovedViaEnhancedInputThisFrame = false;
+}
+
+void AGAME3023_F26_RoshanCharacter::TriggerControllerRumble(float Intensity, float Duration, bool bHeavyLeft, bool bLightRight)
+{
+	// play haptic rumble on dualsense controller if enabled
+	if (!bEnableControllerVibration) return;
+
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		const float FinalIntensity = FMath::Clamp(Intensity * VibrationIntensity, 0.0f, 1.0f);
+		PC->PlayDynamicForceFeedback(
+			FinalIntensity,
+			Duration,
+			bHeavyLeft,
+			bLightRight,
+			bHeavyLeft,
+			bLightRight,
+			EDynamicForceFeedbackAction::Start
+		);
 	}
 }
 
@@ -178,11 +279,25 @@ void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* P
 	PlayerInputComponent->BindKey(EKeys::E, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
 	PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
 	PlayerInputComponent->BindKey(EKeys::Q, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery); // Q also works as drop backup
+
+	// dualsense ps5 controller button bindings so gamepad works out of the box!
+	// cross (X button on ps5) -> jump
+	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoJumpStart);
+	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Released, this, &AGAME3023_F26_RoshanCharacter::DoJumpEnd);
+
+	// square button OR R1 bumper -> interact (pick up battery / plug into cylinder)
+	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Left, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
+	PlayerInputComponent->BindKey(EKeys::Gamepad_RightShoulder, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
+
+	// circle button OR L1 bumper -> drop battery onto floor
+	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Right, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
+	PlayerInputComponent->BindKey(EKeys::Gamepad_LeftShoulder, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
 }
 
 void AGAME3023_F26_RoshanCharacter::Move(const FInputActionValue& Value)
 {
 	FVector2D MovementVector = Value.Get<FVector2D>();
+	bMovedViaEnhancedInputThisFrame = true;
 	DoMove(MovementVector.X, MovementVector.Y);
 }
 
@@ -301,6 +416,9 @@ bool AGAME3023_F26_RoshanCharacter::TryPickupBattery(ABatteryCapsule* Battery)
 	// if already holding one, reject it and print debug message
 	if (HasBattery())
 	{
+		// short error buzz on dualsense controller
+		TriggerControllerRumble(0.8f, 0.15f, true, false);
+
 		UE_LOG(LogGAME3023_F26_Roshan, Warning, TEXT("[Live Wire] Inventory Full! Player is already carrying a Battery Capsule."));
 
 		if (GEngine)
@@ -320,6 +438,9 @@ bool AGAME3023_F26_RoshanCharacter::TryPickupBattery(ABatteryCapsule* Battery)
 
 	CarriedBattery = Battery;
 	Battery->OnCollected(this);
+
+	// crisp pickup vibration on dualsense controller
+	TriggerControllerRumble(0.5f, 0.18f, false, true);
 
 	if (CurrentInteractable == Battery)
 	{
