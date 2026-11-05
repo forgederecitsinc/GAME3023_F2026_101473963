@@ -1,7 +1,7 @@
 // roshan - 101473963 - game3023 game engines 3
 // red power cylinder header
-// switched from hex to 4-digit ID for matching with battery capsule
-// if BatteryID == CellID, powers on! otherwise stays off
+// when powered on with matching battery, lets out a thin laser beam
+// laser length is instance editable so i can tune how far it reaches in the arena
 
 #pragma once
 
@@ -32,7 +32,6 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 	// 4-digit ID for this cell (default 1001)
-	// instance editable in editor so i can place cells with different IDs in level
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Cell ID (4-Digit)"))
 	int32 CellID = 1001;
 
@@ -43,9 +42,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Custom Color", EditCondition = "bUseCustomColor"))
 	FLinearColor CustomColor = FLinearColor::Red;
 
-	// dynamic material for glow
+	// dynamic material for cylinder glow
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> DynamicMaterial;
+
+	// laser dynamic material instance so the beam glows super bright
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> LaserDynamicMaterial;
 
 	// updates material color based on ID
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Color")
@@ -66,6 +69,34 @@ public:
 	// socket on top where the battery snaps in
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USceneComponent> BatterySocket;
+
+	// laser emitter socket on the front face of the cylinder
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<USceneComponent> LaserEmitter;
+
+	// thin visual laser beam mesh
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UStaticMeshComponent> LaserBeamMesh;
+
+	// laser length - instance editable per cylinder in the details panel!
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Laser", meta = (DisplayName = "Laser Max Length", ClampMin = "50.0", UIMin = "50.0"))
+	float LaserLength = 1200.0f;
+
+	// laser beam thickness
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Laser", meta = (DisplayName = "Laser Thickness", ClampMin = "1.0", UIMin = "1.0"))
+	float LaserThickness = 6.0f;
+
+	// stops the laser if it hits a wall or obstacle instead of going through
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Laser", meta = (DisplayName = "Laser Stops At Obstacles"))
+	bool bLaserStopsAtObstacles = true;
+
+	// handy checkbox to preview laser reach in editor viewport without playing
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Laser", meta = (DisplayName = "Preview Laser In Editor"))
+	bool bPreviewLaserInEditor = false;
+
+	// updates laser position, scale, and visibility
+	UFUNCTION(BlueprintCallable, Category = "LiveWire|Laser")
+	void UpdateLaserBeam();
 
 	// trigger zone for pressing E
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")

@@ -1,6 +1,7 @@
 // roshan - 101473963 - game3023 game engines 3
 // red power cylinder cpp
 // checks if inserted battery's 4-digit ID matches the cell's ID
+// shoots out a thin glowing laser beam with instance-editable length when powered on
 
 #include "RedPowerCylinder.h"
 #include "Components/StaticMeshComponent.h"
@@ -45,6 +46,27 @@ ARedPowerCylinder::ARedPowerCylinder()
 	BatterySocket->SetupAttachment(RootComponent);
 	BatterySocket->SetRelativeLocation(FVector(0.0f, 0.0f, 65.0f));
 
+	// laser emitter on the front face of the cylinder
+	LaserEmitter = CreateDefaultSubobject<USceneComponent>(TEXT("LaserEmitter"));
+	LaserEmitter->SetupAttachment(RootComponent);
+	LaserEmitter->SetRelativeLocation(FVector(65.0f, 0.0f, 25.0f)); // front face, mid height
+
+	// laser beam mesh - thin cylinder stretched horizontally
+	LaserBeamMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LaserBeamMesh"));
+	LaserBeamMesh->SetupAttachment(LaserEmitter);
+	LaserBeamMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); // laser shouldn't block character physically
+	LaserBeamMesh->SetCastShadow(false); // laser shouldn't cast shadow
+
+	if (MeshFinder.Succeeded())
+	{
+		LaserBeamMesh->SetStaticMesh(MeshFinder.Object);
+	}
+	if (BaseMatFinder.Succeeded())
+	{
+		LaserBeamMesh->SetMaterial(0, BaseMatFinder.Object);
+	}
+	LaserBeamMesh->SetVisibility(false); // off until powered on
+
 	// interaction trigger
 	InteractionZone = CreateDefaultSubobject<USphereComponent>(TEXT("InteractionZone"));
 	InteractionZone->SetupAttachment(RootComponent);
@@ -57,6 +79,7 @@ void ARedPowerCylinder::OnConstruction(const FTransform& Transform)
 	Super::OnConstruction(Transform);
 	// apply color whenever cell ID changes in editor
 	ApplyColorFromID();
+	UpdateLaserBeam();
 }
 
 void ARedPowerCylinder::BeginPlay()
@@ -67,6 +90,7 @@ void ARedPowerCylinder::BeginPlay()
 	InteractionZone->OnComponentEndOverlap.AddDynamic(this, &ARedPowerCylinder::OnInteractionEndOverlap);
 
 	ApplyColorFromID();
+	UpdateLaserBeam();
 }
 
 FLinearColor ARedPowerCylinder::GetColorForID(int32 InID) const
@@ -122,9 +146,75 @@ void ARedPowerCylinder::ApplyColorFromID()
 	}
 }
 
+void ARedPowerCylinder::UpdateLaserBeam()
+{
+	if (!LaserBeamMesh || !LaserEmitter) return;
+
+	// only active if powered on, or if previewing in editor
+	const bool bShouldBeActive = bIsPowered || (bPreviewLaserInEditor && GetWorld() && !GetWorld()->IsGameWorld());
+
+	if (!bShouldBeActive)
+	{
+		LaserBeamMesh->SetVisibility(false);
+		return;
+	}
+
+	LaserBeamMesh->SetVisibility(true);
+
+	const FVector Start = LaserEmitter->GetComponentLocation();
+	const FVector Forward = LaserEmitter->GetForwardVector();
+	const FVector DesiredEnd = Start + Forward * LaserLength;
+
+	float ActualDistance = LaserLength;
+
+	// trace forward so laser stops at walls instead of clipping into next room
+	if (bLaserStopsAtObstacles && GetWorld())
+	{
+		FHitResult Hit;
+		FCollisionQueryParams Params;
+		Params.AddIgnoredActor(this);
+		if (InsertedBattery)
+		{
+			Params.AddIgnoredActor(InsertedBattery);
+		}
+
+		if (GetWorld()->LineTraceSingleByChannel(Hit, Start, DesiredEnd, ECC_WorldStatic, Params))
+		{
+			ActualDistance = FMath::Max(20.0f, Hit.Distance);
+		}
+	}
+
+	// position laser beam: cylinder mesh origin is center, so offset forward by half distance
+	// rotate pitch 90 degrees so cylinder aligns with forward vector
+	LaserBeamMesh->SetRelativeLocation(FVector(ActualDistance * 0.5f, 0.0f, 0.0f));
+	LaserBeamMesh->SetRelativeRotation(FRotator(90.0f, 0.0f, 0.0f));
+	LaserBeamMesh->SetRelativeScale3D(FVector(LaserThickness / 100.0f, LaserThickness / 100.0f, ActualDistance / 100.0f));
+
+	// create bright emissive laser material
+	const FLinearColor ChosenColor = bUseCustomColor ? CustomColor : GetColorForID(CellID);
+
+	if (!LaserDynamicMaterial)
+	{
+		LaserDynamicMaterial = LaserBeamMesh->CreateAndSetMaterialInstanceDynamic(0);
+	}
+
+	if (LaserDynamicMaterial)
+	{
+		LaserDynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), ChosenColor);
+		LaserDynamicMaterial->SetVectorParameterValue(TEXT("Color"), ChosenColor);
+		LaserDynamicMaterial->SetVectorParameterValue(TEXT("Emissive"), ChosenColor * 8.0f); // laser intense glow
+	}
+}
+
 void ARedPowerCylinder::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	// if cell is powered, continuously trace laser so it reacts if anything moves in front
+	if (bIsPowered)
+	{
+		UpdateLaserBeam();
+	}
 }
 
 void ARedPowerCylinder::OnInteractionBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -274,6 +364,7 @@ ABatteryCapsule* ARedPowerCylinder::RemoveBattery()
 	bIsPowered = false;
 
 	UpdateVisualState();
+	UpdateLaserBeam(); // turns off laser!
 
 	return Extracted;
 }
@@ -294,6 +385,7 @@ bool ARedPowerCylinder::InsertBattery(ABatteryCapsule* Battery)
 	{
 		bIsPowered = true;
 		UpdateVisualState(); // turns on glow
+		UpdateLaserBeam();   // fires laser!
 
 		if (GEngine)
 		{
@@ -301,7 +393,7 @@ bool ARedPowerCylinder::InsertBattery(ABatteryCapsule* Battery)
 				-1,
 				4.5f,
 				FColor::Green,
-				FString::Printf(TEXT("[ID MATCH: %d] Battery attached & Cylinder POWERED ON!"), CellID),
+				FString::Printf(TEXT("[ID MATCH: %d] Battery attached & Cylinder POWERED ON! Laser fired!"), CellID),
 				true,
 				FVector2D(1.4f, 1.4f)
 			);
@@ -315,6 +407,7 @@ bool ARedPowerCylinder::InsertBattery(ABatteryCapsule* Battery)
 		// wrong ID: attaches, but cell stays unpowered
 		bIsPowered = false;
 		UpdateVisualState();
+		UpdateLaserBeam(); // keeps laser off
 
 		if (GEngine)
 		{
