@@ -52,26 +52,27 @@ AGAME3023_F26_RoshanCharacter::AGAME3023_F26_RoshanCharacter()
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
 
-	// 2.5d imax top-down camera boom
+	// hades style 2.5d top-down cinematic camera boom
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
 	// locking absolute rotation so the boom NEVER rotates when player turns
 	CameraBoom->SetUsingAbsoluteRotation(true);
 	CameraBoom->TargetArmLength = CameraDistance;
 	CameraBoom->SetRelativeRotation(FRotator(CameraPitch, CameraYaw, 0.0f));
-	CameraBoom->bUsePawnControlRotation = false; // do not spin with mouse
+	CameraBoom->bUsePawnControlRotation = false; // do not spin with mouse or controller
 	CameraBoom->bInheritPitch = false;
 	CameraBoom->bInheritYaw = false;
 	CameraBoom->bInheritRoll = false;
 	// turning off collision test so the camera doesn't zoom in crazy when walking under catwalks
 	CameraBoom->bDoCollisionTest = bEnableCameraCollision;
 	CameraBoom->ProbeSize = 12.0f;
-	CameraBoom->SocketOffset = FVector(0.0f, 0.0f, 100.0f);
+	CameraBoom->SocketOffset = CameraSocketOffset;
 
-	// camera lag gives that smooth drone/crane feel
+	// camera lag gives that smooth drone crane feel
 	CameraBoom->bEnableCameraLag = true;
 	CameraBoom->CameraLagSpeed = CameraLagSpeed;
 	CameraBoom->CameraLagMaxDistance = 600.0f;
+	CameraBoom->bEnableCameraRotationLag = false;
 
 	// follow camera with wide imax fov
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
@@ -83,6 +84,7 @@ AGAME3023_F26_RoshanCharacter::AGAME3023_F26_RoshanCharacter()
 void AGAME3023_F26_RoshanCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
 	// apply our camera settings again here so blueprint defaults don't overwrite them
 	ApplyCinematicCameraSettings();
 
@@ -98,6 +100,16 @@ void AGAME3023_F26_RoshanCharacter::BeginPlay()
 
 	// reset controller rotation to forward
 	if (AController* PC = GetController())
+	{
+		PC->SetControlRotation(FRotator(0.0f, CameraYaw, 0.0f));
+	}
+}
+
+void AGAME3023_F26_RoshanCharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+
+	if (AController* PC = NewController)
 	{
 		PC->SetControlRotation(FRotator(0.0f, CameraYaw, 0.0f));
 	}
@@ -385,6 +397,40 @@ void AGAME3023_F26_RoshanCharacter::OnConstruction(const FTransform& Transform)
 	ApplyCinematicCameraSettings();
 }
 
+#if WITH_EDITOR
+void AGAME3023_F26_RoshanCharacter::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	const FName PropName = PropertyChangedEvent.Property ? PropertyChangedEvent.Property->GetFName() : NAME_None;
+
+	// if user changed TargetArmLength directly on CameraBoom in the components inspector, sync CameraDistance!
+	if (CameraBoom)
+	{
+		if (PropName == GET_MEMBER_NAME_CHECKED(USpringArmComponent, TargetArmLength))
+		{
+			CameraDistance = CameraBoom->TargetArmLength;
+		}
+		else if (PropName == GET_MEMBER_NAME_CHECKED(USpringArmComponent, SocketOffset))
+		{
+			CameraSocketOffset = CameraBoom->SocketOffset;
+		}
+	}
+
+	// if user changed CameraDistance under Cinematic Camera in inspector, push it straight into CameraBoom
+	if (PropName == GET_MEMBER_NAME_CHECKED(AGAME3023_F26_RoshanCharacter, CameraDistance))
+	{
+		if (CameraBoom)
+		{
+			CameraBoom->TargetArmLength = CameraDistance;
+		}
+	}
+
+	// live refresh in viewport
+	ApplyCinematicCameraSettings();
+}
+#endif
+
 void AGAME3023_F26_RoshanCharacter::ApplyCinematicCameraSettings()
 {
 	// lock controller rotation
@@ -401,8 +447,10 @@ void AGAME3023_F26_RoshanCharacter::ApplyCinematicCameraSettings()
 	if (CameraBoom)
 	{
 		CameraBoom->SetUsingAbsoluteRotation(true);
+		CameraBoom->SetRelativeLocation(FVector::ZeroVector);
 		CameraBoom->SetWorldRotation(FRotator(CameraPitch, CameraYaw, 0.0f));
 		CameraBoom->TargetArmLength = CameraDistance;
+		CameraBoom->SocketOffset = CameraSocketOffset;
 		CameraBoom->bUsePawnControlRotation = false;
 		CameraBoom->bInheritPitch = false;
 		CameraBoom->bInheritYaw = false;
@@ -412,7 +460,7 @@ void AGAME3023_F26_RoshanCharacter::ApplyCinematicCameraSettings()
 		CameraBoom->bEnableCameraLag = true;
 		CameraBoom->CameraLagSpeed = CameraLagSpeed;
 		CameraBoom->CameraLagMaxDistance = 600.0f;
-		CameraBoom->SocketOffset = FVector(0.0f, 0.0f, 100.0f);
+		CameraBoom->bEnableCameraRotationLag = false;
 	}
 
 	if (FollowCamera)
@@ -420,6 +468,11 @@ void AGAME3023_F26_RoshanCharacter::ApplyCinematicCameraSettings()
 		FollowCamera->SetFieldOfView(CameraFOV);
 		FollowCamera->bUsePawnControlRotation = false;
 		FollowCamera->SetRelativeRotation(FRotator::ZeroRotator);
+	}
+
+	if (AController* PC = GetController())
+	{
+		PC->SetControlRotation(FRotator(0.0f, CameraYaw, 0.0f));
 	}
 }
 
@@ -499,7 +552,6 @@ void AGAME3023_F26_RoshanCharacter::Move(const FInputActionValue& Value)
 
 void AGAME3023_F26_RoshanCharacter::Look(const FInputActionValue& Value)
 {
-	// do nothing - camera is fixed
 	FVector2D LookAxisVector = Value.Get<FVector2D>();
 	DoLook(LookAxisVector.X, LookAxisVector.Y);
 }
@@ -508,7 +560,7 @@ void AGAME3023_F26_RoshanCharacter::DoMove(float Right, float Forward)
 {
 	if (GetController() != nullptr)
 	{
-		// 2.5d top-down movement:
+		// 2.5d hades top-down movement:
 		// W is always screen up (+X)
 		// S is always screen down (-X)
 		// D is always screen right (+Y)
@@ -525,7 +577,7 @@ void AGAME3023_F26_RoshanCharacter::DoMove(float Right, float Forward)
 
 void AGAME3023_F26_RoshanCharacter::DoLook(float Yaw, float Pitch)
 {
-	// intentionally left empty - top down camera doesn't rotate with mouse
+	// intentionally left empty: player cannot spin or pitch the top-down 2.5d camera
 }
 
 void AGAME3023_F26_RoshanCharacter::DoJumpStart()

@@ -88,25 +88,28 @@ protected:
 	TObjectPtr<AActor> CurrentInteractable;
 
 public:
-	// cinematic 2.5d imax camera settings
-	// fixed top-down angle so the player gets a huge view of the arena
+	// hades style 2.5d top-down cinematic camera
+	// fixed top angle looking down at arena so player gets an imax view and never gets dizzy
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
-	float CameraPitch = -60.0f; // pitch down looking at arena
+	float CameraPitch = -60.0f; // pitch down looking at arena (hades style)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
 	float CameraYaw = 0.0f; // facing forward down x axis
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera", meta = (ClampMin = "200.0", ClampMax = "4000.0"))
+	float CameraDistance = 1600.0f; // arm length for wide arena view (editable in inspector)
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
-	float CameraDistance = 1750.0f; // arm length for wide area view
+	FVector CameraSocketOffset = FVector(0.0f, 0.0f, 100.0f); // slight height offset
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
 	float CameraFOV = 85.0f; // wide imax field of view
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
-	float CameraLagSpeed = 4.0f; // smooth camera tracking speed
+	float CameraLagSpeed = 4.0f; // smooth camera crane tracking speed
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
-	bool bEnableCameraCollision = false; // keep off so camera doesn't zoom in near catwalks
+	bool bEnableCameraCollision = false; // keep off so camera doesn't zoom in crazy when walking under catwalks
 
 	// helper to lock down all camera settings
 	UFUNCTION(BlueprintCallable, Category = "Cinematic Camera")
@@ -120,7 +123,10 @@ public:
 	float ControllerStickDeadZone = 0.2f; // deadzone so stick drift doesn't move the character
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller")
-	bool bEnableRightStickAiming = true; // twin-stick style aiming with right analog stick
+	float GamepadLookSensitivity = 1.5f; // dualsense right stick look speed for death stranding camera
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller")
+	bool bEnableRightStickAiming = true; // twin-stick style aiming fallback if in top-down mode
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller")
 	bool bEnableControllerVibration = true; // rumble feedback when picking up or plugging in batteries
@@ -165,9 +171,15 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void PossessedBy(AController* NewController) override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaTime) override;
 	virtual void OnConstruction(const FTransform& Transform) override;
+
+#if WITH_EDITOR
+	// live update camera when changing settings in the editor inspector details panel
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
 
 	// tracks if enhanced input already handled movement this frame so left stick doesn't double-add
 	bool bMovedViaEnhancedInputThisFrame = false;
