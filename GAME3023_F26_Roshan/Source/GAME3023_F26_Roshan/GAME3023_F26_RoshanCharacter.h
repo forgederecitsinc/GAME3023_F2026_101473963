@@ -203,7 +203,14 @@ protected:
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
 
+	// disable jumping for the player character
+	virtual bool CanJumpInternal_Implementation() const override;
+
 public:
+
+	// jump overrides to prevent jumping
+	virtual void Jump() override;
+	virtual void StopJumping() override;
 
 	// wasd movement handling
 	UFUNCTION(BlueprintCallable, Category="Input")

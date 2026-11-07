@@ -44,9 +44,9 @@ AGAME3023_F26_RoshanCharacter::AGAME3023_F26_RoshanCharacter()
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 650.0f, 0.0f); // snappy rotation speed
 
-	// movement params from template
-	GetCharacterMovement()->JumpZVelocity = 500.f;
-	GetCharacterMovement()->AirControl = 0.35f;
+	// movement params (jumping disabled)
+	GetCharacterMovement()->JumpZVelocity = 0.f;
+	GetCharacterMovement()->AirControl = 0.0f;
 	GetCharacterMovement()->MaxWalkSpeed = 500.f;
 	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
@@ -496,9 +496,9 @@ void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* P
 	// enhanced input bindings
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
 		
-		// jump
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
+		// jump (disabled)
+		// EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
+		// EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 
 		// wasd move
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AGAME3023_F26_RoshanCharacter::Move);
@@ -530,9 +530,9 @@ void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* P
 	PlayerInputComponent->BindKey(EKeys::Q, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery); // Q also works as drop backup
 
 	// dualsense ps5 controller button bindings so gamepad works out of the box!
-	// cross (X button on ps5) -> jump
-	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoJumpStart);
-	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Released, this, &AGAME3023_F26_RoshanCharacter::DoJumpEnd);
+	// cross (X button on ps5) -> jump (disabled)
+	// PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoJumpStart);
+	// PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Released, this, &AGAME3023_F26_RoshanCharacter::DoJumpEnd);
 
 	// square button OR R1 bumper -> interact (pick up battery / plug into cylinder)
 	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Left, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
@@ -582,12 +582,28 @@ void AGAME3023_F26_RoshanCharacter::DoLook(float Yaw, float Pitch)
 
 void AGAME3023_F26_RoshanCharacter::DoJumpStart()
 {
-	Jump();
+	// jumping is disabled
 }
 
 void AGAME3023_F26_RoshanCharacter::DoJumpEnd()
 {
-	StopJumping();
+	// jumping is disabled
+}
+
+bool AGAME3023_F26_RoshanCharacter::CanJumpInternal_Implementation() const
+{
+	// jumping is completely disabled for the player
+	return false;
+}
+
+void AGAME3023_F26_RoshanCharacter::Jump()
+{
+	// jumping is disabled
+}
+
+void AGAME3023_F26_RoshanCharacter::StopJumping()
+{
+	// jumping is disabled
 }
 
 void AGAME3023_F26_RoshanCharacter::DoInteract()
