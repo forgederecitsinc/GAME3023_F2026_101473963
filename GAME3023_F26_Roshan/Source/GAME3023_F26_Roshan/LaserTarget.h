@@ -6,16 +6,15 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "LaserTarget.generated.h"
 
+class UStaticMesh;
 class UStaticMeshComponent;
 class USceneComponent;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
-class ALaserTarget;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnLaserTargetHitStateChanged, ALaserTarget*, HitTarget, bool, bIsHit);
-
-#include "LaserTarget.generated.h"
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnLaserTargetHitStateChanged, ALaserTarget*, Target, bool, bIsHit);
 
 UCLASS()
 class GAME3023_F26_ROSHAN_API ALaserTarget : public AActor
@@ -36,32 +35,30 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Target ID (4-Digit)"))
 	int32 TargetID = 1001;
 
-	// Optional manual color override for the main target body
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Use Custom Color Override"))
-	bool bUseCustomColor = false;
+	// ==========================================
+	// Static Mesh Assets (Editable in BP_LaserTarget & Details panel)
+	// ==========================================
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Meshes", meta = (DisplayName = "Base Pedestal Mesh"))
+	TObjectPtr<UStaticMesh> BasePedestalMeshAsset;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Custom Color", EditCondition = "bUseCustomColor"))
-	FLinearColor CustomColor = FLinearColor(1.0f, 0.10f, 0.12f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Meshes", meta = (DisplayName = "Pillar Column Mesh"))
+	TObjectPtr<UStaticMesh> PostColumnMeshAsset;
 
-	// Base pedestal slab color (clean light industrial concrete/cream)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Base Pedestal Color"))
-	FLinearColor PedestalColor = FLinearColor(0.82f, 0.82f, 0.85f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Meshes", meta = (DisplayName = "Neck Collar Mesh"))
+	TObjectPtr<UStaticMesh> NeckCollarMeshAsset;
 
-	// Pillar post column color (silver metallic alloy)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Pillar Post Color"))
-	FLinearColor PillarColor = FLinearColor(0.80f, 0.82f, 0.86f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Meshes", meta = (DisplayName = "Target Body Mesh"))
+	TObjectPtr<UStaticMesh> TargetBodyMeshAsset;
 
-	// Neck collar plate color (dark industrial charcoal)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Neck Collar Color"))
-	FLinearColor NeckCollarColor = FLinearColor(0.14f, 0.14f, 0.16f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Meshes", meta = (DisplayName = "Top Cap Mesh"))
+	TObjectPtr<UStaticMesh> TopCapMeshAsset;
 
-	// Top cap box color (dark industrial charcoal)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Top Cap Color"))
-	FLinearColor TopCapColor = FLinearColor(0.12f, 0.12f, 0.14f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Meshes", meta = (DisplayName = "Sensor Box Mesh"))
+	TObjectPtr<UStaticMesh> SensorMeshAsset;
 
-	// Side sensor receiver box color (dark charcoal)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Sensor Box Color"))
-	FLinearColor SensorColor = FLinearColor(0.10f, 0.10f, 0.12f);
+	// Optional base flat material used to create dynamic instances
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Base Material"))
+	TObjectPtr<UMaterialInterface> BaseMaterial;
 
 	// Whether to show the bottom base pedestal slab (disable if placing on an existing arena pedestal)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Appearance", meta = (DisplayName = "Show Base Structure"))
@@ -86,8 +83,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Appearance", meta = (DisplayName = "Sensor Box Scale"))
 	FVector SensorBoxScale = FVector(0.50f, 0.40f, 0.45f);
 
+	// Automatically center the sensor box horizontally and vertically on the target body face
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Appearance", meta = (DisplayName = "Auto Center Sensor On Face"))
+	bool bAutoCenterSensor = true;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Appearance", meta = (DisplayName = "Sensor Box Location"))
-	FVector SensorBoxLocation = FVector(55.0f, 98.0f, 185.0f);
+	FVector SensorBoxLocation = FVector(0.0f, 98.0f, 185.0f);
 
 	// Laser hit state
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Gameplay", meta = (DisplayName = "Is Hit By Laser"))
@@ -132,31 +133,31 @@ public:
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
 	FLinearColor GetColorForID(int32 InID) const;
 
-	// Components
+	// Components - EditAnywhere & BlueprintReadWrite so they are fully editable in BP_LaserTarget
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USceneComponent> SceneRoot;
 
 	// 1. Base pedestal slab
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> BasePedestalMesh;
 
 	// 2. Upright pillar column
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> PostColumnMesh;
 
 	// 3. Neck swivel platform collar
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> NeckCollarMesh;
 
 	// 4. Main target receiver body box
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> TargetBodyMesh;
 
 	// 5. Top cap box
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> TopCapMesh;
 
 	// 6. Side sensor / receiver box
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> SensorMesh;
 };

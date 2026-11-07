@@ -29,6 +29,15 @@ ALaserTarget::ALaserTarget()
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> FlatMatFinder(TEXT("/Game/LevelPrototyping/Materials/M_FlatCol.M_FlatCol"));
 	UMaterialInterface* BaseFlatMat = FlatMatFinder.Succeeded() ? FlatMatFinder.Object.Get() : nullptr;
 
+	// Default mesh assets exposed for editing in BP_LaserTarget
+	BasePedestalMeshAsset = CubeMesh;
+	PostColumnMeshAsset = CylinderMesh;
+	NeckCollarMeshAsset = CubeMesh;
+	TargetBodyMeshAsset = CubeMesh;
+	TopCapMeshAsset = CubeMesh;
+	SensorMeshAsset = CubeMesh;
+	BaseMaterial = BaseFlatMat;
+
 	// 1. Base pedestal slab - clean light industrial concrete foundation on floor
 	BasePedestalMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BasePedestalMesh"));
 	BasePedestalMesh->SetupAttachment(RootComponent);
@@ -74,7 +83,7 @@ ALaserTarget::ALaserTarget()
 	if (CubeMesh) TopCapMesh->SetStaticMesh(CubeMesh);
 	if (BaseFlatMat) TopCapMesh->SetMaterial(0, BaseFlatMat);
 
-	// 6. Side sensor / receiver box - dark rectangular sensor attached to side face flush with front
+	// 6. Side sensor / receiver box - dark rectangular sensor centered on the side face
 	SensorMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SensorMesh"));
 	SensorMesh->SetupAttachment(RootComponent);
 	SensorMesh->SetRelativeLocation(SensorBoxLocation);
@@ -95,6 +104,10 @@ void ALaserTarget::OnConstruction(const FTransform& Transform)
 		BasePedestalMesh->SetCollisionEnabled(bShowBaseStructure ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
 		BasePedestalMesh->SetRelativeLocation(FVector(0.0f, 0.0f, -BasePedestalScale.Z * 50.0f));
 		BasePedestalMesh->SetRelativeScale3D(BasePedestalScale);
+		if (BasePedestalMeshAsset)
+		{
+			BasePedestalMesh->SetStaticMesh(BasePedestalMeshAsset);
+		}
 	}
 
 	// 2. Upright pillar column
@@ -102,6 +115,10 @@ void ALaserTarget::OnConstruction(const FTransform& Transform)
 	{
 		PostColumnMesh->SetRelativeLocation(FVector(0.0f, 0.0f, PillarScale.Z * 50.0f));
 		PostColumnMesh->SetRelativeScale3D(PillarScale);
+		if (PostColumnMeshAsset)
+		{
+			PostColumnMesh->SetStaticMesh(PostColumnMeshAsset);
+		}
 	}
 
 	const float PillarTop = PillarScale.Z * 100.0f;
@@ -114,6 +131,10 @@ void ALaserTarget::OnConstruction(const FTransform& Transform)
 	{
 		NeckCollarMesh->SetRelativeLocation(FVector(0.0f, 0.0f, CollarCenter));
 		NeckCollarMesh->SetRelativeScale3D(NeckCollarScale);
+		if (NeckCollarMeshAsset)
+		{
+			NeckCollarMesh->SetStaticMesh(NeckCollarMeshAsset);
+		}
 	}
 
 	const float BodyHeight = TargetBodyScale.Z * 100.0f;
@@ -125,6 +146,10 @@ void ALaserTarget::OnConstruction(const FTransform& Transform)
 	{
 		TargetBodyMesh->SetRelativeLocation(FVector(0.0f, 0.0f, BodyCenter));
 		TargetBodyMesh->SetRelativeScale3D(TargetBodyScale);
+		if (TargetBodyMeshAsset)
+		{
+			TargetBodyMesh->SetStaticMesh(TargetBodyMeshAsset);
+		}
 	}
 
 	const float CapHeight = TopCapScale.Z * 100.0f;
@@ -135,13 +160,28 @@ void ALaserTarget::OnConstruction(const FTransform& Transform)
 	{
 		TopCapMesh->SetRelativeLocation(FVector(0.0f, 0.0f, CapCenter));
 		TopCapMesh->SetRelativeScale3D(TopCapScale);
+		if (TopCapMeshAsset)
+		{
+			TopCapMesh->SetStaticMesh(TopCapMeshAsset);
+		}
 	}
 
 	// 6. Side sensor box
 	if (SensorMesh)
 	{
+		if (bAutoCenterSensor)
+		{
+			const float TargetBodyHalfWidthY = (TargetBodyScale.Y * 100.0f) * 0.5f;
+			const float SensorHalfWidthY = (SensorBoxScale.Y * 100.0f) * 0.5f;
+			SensorBoxLocation = FVector(0.0f, TargetBodyHalfWidthY + SensorHalfWidthY - 2.0f, BodyCenter);
+		}
+
 		SensorMesh->SetRelativeLocation(SensorBoxLocation);
 		SensorMesh->SetRelativeScale3D(SensorBoxScale);
+		if (SensorMeshAsset)
+		{
+			SensorMesh->SetStaticMesh(SensorMeshAsset);
+		}
 	}
 
 	ApplyColors();
@@ -182,95 +222,65 @@ FLinearColor ALaserTarget::GetColorForID(int32 InID) const
 
 void ALaserTarget::ApplyColors()
 {
-	const FLinearColor ChosenColor = bUseCustomColor ? CustomColor : GetColorForID(TargetID);
+	const FLinearColor BodyColor = GetColorForID(TargetID);
+	const FLinearColor SensorColor = FLinearColor(0.10f, 0.10f, 0.12f);
+	const FLinearColor TopCapColor = FLinearColor(0.12f, 0.12f, 0.14f);
+	const FLinearColor NeckCollarColor = FLinearColor(0.14f, 0.14f, 0.16f);
+	const FLinearColor PillarColor = FLinearColor(0.80f, 0.82f, 0.86f);
+	const FLinearColor PedestalColor = FLinearColor(0.82f, 0.82f, 0.85f);
+
+	// Ensure base material is assigned if not set
+	if (BaseMaterial)
+	{
+		if (BasePedestalMesh && !BasePedestalMesh->GetMaterial(0)) BasePedestalMesh->SetMaterial(0, BaseMaterial);
+		if (PostColumnMesh && !PostColumnMesh->GetMaterial(0)) PostColumnMesh->SetMaterial(0, BaseMaterial);
+		if (NeckCollarMesh && !NeckCollarMesh->GetMaterial(0)) NeckCollarMesh->SetMaterial(0, BaseMaterial);
+		if (TargetBodyMesh && !TargetBodyMesh->GetMaterial(0)) TargetBodyMesh->SetMaterial(0, BaseMaterial);
+		if (TopCapMesh && !TopCapMesh->GetMaterial(0)) TopCapMesh->SetMaterial(0, BaseMaterial);
+		if (SensorMesh && !SensorMesh->GetMaterial(0)) SensorMesh->SetMaterial(0, BaseMaterial);
+	}
+
+	auto SetMeshColor = [](UStaticMeshComponent* MeshComp, const FLinearColor& BaseCol, const FLinearColor& EmissiveCol) -> UMaterialInstanceDynamic*
+	{
+		if (!MeshComp) return nullptr;
+		UMaterialInstanceDynamic* Dyn = Cast<UMaterialInstanceDynamic>(MeshComp->GetMaterial(0));
+		if (!Dyn)
+		{
+			Dyn = MeshComp->CreateAndSetMaterialInstanceDynamic(0);
+		}
+		if (Dyn)
+		{
+			// M_FlatCol uses "Base Color" (with space), custom materials may use "BaseColor" or "Color"
+			Dyn->SetVectorParameterValue(TEXT("Base Color"), BaseCol);
+			Dyn->SetVectorParameterValue(TEXT("BaseColor"), BaseCol);
+			Dyn->SetVectorParameterValue(TEXT("Color"), BaseCol);
+			Dyn->SetVectorParameterValue(TEXT("Tint"), BaseCol);
+			Dyn->SetVectorParameterValue(TEXT("Emissive Color"), EmissiveCol);
+			Dyn->SetVectorParameterValue(TEXT("EmissiveColor"), EmissiveCol);
+			Dyn->SetVectorParameterValue(TEXT("Emissive"), EmissiveCol);
+		}
+		return Dyn;
+	};
 
 	// 1. Base pedestal slab (clean industrial concrete/cream)
-	if (BasePedestalMesh)
-	{
-		PedestalDynamicMaterial = BasePedestalMesh->CreateAndSetMaterialInstanceDynamic(0);
-		if (PedestalDynamicMaterial)
-		{
-			PedestalDynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), PedestalColor);
-			PedestalDynamicMaterial->SetVectorParameterValue(TEXT("Color"), PedestalColor);
-		}
-	}
+	PedestalDynamicMaterial = SetMeshColor(BasePedestalMesh, PedestalColor, FLinearColor::Black);
 
-	// 2. Pillar post column (silver metallic alloy)
-	if (PostColumnMesh)
-	{
-		PillarDynamicMaterial = PostColumnMesh->CreateAndSetMaterialInstanceDynamic(0);
-		if (PillarDynamicMaterial)
-		{
-			PillarDynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), PillarColor);
-			PillarDynamicMaterial->SetVectorParameterValue(TEXT("Color"), PillarColor);
-		}
-	}
+	// 2. Upright pillar column (silver metallic alloy)
+	PillarDynamicMaterial = SetMeshColor(PostColumnMesh, PillarColor, FLinearColor::Black);
 
 	// 3. Neck collar plate (dark industrial charcoal)
-	if (NeckCollarMesh)
-	{
-		CollarDynamicMaterial = NeckCollarMesh->CreateAndSetMaterialInstanceDynamic(0);
-		if (CollarDynamicMaterial)
-		{
-			CollarDynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), NeckCollarColor);
-			CollarDynamicMaterial->SetVectorParameterValue(TEXT("Color"), NeckCollarColor);
-		}
-	}
+	CollarDynamicMaterial = SetMeshColor(NeckCollarMesh, NeckCollarColor, FLinearColor::Black);
 
-	// 4. Main target receiver body box (vibrant target red)
-	if (TargetBodyMesh)
-	{
-		BodyDynamicMaterial = TargetBodyMesh->CreateAndSetMaterialInstanceDynamic(0);
-		if (BodyDynamicMaterial)
-		{
-			BodyDynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), ChosenColor);
-			BodyDynamicMaterial->SetVectorParameterValue(TEXT("Color"), ChosenColor);
-
-			if (bIsHitByLaser && bGlowWhenHit)
-			{
-				BodyDynamicMaterial->SetVectorParameterValue(TEXT("EmissiveColor"), ChosenColor * 3.0f);
-				BodyDynamicMaterial->SetVectorParameterValue(TEXT("Emissive"), ChosenColor * 3.0f);
-			}
-			else
-			{
-				BodyDynamicMaterial->SetVectorParameterValue(TEXT("EmissiveColor"), FLinearColor::Black);
-				BodyDynamicMaterial->SetVectorParameterValue(TEXT("Emissive"), FLinearColor::Black);
-			}
-		}
-	}
+	// 4. Main target receiver body box (vibrant target color, glows on hit)
+	const FLinearColor BodyEmissive = (bIsHitByLaser && bGlowWhenHit) ? (BodyColor * 3.0f) : FLinearColor::Black;
+	BodyDynamicMaterial = SetMeshColor(TargetBodyMesh, BodyColor, BodyEmissive);
 
 	// 5. Top cap box (dark charcoal)
-	if (TopCapMesh)
-	{
-		CapDynamicMaterial = TopCapMesh->CreateAndSetMaterialInstanceDynamic(0);
-		if (CapDynamicMaterial)
-		{
-			CapDynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), TopCapColor);
-			CapDynamicMaterial->SetVectorParameterValue(TEXT("Color"), TopCapColor);
-		}
-	}
+	CapDynamicMaterial = SetMeshColor(TopCapMesh, TopCapColor, FLinearColor::Black);
 
 	// 6. Side sensor / receiver box (dark charcoal, glows on hit)
-	if (SensorMesh)
-	{
-		SensorDynamicMaterial = SensorMesh->CreateAndSetMaterialInstanceDynamic(0);
-		if (SensorDynamicMaterial)
-		{
-			SensorDynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), SensorColor);
-			SensorDynamicMaterial->SetVectorParameterValue(TEXT("Color"), SensorColor);
-
-			if (bIsHitByLaser && bGlowWhenHit)
-			{
-				SensorDynamicMaterial->SetVectorParameterValue(TEXT("EmissiveColor"), ChosenColor * 5.0f);
-				SensorDynamicMaterial->SetVectorParameterValue(TEXT("Emissive"), ChosenColor * 5.0f);
-			}
-			else
-			{
-				SensorDynamicMaterial->SetVectorParameterValue(TEXT("EmissiveColor"), FLinearColor::Black);
-				SensorDynamicMaterial->SetVectorParameterValue(TEXT("Emissive"), FLinearColor::Black);
-			}
-		}
-	}
+	const FLinearColor SensorEmissive = (bIsHitByLaser && bGlowWhenHit) ? (BodyColor * 5.0f) : FLinearColor::Black;
+	SensorDynamicMaterial = SetMeshColor(SensorMesh, SensorColor, SensorEmissive);
 }
 
 void ALaserTarget::SetLaserHit(bool bHit, AActor* SourceActor)
