@@ -32,19 +32,9 @@ ABatteryCapsule::ABatteryCapsule()
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMeshFinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	UStaticMesh* CylinderMesh = CylinderMeshFinder.Succeeded() ? CylinderMeshFinder.Object : nullptr;
 
-	// load level prototyping and blockout materials
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> CharcoalMatFinder(TEXT("/Game/Blockouts/Materials/Colors/M_COL_Charcoal.M_COL_Charcoal"));
-	UMaterialInterface* CharcoalMat = CharcoalMatFinder.Succeeded() ? CharcoalMatFinder.Object : nullptr;
-
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> CreamMatFinder(TEXT("/Game/Blockouts/Materials/Colors/M_COL_Cream.M_COL_Cream"));
-	UMaterialInterface* CreamMat = CreamMatFinder.Succeeded() ? CreamMatFinder.Object : nullptr;
-
+	// load level prototyping base flat material
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> FlatMatFinder(TEXT("/Game/LevelPrototyping/Materials/M_FlatCol.M_FlatCol"));
 	UMaterialInterface* FlatMat = FlatMatFinder.Succeeded() ? FlatMatFinder.Object : nullptr;
-
-	// fallback to flat prototype material if specific color assets are missing
-	if (!CharcoalMat) CharcoalMat = FlatMat;
-	if (!CreamMat) CreamMat = FlatMat;
 
 	// 1. base plinth foundation - sharp dark charcoal square slab at the bottom (140x140x20 cm)
 	BasePlinthMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BasePlinthMesh"));
@@ -53,7 +43,7 @@ ABatteryCapsule::ABatteryCapsule()
 	BasePlinthMesh->SetRelativeScale3D(FVector(1.40f, 1.40f, 0.20f));
 	BasePlinthMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 	if (CubeMesh) BasePlinthMesh->SetStaticMesh(CubeMesh);
-	if (CharcoalMat) BasePlinthMesh->SetMaterial(0, CharcoalMat);
+	if (FlatMat) BasePlinthMesh->SetMaterial(0, FlatMat);
 
 	// 2. base pedestal plate - sharp light cream square slab (115x115x30 cm)
 	BasePedestalMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BasePedestalMesh"));
@@ -62,7 +52,7 @@ ABatteryCapsule::ABatteryCapsule()
 	BasePedestalMesh->SetRelativeScale3D(FVector(1.15f, 1.15f, 0.30f));
 	BasePedestalMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 	if (CubeMesh) BasePedestalMesh->SetStaticMesh(CubeMesh);
-	if (CreamMat) BasePedestalMesh->SetMaterial(0, CreamMat);
+	if (FlatMat) BasePedestalMesh->SetMaterial(0, FlatMat);
 
 	// 3. central battery cylinder cell core (80 cm dia, 140 cm height)
 	BatteryMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BatteryMesh"));
@@ -80,7 +70,7 @@ ABatteryCapsule::ABatteryCapsule()
 	TopCapMesh->SetRelativeScale3D(FVector(0.95f, 0.95f, 0.24f));
 	TopCapMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 	if (CubeMesh) TopCapMesh->SetStaticMesh(CubeMesh);
-	if (CharcoalMat) TopCapMesh->SetMaterial(0, CharcoalMat);
+	if (FlatMat) TopCapMesh->SetMaterial(0, FlatMat);
 
 	// 5. interaction trigger zone for collecting battery with E key
 	InteractionZone = CreateDefaultSubobject<USphereComponent>(TEXT("InteractionZone"));
@@ -96,6 +86,16 @@ void ABatteryCapsule::OnConstruction(const FTransform& Transform)
 	BuildBatteryComponents();
 	ApplyColorFromID();
 }
+
+#if WITH_EDITOR
+void ABatteryCapsule::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	BuildBatteryComponents();
+	ApplyColorFromID();
+}
+#endif
 
 void ABatteryCapsule::BeginPlay()
 {
@@ -116,12 +116,7 @@ void ABatteryCapsule::BuildBatteryComponents()
 	// load primitives dynamically for existing level or blueprint instances
 	UStaticMesh* CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
 	UStaticMesh* CylinderMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-	UMaterialInterface* CharcoalMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Blockouts/Materials/Colors/M_COL_Charcoal.M_COL_Charcoal"));
-	UMaterialInterface* CreamMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Blockouts/Materials/Colors/M_COL_Cream.M_COL_Cream"));
 	UMaterialInterface* FlatMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/LevelPrototyping/Materials/M_FlatCol.M_FlatCol"));
-
-	if (!CharcoalMat) CharcoalMat = FlatMat;
-	if (!CreamMat) CreamMat = FlatMat;
 
 	// ensure base plinth mesh exists
 	if (!BasePlinthMesh)
@@ -141,9 +136,9 @@ void ABatteryCapsule::BuildBatteryComponents()
 		BasePlinthMesh->SetRelativeScale3D(FVector(1.40f, 1.40f, 0.20f));
 		BasePlinthMesh->SetRelativeRotation(FRotator::ZeroRotator);
 		BasePlinthMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
-		if (CubeMesh) BasePlinthMesh->SetStaticMesh(CubeMesh);
+		if (CubeMesh && !BasePlinthMesh->GetStaticMesh()) BasePlinthMesh->SetStaticMesh(CubeMesh);
 		if (PlinthMaterial) BasePlinthMesh->SetMaterial(0, PlinthMaterial);
-		else if (CharcoalMat) BasePlinthMesh->SetMaterial(0, CharcoalMat);
+		else if (FlatMat && !BasePlinthMesh->GetMaterial(0)) BasePlinthMesh->SetMaterial(0, FlatMat);
 	}
 
 	// ensure base pedestal mesh exists
@@ -164,9 +159,9 @@ void ABatteryCapsule::BuildBatteryComponents()
 		BasePedestalMesh->SetRelativeScale3D(FVector(1.15f, 1.15f, 0.30f));
 		BasePedestalMesh->SetRelativeRotation(FRotator::ZeroRotator);
 		BasePedestalMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
-		if (CubeMesh) BasePedestalMesh->SetStaticMesh(CubeMesh);
+		if (CubeMesh && !BasePedestalMesh->GetStaticMesh()) BasePedestalMesh->SetStaticMesh(CubeMesh);
 		if (PedestalMaterial) BasePedestalMesh->SetMaterial(0, PedestalMaterial);
-		else if (CreamMat) BasePedestalMesh->SetMaterial(0, CreamMat);
+		else if (FlatMat && !BasePedestalMesh->GetMaterial(0)) BasePedestalMesh->SetMaterial(0, FlatMat);
 	}
 
 	// configure battery cylinder core
@@ -176,8 +171,8 @@ void ABatteryCapsule::BuildBatteryComponents()
 		BatteryMesh->SetRelativeScale3D(FVector(0.80f, 0.80f, 1.40f));
 		BatteryMesh->SetRelativeRotation(FRotator::ZeroRotator);
 		BatteryMesh->SetCollisionProfileName(TEXT("NoCollision"));
-		if (CylinderMesh) BatteryMesh->SetStaticMesh(CylinderMesh);
-		if (FlatMat) BatteryMesh->SetMaterial(0, FlatMat);
+		if (CylinderMesh && !BatteryMesh->GetStaticMesh()) BatteryMesh->SetStaticMesh(CylinderMesh);
+		if (FlatMat && !BatteryMesh->GetMaterial(0)) BatteryMesh->SetMaterial(0, FlatMat);
 	}
 
 	// ensure top terminal cap mesh exists
@@ -197,9 +192,9 @@ void ABatteryCapsule::BuildBatteryComponents()
 		TopCapMesh->SetRelativeScale3D(FVector(0.95f, 0.95f, 0.24f));
 		TopCapMesh->SetRelativeRotation(FRotator::ZeroRotator);
 		TopCapMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
-		if (CubeMesh) TopCapMesh->SetStaticMesh(CubeMesh);
+		if (CubeMesh && !TopCapMesh->GetStaticMesh()) TopCapMesh->SetStaticMesh(CubeMesh);
 		if (TopCapMaterial) TopCapMesh->SetMaterial(0, TopCapMaterial);
-		else if (CharcoalMat) TopCapMesh->SetMaterial(0, CharcoalMat);
+		else if (FlatMat && !TopCapMesh->GetMaterial(0)) TopCapMesh->SetMaterial(0, FlatMat);
 	}
 }
 
@@ -226,55 +221,53 @@ FLinearColor ABatteryCapsule::GetColorForID(int32 InID) const
 
 void ABatteryCapsule::ApplyColorFromID()
 {
-	const FLinearColor ChosenColor = bUseCustomColor ? CustomColor : GetColorForID(BatteryID);
+	const FLinearColor ChosenColor = GetColorForID(BatteryID);
+	UMaterialInterface* FlatMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/LevelPrototyping/Materials/M_FlatCol.M_FlatCol"));
 
-	// 1. battery central cylinder glow
-	if (BatteryMesh)
+	auto SetMeshColor = [FlatMat](UStaticMeshComponent* MeshComp, const FLinearColor& BaseCol, const FLinearColor& EmissiveCol, UMaterialInterface* CustomMat) -> UMaterialInstanceDynamic*
 	{
-		if (!DynamicMaterial)
+		if (!MeshComp) return nullptr;
+		if (CustomMat)
 		{
-			DynamicMaterial = BatteryMesh->CreateAndSetMaterialInstanceDynamic(0);
+			MeshComp->SetMaterial(0, CustomMat);
+			return nullptr;
 		}
-		if (DynamicMaterial)
-		{
-			DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), ChosenColor);
-			DynamicMaterial->SetVectorParameterValue(TEXT("Color"), ChosenColor);
-			DynamicMaterial->SetVectorParameterValue(TEXT("Emissive"), ChosenColor * 1.5f);
-		}
-	}
 
-	// 2. base plinth foundation (dark charcoal)
-	if (BasePlinthMesh && !PlinthMaterial)
-	{
-		UMaterialInstanceDynamic* PlinthDyn = BasePlinthMesh->CreateAndSetMaterialInstanceDynamic(0);
-		if (PlinthDyn)
+		UMaterialInstanceDynamic* Dyn = Cast<UMaterialInstanceDynamic>(MeshComp->GetMaterial(0));
+		if (!Dyn)
 		{
-			PlinthDyn->SetVectorParameterValue(TEXT("BaseColor"), PlinthColor);
-			PlinthDyn->SetVectorParameterValue(TEXT("Color"), PlinthColor);
+			if (FlatMat)
+			{
+				Dyn = UMaterialInstanceDynamic::Create(FlatMat, MeshComp);
+				MeshComp->SetMaterial(0, Dyn);
+			}
+			else
+			{
+				Dyn = MeshComp->CreateAndSetMaterialInstanceDynamic(0);
+			}
 		}
-	}
 
-	// 3. base pedestal plate (clean cream)
-	if (BasePedestalMesh && !PedestalMaterial)
-	{
-		UMaterialInstanceDynamic* PedestalDyn = BasePedestalMesh->CreateAndSetMaterialInstanceDynamic(0);
-		if (PedestalDyn)
+		if (Dyn)
 		{
-			PedestalDyn->SetVectorParameterValue(TEXT("BaseColor"), PedestalColor);
-			PedestalDyn->SetVectorParameterValue(TEXT("Color"), PedestalColor);
+			Dyn->SetVectorParameterValue(TEXT("BaseColor"), BaseCol);
+			Dyn->SetVectorParameterValue(TEXT("Color"), BaseCol);
+			Dyn->SetVectorParameterValue(TEXT("EmissiveColor"), EmissiveCol);
+			Dyn->SetVectorParameterValue(TEXT("Emissive"), EmissiveCol);
 		}
-	}
+		return Dyn;
+	};
 
-	// 4. top terminal cap (dark charcoal)
-	if (TopCapMesh && !TopCapMaterial)
-	{
-		UMaterialInstanceDynamic* TopCapDyn = TopCapMesh->CreateAndSetMaterialInstanceDynamic(0);
-		if (TopCapDyn)
-		{
-			TopCapDyn->SetVectorParameterValue(TEXT("BaseColor"), TopCapColor);
-			TopCapDyn->SetVectorParameterValue(TEXT("Color"), TopCapColor);
-		}
-	}
+	// 1. Central battery core (glowing cyan energy)
+	DynamicMaterial = SetMeshColor(BatteryMesh, ChosenColor, ChosenColor * 3.0f, nullptr);
+
+	// 2. Base plinth foundation (#383F4C)
+	SetMeshColor(BasePlinthMesh, PlinthColor, FLinearColor::Black, PlinthMaterial);
+
+	// 3. Base pedestal slab (#1A1D24)
+	SetMeshColor(BasePedestalMesh, PedestalColor, FLinearColor::Black, PedestalMaterial);
+
+	// 4. Top terminal cap (#222730)
+	SetMeshColor(TopCapMesh, TopCapColor, FLinearColor::Black, TopCapMaterial);
 }
 
 void ABatteryCapsule::Tick(float DeltaTime)

@@ -26,6 +26,9 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnConstruction(const FTransform& Transform) override;
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
 
 public:	
 	virtual void Tick(float DeltaTime) override;
@@ -35,24 +38,24 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Battery ID (4-Digit)"))
 	int32 BatteryID = 1001;
 
-	// optional checkbox to manually pick a custom color override
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Use Custom Color Override"))
+	// Legacy backward-compatibility aliases (non-instance-editable)
+	UPROPERTY()
 	bool bUseCustomColor = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Custom Color", EditCondition = "bUseCustomColor"))
-	FLinearColor CustomColor = FLinearColor(0.1f, 0.85f, 0.2f);
+	UPROPERTY()
+	FLinearColor CustomColor = FLinearColor(0.0000f, 0.8714f, 1.0000f);
 
-	// base plinth foundation color (dark charcoal)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Base Plinth Color"))
-	FLinearColor PlinthColor = FLinearColor(0.12f, 0.12f, 0.14f);
+	// Base mesh foundation colors (fixed industrial palette matching arena blockout)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "LiveWire|Appearance", meta = (DisplayName = "Base Plinth Color"))
+	FLinearColor PlinthColor = FLinearColor(0.0395f, 0.0497f, 0.0723f); // #383F4C
 
-	// base pedestal slab color (clean light industrial cream/concrete)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Base Pedestal Color"))
-	FLinearColor PedestalColor = FLinearColor(0.85f, 0.85f, 0.82f);
+	// Base pedestal slab color (matte deep slate / charcoal #1A1D24)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "LiveWire|Appearance", meta = (DisplayName = "Base Pedestal Color"))
+	FLinearColor PedestalColor = FLinearColor(0.0103f, 0.0123f, 0.0176f); // #1A1D24
 
-	// top terminal cap color (dark charcoal)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Top Cap Color"))
-	FLinearColor TopCapColor = FLinearColor(0.12f, 0.12f, 0.14f);
+	// Top terminal cap color (anodized dark alloy #222730)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "LiveWire|Appearance", meta = (DisplayName = "Top Cap Color"))
+	FLinearColor TopCapColor = FLinearColor(0.0160f, 0.0203f, 0.0296f); // #222730
 
 	// runtime dynamic material instance for battery cylinder glow
 	UPROPERTY(Transient)
