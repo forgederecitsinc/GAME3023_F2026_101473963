@@ -7,6 +7,12 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
+#include "CombatDamageable.h"
+
+// Delegates for player health events
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnPlayerHealthChanged, float, CurrentHealth, float, MaxHealth, float, DeltaHealth);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerDied);
+
 #include "GAME3023_F26_RoshanCharacter.generated.h"
 
 class USpringArmComponent;
@@ -48,7 +54,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 // main player character for the project
 UCLASS(abstract)
-class AGAME3023_F26_RoshanCharacter : public ACharacter
+class AGAME3023_F26_RoshanCharacter : public ACharacter, public ICombatDamageable
 {
 	GENERATED_BODY()
 
@@ -327,6 +333,75 @@ public:
 	// Currently active 2D audio component playing the background music
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Audio", meta = (DisplayName = "Active BGM Audio Component"))
 	TObjectPtr<UAudioComponent> BGMAudioComponent;
+
+	// ==========================================
+	// LiveWire Player Health System
+	// ==========================================
+
+	// Maximum health points for the player
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (ClampMin = "1.0", DisplayName = "Max Health"))
+	float MaxHealth = 100.0f;
+
+	// Current health points for the player (starts at 100 when game begins)
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (DisplayName = "Current Health"))
+	float CurrentHealth = 100.0f;
+
+	// Whether the player is currently dead
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Health", meta = (DisplayName = "Is Dead"))
+	bool bIsDead = false;
+
+	// Event fired when player health changes (CurrentHealth, MaxHealth, DeltaHealth)
+	UPROPERTY(BlueprintAssignable, Category = "LiveWire|Health")
+	FOnPlayerHealthChanged OnHealthChanged;
+
+	// Event fired when player health reaches zero
+	UPROPERTY(BlueprintAssignable, Category = "LiveWire|Health")
+	FOnPlayerDied OnPlayerDied;
+
+	// Standard Unreal Engine TakeDamage override
+	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
+
+	// ICombatDamageable interface implementation
+	virtual void ApplyDamage(float Damage, AActor* DamageCauser, const FVector& DamageLocation, const FVector& DamageImpulse) override;
+	virtual void HandleDeath() override;
+	virtual void ApplyHealing(float Healing, AActor* Healer) override;
+	virtual void NotifyDanger(const FVector& DangerLocation, AActor* DangerSource) override;
+
+	// Deals damage to player and updates health points
+	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
+	void ApplyDamageToPlayer(float DamageAmount, AActor* DamageCauser = nullptr);
+
+	// Heals the player by a specified amount up to MaxHealth
+	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
+	void HealPlayer(float HealAmount);
+
+	// Directly sets the player's health points
+	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
+	void SetHealth(float NewHealth);
+
+	// Resets player health back to MaxHealth (100) and revives player
+	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
+	void ResetHealth();
+
+	// Health getters
+	UFUNCTION(BlueprintPure, Category = "LiveWire|Health")
+	float GetCurrentHealth() const { return CurrentHealth; }
+
+	UFUNCTION(BlueprintPure, Category = "LiveWire|Health")
+	float GetMaxHealth() const { return MaxHealth; }
+
+	UFUNCTION(BlueprintPure, Category = "LiveWire|Health")
+	float GetHealthPercent() const { return MaxHealth > 0.0f ? FMath::Clamp(CurrentHealth / MaxHealth, 0.0f, 1.0f) : 0.0f; }
+
+	UFUNCTION(BlueprintPure, Category = "LiveWire|Health")
+	bool IsDead() const { return bIsDead; }
+
+	// Convenience HP aliases
+	UFUNCTION(BlueprintPure, Category = "LiveWire|Health", meta = (DisplayName = "Get Current HP"))
+	float GetCurrentHP() const { return CurrentHealth; }
+
+	UFUNCTION(BlueprintPure, Category = "LiveWire|Health", meta = (DisplayName = "Get Max HP"))
+	float GetMaxHP() const { return MaxHealth; }
 
 public:
 

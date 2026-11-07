@@ -4,6 +4,7 @@
 
 #include "GAME3023_F26_RoshanCharacter.h"
 #include "Engine/LocalPlayer.h"
+#include "Engine/DamageEvents.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -95,6 +96,11 @@ AGAME3023_F26_RoshanCharacter::AGAME3023_F26_RoshanCharacter()
 	{
 		BackgroundMusicTrack = BGMFinder.Object;
 	}
+
+	// player health: starts with 100 HP
+	MaxHealth = 100.0f;
+	CurrentHealth = 100.0f;
+	bIsDead = false;
 }
 
 void AGAME3023_F26_RoshanCharacter::BeginPlay()
@@ -125,6 +131,11 @@ void AGAME3023_F26_RoshanCharacter::BeginPlay()
 	{
 		InitInteractionPromptWidget();
 	}
+
+	// player starts with 100 health points when game starts
+	CurrentHealth = MaxHealth;
+	bIsDead = false;
+	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth, 0.0f);
 
 	// start playing LiveWire background music the moment the player starts playing
 	if (bAutoPlayBGM && IsLocallyControlled())
@@ -984,19 +995,17 @@ void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
 		InteractionPromptWidget->bAnchorToScreenBottom = bAnchorPromptToScreenBottom;
 
 		FString ActionStr = TEXT("Press Square to Interact");
-		FString TargetStr = BestCandidate->GetName();
+		FString TargetStr = TEXT("");
 
 		if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(BestCandidate))
 		{
 			if (HasBattery())
 			{
 				ActionStr = TEXT("Hands Full (Drop Battery First)");
-				TargetStr = FString::Printf(TEXT("Battery Capsule (ID: %d)"), Battery->BatteryID);
 			}
 			else
 			{
 				ActionStr = TEXT("Press Square to Collect Battery");
-				TargetStr = FString::Printf(TEXT("Battery Capsule (ID: %d)"), Battery->BatteryID);
 			}
 		}
 		else if (ARedPowerCylinder* Cylinder = Cast<ARedPowerCylinder>(BestCandidate))
@@ -1004,17 +1013,14 @@ void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
 			if (Cylinder->bHasBattery)
 			{
 				ActionStr = TEXT("Press Square to Remove Battery");
-				TargetStr = FString::Printf(TEXT("Laser Gun (ID: %d) - Online"), Cylinder->CellID);
 			}
 			else if (HasBattery())
 			{
 				ActionStr = TEXT("Press Square to Attach Battery");
-				TargetStr = FString::Printf(TEXT("Laser Gun (ID: %d) - Ready"), Cylinder->CellID);
 			}
 			else
 			{
-				ActionStr = TEXT("Press Square to Inspect");
-				TargetStr = FString::Printf(TEXT("Laser Gun (ID: %d) - Offline"), Cylinder->CellID);
+				ActionStr = TEXT("Laser Gun (Requires Battery)");
 			}
 		}
 
@@ -1118,5 +1124,145 @@ void AGAME3023_F26_RoshanCharacter::OnBGMAudioFinished()
 	{
 		BGMAudioComponent->Play();
 	}
+}
+
+// ==========================================
+// LiveWire Player Health System
+// ==========================================
+
+float AGAME3023_F26_RoshanCharacter::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	if (bIsDead || DamageAmount <= 0.0f)
+	{
+		return 0.0f;
+	}
+
+	const float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	ApplyDamageToPlayer(ActualDamage, DamageCauser);
+	return ActualDamage;
+}
+
+void AGAME3023_F26_RoshanCharacter::ApplyDamage(float Damage, AActor* DamageCauser, const FVector& DamageLocation, const FVector& DamageImpulse)
+{
+	if (DamageImpulse.SizeSquared() > 0.0f && GetCharacterMovement())
+	{
+		GetCharacterMovement()->AddImpulse(DamageImpulse, true);
+	}
+	ApplyDamageToPlayer(Damage, DamageCauser);
+}
+
+void AGAME3023_F26_RoshanCharacter::HandleDeath()
+{
+	bIsDead = true;
+	UE_LOG(LogTemplateCharacter, Warning, TEXT("[LiveWire Health] Player '%s' died!"), *GetNameSafe(this));
+
+	OnPlayerDied.Broadcast();
+
+	// drop carried battery if player is carrying one
+	if (HasBattery())
+	{
+		DropCurrentBattery();
+	}
+
+	// disable player movement on death
+	if (GetCharacterMovement())
+	{
+		GetCharacterMovement()->DisableMovement();
+		GetCharacterMovement()->StopMovementImmediately();
+	}
+
+	// dualsense rumble pulse on death
+	if (bEnableControllerVibration)
+	{
+		TriggerControllerRumble(1.0f, 0.5f, true, true);
+	}
+}
+
+void AGAME3023_F26_RoshanCharacter::ApplyHealing(float Healing, AActor* Healer)
+{
+	HealPlayer(Healing);
+}
+
+void AGAME3023_F26_RoshanCharacter::NotifyDanger(const FVector& DangerLocation, AActor* DangerSource)
+{
+	// danger notification warning
+}
+
+void AGAME3023_F26_RoshanCharacter::ApplyDamageToPlayer(float DamageAmount, AActor* DamageCauser)
+{
+	if (bIsDead || DamageAmount <= 0.0f)
+	{
+		return;
+	}
+
+	const float OldHealth = CurrentHealth;
+	CurrentHealth = FMath::Clamp(CurrentHealth - DamageAmount, 0.0f, MaxHealth);
+	const float DeltaHealth = CurrentHealth - OldHealth;
+
+	UE_LOG(LogTemplateCharacter, Log, TEXT("[LiveWire Health] Player took %.1f damage from '%s'. Health: %.1f / %.1f"),
+		DamageAmount, *GetNameSafe(DamageCauser), CurrentHealth, MaxHealth);
+
+	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth, DeltaHealth);
+
+	// rumble feedback when player takes damage
+	if (bEnableControllerVibration)
+	{
+		TriggerControllerRumble(0.75f, 0.2f, true, false);
+	}
+
+	if (CurrentHealth <= 0.0f)
+	{
+		HandleDeath();
+	}
+}
+
+void AGAME3023_F26_RoshanCharacter::HealPlayer(float HealAmount)
+{
+	if (bIsDead || HealAmount <= 0.0f || CurrentHealth >= MaxHealth)
+	{
+		return;
+	}
+
+	const float OldHealth = CurrentHealth;
+	CurrentHealth = FMath::Clamp(CurrentHealth + HealAmount, 0.0f, MaxHealth);
+	const float DeltaHealth = CurrentHealth - OldHealth;
+
+	UE_LOG(LogTemplateCharacter, Log, TEXT("[LiveWire Health] Player healed for %.1f. Health: %.1f / %.1f"),
+		HealAmount, CurrentHealth, MaxHealth);
+
+	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth, DeltaHealth);
+}
+
+void AGAME3023_F26_RoshanCharacter::SetHealth(float NewHealth)
+{
+	const float OldHealth = CurrentHealth;
+	CurrentHealth = FMath::Clamp(NewHealth, 0.0f, MaxHealth);
+	const float DeltaHealth = CurrentHealth - OldHealth;
+
+	if (bIsDead && CurrentHealth > 0.0f)
+	{
+		bIsDead = false;
+		if (GetCharacterMovement())
+		{
+			GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+		}
+	}
+
+	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth, DeltaHealth);
+
+	if (CurrentHealth <= 0.0f && !bIsDead)
+	{
+		HandleDeath();
+	}
+}
+
+void AGAME3023_F26_RoshanCharacter::ResetHealth()
+{
+	bIsDead = false;
+	if (GetCharacterMovement())
+	{
+		GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	}
+	SetHealth(MaxHealth);
 }
 
