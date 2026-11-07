@@ -41,6 +41,8 @@ struct FOccludingMeshData
 };
 
 class UInteractPromptWidget;
+class USoundBase;
+class UAudioComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -286,6 +288,45 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Interaction UI")
 	void UpdateInteractionPrompt(float DeltaTime);
 
+	// ==========================================
+	// LiveWire Background Music (BGM)
+	// ==========================================
+
+	// Background music track asset to play (defaults to /Game/Sound/LiveWire_Substation_Theme)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Audio", meta = (DisplayName = "Background Music Track"))
+	TObjectPtr<USoundBase> BackgroundMusicTrack;
+
+	// Volume multiplier for the background music (0.0 = silent, 1.0 = normal, clamp 0 to 2)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Audio", meta = (DisplayName = "BGM Volume", ClampMin = "0.0", ClampMax = "2.0", UIMin = "0.0", UIMax = "1.0"))
+	float BGMVolume = 0.65f;
+
+	// Pitch multiplier for the background music (1.0 = normal speed/pitch)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Audio", meta = (DisplayName = "BGM Pitch", ClampMin = "0.2", ClampMax = "2.0"))
+	float BGMPitch = 1.0f;
+
+	// Whether background music starts playing automatically the moment player enters the level
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Audio", meta = (DisplayName = "Auto-Play BGM On Start"))
+	bool bAutoPlayBGM = true;
+
+	// Starts playing the background music track (loops continuously)
+	UFUNCTION(BlueprintCallable, Category = "LiveWire|Audio")
+	void PlayBackgroundMusic();
+
+	// Stops the background music track
+	UFUNCTION(BlueprintCallable, Category = "LiveWire|Audio")
+	void StopBackgroundMusic();
+
+	// Sets the volume of the background music at runtime
+	UFUNCTION(BlueprintCallable, Category = "LiveWire|Audio")
+	void SetBGMVolume(float NewVolume);
+
+	// Called automatically when the BGM track reaches the end to loop it seamlessly
+	UFUNCTION()
+	void OnBGMAudioFinished();
+
+	// Currently active 2D audio component playing the background music
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Audio", meta = (DisplayName = "Active BGM Audio Component"))
+	TObjectPtr<UAudioComponent> BGMAudioComponent;
 
 public:
 

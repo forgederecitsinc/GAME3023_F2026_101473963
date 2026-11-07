@@ -28,6 +28,11 @@
 #include "UObject/UObjectGlobals.h"
 #include "UObject/Package.h"
 #include "UObject/ObjectKey.h"
+#include "Components/AudioComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
+#include "Sound/SoundWave.h"
+#include "UObject/ConstructorHelpers.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -84,6 +89,12 @@ AGAME3023_F26_RoshanCharacter::AGAME3023_F26_RoshanCharacter()
 	FollowCamera->bUsePawnControlRotation = false;
 	FollowCamera->SetFieldOfView(CameraFOV);
 
+	// automatically assign the LiveWire substation background music track if available
+	static ConstructorHelpers::FObjectFinder<USoundBase> BGMFinder(TEXT("/Game/Sound/LiveWire_Substation_Theme.LiveWire_Substation_Theme"));
+	if (BGMFinder.Succeeded())
+	{
+		BackgroundMusicTrack = BGMFinder.Object;
+	}
 }
 
 void AGAME3023_F26_RoshanCharacter::BeginPlay()
@@ -115,6 +126,11 @@ void AGAME3023_F26_RoshanCharacter::BeginPlay()
 		InitInteractionPromptWidget();
 	}
 
+	// start playing LiveWire background music the moment the player starts playing
+	if (bAutoPlayBGM && IsLocallyControlled())
+	{
+		PlayBackgroundMusic();
+	}
 }
 
 void AGAME3023_F26_RoshanCharacter::PossessedBy(AController* NewController)
@@ -130,11 +146,18 @@ void AGAME3023_F26_RoshanCharacter::PossessedBy(AController* NewController)
 	{
 		InitInteractionPromptWidget();
 
+		if (bAutoPlayBGM && (!BGMAudioComponent || !BGMAudioComponent->IsPlaying()))
+		{
+			PlayBackgroundMusic();
+		}
 	}
 }
 
 void AGAME3023_F26_RoshanCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	// stop background music
+	StopBackgroundMusic();
+
 	// clean up interaction prompt widget
 	if (InteractionPromptWidget)
 	{
@@ -1009,6 +1032,91 @@ void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
 		}
 
 		InteractionPromptWidget->HidePrompt();
+	}
+}
+
+// ==========================================
+// LiveWire Background Music (BGM) Implementation
+// ==========================================
+
+void AGAME3023_F26_RoshanCharacter::PlayBackgroundMusic()
+{
+	// Avoid duplicate playback if already playing
+	if (BGMAudioComponent && BGMAudioComponent->IsPlaying())
+	{
+		return;
+	}
+
+	// If not assigned yet, dynamically load the LiveWire substation theme asset
+	if (!BackgroundMusicTrack)
+	{
+		BackgroundMusicTrack = LoadObject<USoundBase>(nullptr, TEXT("/Game/Sound/LiveWire_Substation_Theme.LiveWire_Substation_Theme"));
+	}
+
+	if (BackgroundMusicTrack)
+	{
+		// Enable looping on SoundWave asset
+		if (USoundWave* Wave = Cast<USoundWave>(BackgroundMusicTrack))
+		{
+			Wave->bLooping = true;
+		}
+
+		// Spawn 2D non-spatialized stereo background audio component
+		BGMAudioComponent = UGameplayStatics::SpawnSound2D(
+			this,
+			BackgroundMusicTrack,
+			BGMVolume,
+			BGMPitch,
+			0.0f,
+			nullptr,
+			false, // bPersistAcrossLevelTransition
+			false  // bAutoDestroy: false to keep component alive for seamless looping
+		);
+
+		if (BGMAudioComponent)
+		{
+			BGMAudioComponent->bAutoDestroy = false;
+			BGMAudioComponent->OnAudioFinished.AddDynamic(this, &AGAME3023_F26_RoshanCharacter::OnBGMAudioFinished);
+
+			UE_LOG(LogGAME3023_F26_Roshan, Log, TEXT("[LiveWire Audio] Background music started: %s (Volume: %.2f)"), *BackgroundMusicTrack->GetName(), BGMVolume);
+
+			if (GEngine)
+			{
+				GEngine->AddOnScreenDebugMessage(-1, 4.0f, FColor::Cyan, FString::Printf(TEXT("♪ LiveWire Theme Playing: %s"), *BackgroundMusicTrack->GetName()));
+			}
+		}
+	}
+	else
+	{
+		UE_LOG(LogGAME3023_F26_Roshan, Warning, TEXT("[LiveWire Audio] Could not load /Game/Sound/LiveWire_Substation_Theme!"));
+	}
+}
+
+void AGAME3023_F26_RoshanCharacter::StopBackgroundMusic()
+{
+	if (BGMAudioComponent)
+	{
+		BGMAudioComponent->OnAudioFinished.RemoveAll(this);
+		BGMAudioComponent->Stop();
+		BGMAudioComponent = nullptr;
+		UE_LOG(LogGAME3023_F26_Roshan, Log, TEXT("[LiveWire Audio] Stopped background music."));
+	}
+}
+
+void AGAME3023_F26_RoshanCharacter::SetBGMVolume(float NewVolume)
+{
+	BGMVolume = FMath::Clamp(NewVolume, 0.0f, 2.0f);
+	if (BGMAudioComponent)
+	{
+		BGMAudioComponent->SetVolumeMultiplier(BGMVolume);
+	}
+}
+
+void AGAME3023_F26_RoshanCharacter::OnBGMAudioFinished()
+{
+	if (bAutoPlayBGM && BGMAudioComponent)
+	{
+		BGMAudioComponent->Play();
 	}
 }
 
