@@ -41,47 +41,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Cell ID (4-Digit)"))
 	int32 CellID = 1001;
 
-	// Toggle to automatically set primary colors (Body, Barrel, Dock, Laser) based on Cell ID
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Mesh Colors", meta = (DisplayName = "Sync Colors From Cell ID"))
-	bool bSyncColorsFromCellID = false;
-
-	// --- Instance Editable Mesh Colors (Customizable in Details Panel per Instance) ---
-
-	// Main cylinder gun body mesh color
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Mesh Colors", meta = (DisplayName = "Main Body Color (Cylinder)"))
-	FLinearColor BodyColor = FLinearColor(1.0f, 0.10f, 0.12f);
-
-	// Front barrel mesh color
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Mesh Colors", meta = (DisplayName = "Barrel Color"))
-	FLinearColor BarrelColor = FLinearColor(1.0f, 0.10f, 0.12f);
-
-	// Front emitter nozzle tip mesh color
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Mesh Colors", meta = (DisplayName = "Nozzle Tip Color"))
-	FLinearColor NozzleColor = FLinearColor(0.08f, 0.08f, 0.10f);
-
-	// Battery dock cradle mesh color
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Mesh Colors", meta = (DisplayName = "Battery Dock Color"))
-	FLinearColor BatteryDockColor = FLinearColor(0.75f, 0.08f, 0.10f);
-
-	// Neck collar plate mesh color
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Mesh Colors", meta = (DisplayName = "Neck Collar Color"))
-	FLinearColor NeckCollarColor = FLinearColor(0.14f, 0.14f, 0.16f);
-
-	// Upright pillar post column mesh color
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Mesh Colors", meta = (DisplayName = "Pillar Post Color"))
-	FLinearColor PillarColor = FLinearColor(0.80f, 0.82f, 0.86f);
-
-	// Base pedestal middle tier slab mesh color
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Mesh Colors", meta = (DisplayName = "Base Pedestal Color"))
-	FLinearColor PedestalColor = FLinearColor(0.82f, 0.82f, 0.85f);
-
-	// Base bottom foundation plinth slab mesh color
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Mesh Colors", meta = (DisplayName = "Base Plinth Color"))
-	FLinearColor PlinthColor = FLinearColor(0.12f, 0.12f, 0.14f);
-
-	// Laser beam mesh color
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Mesh Colors", meta = (DisplayName = "Laser Beam Color"))
-	FLinearColor LaserBeamColor = FLinearColor(1.0f, 0.10f, 0.12f);
 
 	// Legacy backward-compatibility aliases
 	UPROPERTY()
@@ -266,4 +225,7 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<ATransformerBushing> LastHitBushing;
+
+	// timer for periodic laser burn damage when player steps into the beam
+	float PlayerLaserDamageTimer = 0.4f;
 };

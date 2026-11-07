@@ -352,15 +352,6 @@ void ARedPowerCylinder::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 
-	if (bSyncColorsFromCellID)
-	{
-		const FLinearColor IDColor = GetColorForID(CellID);
-		BodyColor = IDColor;
-		BarrelColor = IDColor;
-		LaserBeamColor = IDColor;
-		BatteryDockColor = IDColor * 0.75f;
-	}
-
 	BuildGunComponents();
 	ApplyColorFromID();
 	UpdateLaserBeam();
@@ -370,17 +361,6 @@ void ARedPowerCylinder::OnConstruction(const FTransform& Transform)
 void ARedPowerCylinder::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
-
-	const FName PropertyName = (PropertyChangedEvent.Property != nullptr) ? PropertyChangedEvent.Property->GetFName() : NAME_None;
-	if (PropertyName == GET_MEMBER_NAME_CHECKED(ARedPowerCylinder, bSyncColorsFromCellID) ||
-		(bSyncColorsFromCellID && PropertyName == GET_MEMBER_NAME_CHECKED(ARedPowerCylinder, CellID)))
-	{
-		const FLinearColor IDColor = GetColorForID(CellID);
-		BodyColor = IDColor;
-		BarrelColor = IDColor;
-		LaserBeamColor = IDColor;
-		BatteryDockColor = IDColor * 0.75f;
-	}
 
 	ApplyColorFromID();
 	UpdateLaserBeam();
@@ -423,14 +403,15 @@ FLinearColor ARedPowerCylinder::GetColorForID(int32 InID) const
 
 void ARedPowerCylinder::ApplyColorFromID()
 {
-	if (bSyncColorsFromCellID)
-	{
-		const FLinearColor IDColor = GetColorForID(CellID);
-		BodyColor = IDColor;
-		BarrelColor = IDColor;
-		LaserBeamColor = IDColor;
-		BatteryDockColor = IDColor * 0.75f;
-	}
+	const FLinearColor ChosenColor = GetColorForID(CellID);
+	const FLinearColor PlinthColor = FLinearColor(0.12f, 0.12f, 0.14f);
+	const FLinearColor PedestalColor = FLinearColor(0.82f, 0.82f, 0.85f);
+	const FLinearColor PillarColor = FLinearColor(0.80f, 0.82f, 0.86f);
+	const FLinearColor NeckCollarColor = FLinearColor(0.14f, 0.14f, 0.16f);
+	const FLinearColor NozzleColor = FLinearColor(0.08f, 0.08f, 0.10f);
+	const FLinearColor BatteryDockColor = ChosenColor * 0.75f;
+	const FLinearColor BodyColor = ChosenColor;
+	const FLinearColor BarrelColor = ChosenColor;
 
 	auto SetMeshColor = [](UStaticMeshComponent* MeshComp, const FLinearColor& BaseCol, const FLinearColor& EmissiveCol) -> UMaterialInstanceDynamic*
 	{
@@ -619,6 +600,7 @@ void ARedPowerCylinder::UpdateLaserBeam()
 
 	if (LaserDynamicMaterial)
 	{
+		const FLinearColor LaserBeamColor = GetColorForID(CellID);
 		LaserDynamicMaterial->SetVectorParameterValue(TEXT("Base Color"), LaserBeamColor);
 		LaserDynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), LaserBeamColor);
 		LaserDynamicMaterial->SetVectorParameterValue(TEXT("Color"), LaserBeamColor);
@@ -630,6 +612,28 @@ void ARedPowerCylinder::UpdateLaserBeam()
 	// Target detection by matching Target ID during gameplay
 	if (GetWorld() && GetWorld()->IsGameWorld())
 	{
+		// 1. Check if laser beam hits player character and deal laser burn damage
+		AGAME3023_F26_RoshanCharacter* HitPlayer = Cast<AGAME3023_F26_RoshanCharacter>(HitActor);
+		if (!HitPlayer && HitActor)
+		{
+			HitPlayer = Cast<AGAME3023_F26_RoshanCharacter>(HitActor->GetAttachParentActor());
+		}
+
+		if (HitPlayer && !HitPlayer->IsDead())
+		{
+			const float DeltaSec = GetWorld()->GetDeltaSeconds();
+			PlayerLaserDamageTimer += DeltaSec;
+			if (PlayerLaserDamageTimer >= 0.35f)
+			{
+				PlayerLaserDamageTimer = 0.0f;
+				HitPlayer->ApplyDamageToPlayer(10.0f, this);
+			}
+		}
+		else
+		{
+			PlayerLaserDamageTimer = 0.35f;
+		}
+
 		int32 FoundTargetID = -1;
 		const bool bHitMatchingTarget = CheckActorTargetIDMatch(HitActor, FoundTargetID);
 		bIsTargetDetected = bHitMatchingTarget;
