@@ -16,6 +16,7 @@ class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class ABatteryCapsule;
 class AGAME3023_F26_RoshanCharacter;
+class ALaserTarget;
 
 UCLASS()
 class GAME3023_F26_ROSHAN_API ARedPowerCylinder : public AActor
@@ -28,6 +29,9 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnConstruction(const FTransform& Transform) override;
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
 
 public:	
 	virtual void Tick(float DeltaTime) override;
@@ -36,35 +40,56 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Cell ID (4-Digit)"))
 	int32 CellID = 1001;
 
-	// optional manual color override
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Use Custom Color Override"))
-	bool bUseCustomColor = false;
+	// Toggle to automatically set primary colors (Body, Barrel, Dock, Laser) based on Cell ID
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Mesh Colors", meta = (DisplayName = "Sync Colors From Cell ID"))
+	bool bSyncColorsFromCellID = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Custom Color", EditCondition = "bUseCustomColor"))
-	FLinearColor CustomColor = FLinearColor(1.0f, 0.10f, 0.12f);
+	// --- Instance Editable Mesh Colors (Customizable in Details Panel per Instance) ---
 
-	// pillar post color (clean bright silver alloy by default, catches arena light)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Pillar Post Color"))
-	FLinearColor PillarColor = FLinearColor(0.80f, 0.82f, 0.86f);
+	// Main cylinder gun body mesh color
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Mesh Colors", meta = (DisplayName = "Main Body Color (Cylinder)"))
+	FLinearColor BodyColor = FLinearColor(1.0f, 0.10f, 0.12f);
 
-	// base pedestal slab color (clean light industrial cream/concrete)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Base Pedestal Color"))
-	FLinearColor PedestalColor = FLinearColor(0.82f, 0.82f, 0.85f);
+	// Front barrel mesh color
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Mesh Colors", meta = (DisplayName = "Barrel Color"))
+	FLinearColor BarrelColor = FLinearColor(1.0f, 0.10f, 0.12f);
 
-	// base plinth foundation color (dark charcoal)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Base Plinth Color"))
-	FLinearColor PlinthColor = FLinearColor(0.12f, 0.12f, 0.14f);
-
-	// neck collar plate color (sleek dark graphite with accent trim)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Neck Collar Color"))
-	FLinearColor NeckCollarColor = FLinearColor(0.14f, 0.14f, 0.16f);
-
-	// nozzle tip color (dark gunmetal emitter aperture)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Nozzle Tip Color"))
+	// Front emitter nozzle tip mesh color
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Mesh Colors", meta = (DisplayName = "Nozzle Tip Color"))
 	FLinearColor NozzleColor = FLinearColor(0.08f, 0.08f, 0.10f);
 
-	// whether battery dock lights up with cell color accent
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Color", meta = (DisplayName = "Tint Battery Dock With Cell Color"))
+	// Battery dock cradle mesh color
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Mesh Colors", meta = (DisplayName = "Battery Dock Color"))
+	FLinearColor BatteryDockColor = FLinearColor(0.75f, 0.08f, 0.10f);
+
+	// Neck collar plate mesh color
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Mesh Colors", meta = (DisplayName = "Neck Collar Color"))
+	FLinearColor NeckCollarColor = FLinearColor(0.14f, 0.14f, 0.16f);
+
+	// Upright pillar post column mesh color
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Mesh Colors", meta = (DisplayName = "Pillar Post Color"))
+	FLinearColor PillarColor = FLinearColor(0.80f, 0.82f, 0.86f);
+
+	// Base pedestal middle tier slab mesh color
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Mesh Colors", meta = (DisplayName = "Base Pedestal Color"))
+	FLinearColor PedestalColor = FLinearColor(0.82f, 0.82f, 0.85f);
+
+	// Base bottom foundation plinth slab mesh color
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Mesh Colors", meta = (DisplayName = "Base Plinth Color"))
+	FLinearColor PlinthColor = FLinearColor(0.12f, 0.12f, 0.14f);
+
+	// Laser beam mesh color
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Mesh Colors", meta = (DisplayName = "Laser Beam Color"))
+	FLinearColor LaserBeamColor = FLinearColor(1.0f, 0.10f, 0.12f);
+
+	// Legacy backward-compatibility aliases
+	UPROPERTY()
+	bool bUseCustomColor = false;
+
+	UPROPERTY()
+	FLinearColor CustomColor = FLinearColor(1.0f, 0.10f, 0.12f);
+
+	UPROPERTY()
 	bool bTintBatteryDock = true;
 
 	// dynamic materials for laser gun glow
@@ -91,48 +116,48 @@ public:
 	TObjectPtr<USceneComponent> SceneRoot;
 
 	// base bottom plinth - sharp dark square slab on floor
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> BasePlinthMesh;
 
 	// base pedestal plate - sharp middle tier slab
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> BasePedestalMesh;
 
 	// upright pillar post - sharp square column
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> PostColumnMesh;
 
 	// neck collar - square plate beneath the gun head
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> NeckCollarMesh;
 
 	// main gun receiver body - sharp rectangular box tinted with cell color
 	// kept named CylinderMesh so existing code and blueprints continue working cleanly
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> CylinderMesh;
 
 	// front stepped barrel extension - sharp rectangular box
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> BarrelMesh;
 
 	// front emitter nozzle tip - sharp dark box
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> NozzleMesh;
 
 	// battery cradle socket bracket on top deck of the gun
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> BatteryDockMesh;
 
 	// socket where the battery snaps in when inserted
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<USceneComponent> BatterySocket;
 
 	// laser emitter socket on the front tip of the nozzle
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<USceneComponent> LaserEmitter;
 
 	// visual laser beam mesh - sharp rectangular laser beam
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> LaserBeamMesh;
 
 	// laser length - instance editable per cylinder in the details panel
@@ -155,13 +180,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Laser", meta = (DisplayName = "Preview Laser In Editor"))
 	bool bPreviewLaserInEditor = false;
 
-	// Target actor that this laser should detect - assignable per instance in the Details panel
-	UPROPERTY(EditInstanceOnly, BlueprintReadWrite, Category = "LiveWire|Laser", meta = (DisplayName = "Target Object"))
-	TObjectPtr<AActor> TargetObject;
-
-	// Whether the laser beam is currently hitting the assigned target object
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Laser", meta = (DisplayName = "Is Target Detected"))
+	// Whether the laser beam is currently hitting an object with matching Target ID
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Laser", meta = (DisplayName = "Is Matching Target Detected"))
 	bool bIsTargetDetected = false;
+
+	// Currently detected matching actor (displayed in Details panel during play)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Laser", meta = (DisplayName = "Detected Target"))
+	TObjectPtr<AActor> DetectedTarget;
+
+	// Checks if an actor has a Target ID matching this cylinder's CellID
+	UFUNCTION(BlueprintPure, Category = "LiveWire|Laser")
+	bool CheckActorTargetIDMatch(AActor* ActorToCheck, int32& OutFoundID) const;
 
 	// whether to show the bottom base plinth and pedestal slab (disable if placing on an existing arena pedestal)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Appearance", meta = (DisplayName = "Show Base Plinth & Pedestal"))
@@ -229,4 +258,8 @@ private:
 	// one-shot print state latches for laser target detection
 	bool bHasPrintedNoTarget = false;
 	bool bHasPrintedTargetDetected = false;
+
+	// tracked target hit for turning glow on/off
+	UPROPERTY(Transient)
+	TObjectPtr<ALaserTarget> LastHitLaserTarget;
 };
