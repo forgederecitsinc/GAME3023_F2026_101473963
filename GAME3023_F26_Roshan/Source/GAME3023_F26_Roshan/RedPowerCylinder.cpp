@@ -13,6 +13,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "BatteryCapsule.h"
 #include "LaserTarget.h"
+#include "TransformerBushing.h"
 #include "GAME3023_F26_RoshanCharacter.h"
 #include "GAME3023_F26_Roshan.h"
 #include "Kismet/KismetSystemLibrary.h"
@@ -493,6 +494,13 @@ bool ARedPowerCylinder::CheckActorTargetIDMatch(AActor* ActorToCheck, int32& Out
 		return (LaserTarget->TargetID == CellID);
 	}
 
+	// 2. Direct TransformerBushing check
+	if (ATransformerBushing* Bushing = Cast<ATransformerBushing>(ActorToCheck))
+	{
+		OutFoundID = Bushing->BushingID;
+		return (Bushing->BushingID == CellID);
+	}
+
 	// 2. Direct other RedPowerCylinder check
 	if (ARedPowerCylinder* OtherCyl = Cast<ARedPowerCylinder>(ActorToCheck))
 	{
@@ -556,6 +564,11 @@ void ARedPowerCylinder::UpdateLaserBeam()
 		{
 			LastHitLaserTarget->SetLaserHit(false, this);
 			LastHitLaserTarget = nullptr;
+		}
+		if (LastHitBushing)
+		{
+			LastHitBushing->SetLaserHit(false, this);
+			LastHitBushing = nullptr;
 		}
 		return;
 	}
@@ -622,11 +635,13 @@ void ARedPowerCylinder::UpdateLaserBeam()
 		bIsTargetDetected = bHitMatchingTarget;
 		DetectedTarget = bHitMatchingTarget ? HitActor : nullptr;
 
-		// Manage LaserTarget glow transitions
+		// Manage LaserTarget and TransformerBushing glow transitions
 		ALaserTarget* CurrentHitLaserTarget = Cast<ALaserTarget>(HitActor);
-		if (!CurrentHitLaserTarget && HitActor)
+		ATransformerBushing* CurrentHitBushing = Cast<ATransformerBushing>(HitActor);
+		if (HitActor)
 		{
-			CurrentHitLaserTarget = Cast<ALaserTarget>(HitActor->GetAttachParentActor());
+			if (!CurrentHitLaserTarget) CurrentHitLaserTarget = Cast<ALaserTarget>(HitActor->GetAttachParentActor());
+			if (!CurrentHitBushing) CurrentHitBushing = Cast<ATransformerBushing>(HitActor->GetAttachParentActor());
 		}
 
 		if (LastHitLaserTarget && LastHitLaserTarget != CurrentHitLaserTarget)
@@ -635,12 +650,23 @@ void ARedPowerCylinder::UpdateLaserBeam()
 			LastHitLaserTarget = nullptr;
 		}
 
+		if (LastHitBushing && LastHitBushing != CurrentHitBushing)
+		{
+			LastHitBushing->SetLaserHit(false, this);
+			LastHitBushing = nullptr;
+		}
+
 		if (bHitMatchingTarget)
 		{
 			if (CurrentHitLaserTarget)
 			{
 				CurrentHitLaserTarget->SetLaserHit(true, this);
 				LastHitLaserTarget = CurrentHitLaserTarget;
+			}
+			if (CurrentHitBushing)
+			{
+				CurrentHitBushing->SetLaserHit(true, this);
+				LastHitBushing = CurrentHitBushing;
 			}
 
 			// Reset the "no target" latch so it can print again if we lose target
@@ -656,7 +682,7 @@ void ARedPowerCylinder::UpdateLaserBeam()
 #else
 				const FString TargetName = HitActor ? HitActor->GetName() : TEXT("Target");
 #endif
-				const FString Msg = FString::Printf(TEXT("[TARGET MATCH: %d] Laser hit matching target object: %s"), CellID, *TargetName);
+				const FString Msg = FString::Printf(TEXT("[TARGET HIT] Laser hit target object: %s"), *TargetName);
 
 				UKismetSystemLibrary::PrintString(this, Msg, true, true, FLinearColor(0.1f, 1.0f, 0.2f), 3.0f);
 
@@ -673,7 +699,7 @@ void ARedPowerCylinder::UpdateLaserBeam()
 			{
 				bHasPrintedNoTarget = true;
 
-				const FString Msg = FString::Printf(TEXT("[LASER EMITTING] Laser beam emitted (ID: %d) - No matching target detected"), CellID);
+				const FString Msg = TEXT("[LASER ACTIVE] Laser beam emitting - No target detected");
 
 				UKismetSystemLibrary::PrintString(this, Msg, true, true, FLinearColor(1.0f, 0.85f, 0.1f), 2.5f);
 
@@ -708,7 +734,7 @@ void ARedPowerCylinder::OnInteractionBeginOverlap(UPrimitiveComponent* Overlappe
 					2001,
 					2.5f,
 					FColor::Cyan,
-					FString::Printf(TEXT("[Laser Gun] Press [E] / [Square] to Remove Battery (ID: %d)"), CellID)
+					TEXT("[Laser Gun] Press [Square] to Remove Battery")
 				);
 			}
 			else
@@ -719,7 +745,7 @@ void ARedPowerCylinder::OnInteractionBeginOverlap(UPrimitiveComponent* Overlappe
 						2001,
 						2.5f,
 						FColor::Green,
-						FString::Printf(TEXT("[Laser Gun] Press [E] / [Square] to Attach Battery into Laser Gun (ID: %d)"), CellID)
+						TEXT("[Laser Gun] Press [Square] to Attach Battery into Laser Gun")
 					);
 				}
 				else
@@ -728,7 +754,7 @@ void ARedPowerCylinder::OnInteractionBeginOverlap(UPrimitiveComponent* Overlappe
 						2001,
 						2.5f,
 						FColor::Orange,
-						FString::Printf(TEXT("[Laser Gun] Laser Gun (ID: %d): OFFLINE (Requires Matching Battery)"), CellID)
+						TEXT("[Laser Gun] Laser Gun: OFFLINE (Requires Matching Battery)")
 					);
 				}
 			}
@@ -781,7 +807,7 @@ bool ARedPowerCylinder::Interact(AGAME3023_F26_RoshanCharacter* Player)
 					-1,
 					4.0f,
 					FColor::Yellow,
-					FString::Printf(TEXT("[BATTERY REMOVED] Battery removed! Laser Gun (ID: %d) is now OFFLINE."), CellID),
+					TEXT("[BATTERY REMOVED] Battery removed! Laser Gun is now OFFLINE."),
 					true,
 					FVector2D(1.3f, 1.3f)
 				);
@@ -818,7 +844,7 @@ bool ARedPowerCylinder::Interact(AGAME3023_F26_RoshanCharacter* Player)
 				-1,
 				3.5f,
 				FColor::Red,
-				FString::Printf(TEXT("[POWER OFFLINE] Laser Gun (ID: %d) needs a matching Battery!"), CellID),
+				TEXT("[POWER OFFLINE] Laser Gun needs a matching Battery!"),
 				true,
 				FVector2D(1.3f, 1.3f)
 			);
@@ -847,6 +873,11 @@ ABatteryCapsule* ARedPowerCylinder::RemoveBattery()
 	{
 		LastHitLaserTarget->SetLaserHit(false, this);
 		LastHitLaserTarget = nullptr;
+	}
+	if (LastHitBushing)
+	{
+		LastHitBushing->SetLaserHit(false, this);
+		LastHitBushing = nullptr;
 	}
 
 	UpdateVisualState();
@@ -881,7 +912,7 @@ bool ARedPowerCylinder::InsertBattery(ABatteryCapsule* Battery)
 				-1,
 				4.5f,
 				FColor::Green,
-				FString::Printf(TEXT("[ID MATCH: %d] Battery attached & Laser Gun ONLINE! Laser beam active!"), CellID),
+				TEXT("[POWER MATCH] Battery attached & Laser Gun ONLINE! Laser beam active!"),
 				true,
 				FVector2D(1.4f, 1.4f)
 			);
@@ -903,7 +934,7 @@ bool ARedPowerCylinder::InsertBattery(ABatteryCapsule* Battery)
 				-1,
 				5.0f,
 				FColor::Orange,
-				FString::Printf(TEXT("[ID MISMATCH] Battery (ID: %d) attached, but Laser Gun (ID: %d) WON'T POWER ON!"), Battery->BatteryID, CellID),
+				TEXT("[MISMATCH] Battery attached, but Laser Gun WON'T POWER ON!"),
 				true,
 				FVector2D(1.4f, 1.4f)
 			);

@@ -3,12 +3,15 @@
 // designed to receive and detect incoming laser beams from RedPowerCylinder laser turrets
 
 #include "LaserTarget.h"
+#include "TransformerBushing.h"
 #include "Components/StaticMeshComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Kismet/GameplayStatics.h"
+#include "Engine/World.h"
 
 ALaserTarget::ALaserTarget()
 {
@@ -297,4 +300,21 @@ void ALaserTarget::SetLaserHit(bool bHit, AActor* SourceActor)
 
 	// Broadcast delegate event
 	OnLaserHitStateChanged.Broadcast(this, bIsHitByLaser);
+
+	// Also directly notify any matching TransformerBushings in the world
+	if (UWorld* World = GetWorld())
+	{
+		TArray<AActor*> FoundBushings;
+		UGameplayStatics::GetAllActorsOfClass(World, ATransformerBushing::StaticClass(), FoundBushings);
+		for (AActor* BushingActor : FoundBushings)
+		{
+			if (ATransformerBushing* Bushing = Cast<ATransformerBushing>(BushingActor))
+			{
+				if (Bushing->BushingID == TargetID)
+				{
+					Bushing->SetLitUp(bIsHitByLaser);
+				}
+			}
+		}
+	}
 }

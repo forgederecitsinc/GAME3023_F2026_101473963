@@ -17,6 +17,7 @@ class UMaterialInstanceDynamic;
 class ABatteryCapsule;
 class AGAME3023_F26_RoshanCharacter;
 class ALaserTarget;
+class ATransformerBushing;
 
 UCLASS()
 class GAME3023_F26_ROSHAN_API ARedPowerCylinder : public AActor
@@ -262,4 +263,7 @@ private:
 	// tracked target hit for turning glow on/off
 	UPROPERTY(Transient)
 	TObjectPtr<ALaserTarget> LastHitLaserTarget;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ATransformerBushing> LastHitBushing;
 };
