@@ -17,6 +17,7 @@
 #include "BatteryCapsule.h"
 #include "RedPowerCylinder.h"
 #include "InteractPromptWidget.h"
+#include "PlayerHealthHUDWidget.h"
 #include "Engine/OverlapResult.h"
 #include "InputCoreTypes.h"
 #include "GameFramework/PlayerController.h"
@@ -126,16 +127,18 @@ void AGAME3023_F26_RoshanCharacter::BeginPlay()
 		PC->SetControlRotation(FRotator(0.0f, CameraYaw, 0.0f));
 	}
 
-	// initialize interaction prompt widget for local player
+	// initialize interaction prompt and health HUD widgets for local player
 	if (IsLocallyControlled())
 	{
 		InitInteractionPromptWidget();
+		InitHealthHUDWidget();
 	}
 
 	// player starts with 100 health points when game starts
 	CurrentHealth = MaxHealth;
 	bIsDead = false;
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth, 0.0f);
+	UpdateHealthHUD();
 
 	// start playing LiveWire background music the moment the player starts playing
 	if (bAutoPlayBGM && IsLocallyControlled())
@@ -156,6 +159,8 @@ void AGAME3023_F26_RoshanCharacter::PossessedBy(AController* NewController)
 	if (IsLocallyControlled())
 	{
 		InitInteractionPromptWidget();
+		InitHealthHUDWidget();
+		UpdateHealthHUD();
 
 		if (bAutoPlayBGM && (!BGMAudioComponent || !BGMAudioComponent->IsPlaying()))
 		{
@@ -174,6 +179,13 @@ void AGAME3023_F26_RoshanCharacter::EndPlay(const EEndPlayReason::Type EndPlayRe
 	{
 		InteractionPromptWidget->RemoveFromParent();
 		InteractionPromptWidget = nullptr;
+	}
+
+	// clean up health HUD widget
+	if (HealthHUDWidget)
+	{
+		HealthHUDWidget->RemoveFromParent();
+		HealthHUDWidget = nullptr;
 	}
 
 	// put back original materials on any roof meshes before ending play
@@ -594,6 +606,10 @@ void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* P
 	PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
 	PlayerInputComponent->BindKey(EKeys::Q, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery); // Q also works as drop backup
 
+	// debug / test keys for player health points & HUD (K = take 15 damage, H = heal 15 HP)
+	PlayerInputComponent->BindKey(EKeys::K, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::TestTakeDamage);
+	PlayerInputComponent->BindKey(EKeys::H, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::TestHeal);
+
 	// dualsense ps5 controller button bindings so gamepad works out of the box!
 	// cross (X button on ps5) -> jump (disabled)
 	// PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoJumpStart);
@@ -876,6 +892,44 @@ void AGAME3023_F26_RoshanCharacter::InitInteractionPromptWidget()
 			InteractionPromptWidget->HidePrompt();
 			UE_LOG(LogGAME3023_F26_Roshan, Log, TEXT("[Live Wire] Interaction Prompt Widget spawned successfully on Viewport."));
 		}
+	}
+}
+
+void AGAME3023_F26_RoshanCharacter::InitHealthHUDWidget()
+{
+	if (!bShowHealthHUD || HealthHUDWidget)
+	{
+		return;
+	}
+
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC)
+	{
+		return;
+	}
+
+	UClass* WidgetClassToUse = HealthHUDWidgetClass ? HealthHUDWidgetClass.Get() : UPlayerHealthHUDWidget::StaticClass();
+	if (WidgetClassToUse)
+	{
+		HealthHUDWidget = CreateWidget<UPlayerHealthHUDWidget>(PC, WidgetClassToUse);
+		if (HealthHUDWidget)
+		{
+			HealthHUDWidget->AddToViewport(90);
+			HealthHUDWidget->UpdateHealth(CurrentHealth, MaxHealth);
+			UE_LOG(LogGAME3023_F26_Roshan, Log, TEXT("[Live Wire] Player Health HUD Widget spawned successfully on Viewport (Top-Right)."));
+		}
+	}
+}
+
+void AGAME3023_F26_RoshanCharacter::UpdateHealthHUD()
+{
+	if (!HealthHUDWidget)
+	{
+		InitHealthHUDWidget();
+	}
+	if (HealthHUDWidget)
+	{
+		HealthHUDWidget->UpdateHealth(CurrentHealth, MaxHealth);
 	}
 }
 
@@ -1203,6 +1257,7 @@ void AGAME3023_F26_RoshanCharacter::ApplyDamageToPlayer(float DamageAmount, AAct
 		DamageAmount, *GetNameSafe(DamageCauser), CurrentHealth, MaxHealth);
 
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth, DeltaHealth);
+	UpdateHealthHUD();
 
 	// rumble feedback when player takes damage
 	if (bEnableControllerVibration)
@@ -1231,6 +1286,7 @@ void AGAME3023_F26_RoshanCharacter::HealPlayer(float HealAmount)
 		HealAmount, CurrentHealth, MaxHealth);
 
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth, DeltaHealth);
+	UpdateHealthHUD();
 }
 
 void AGAME3023_F26_RoshanCharacter::SetHealth(float NewHealth)
@@ -1249,6 +1305,7 @@ void AGAME3023_F26_RoshanCharacter::SetHealth(float NewHealth)
 	}
 
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth, DeltaHealth);
+	UpdateHealthHUD();
 
 	if (CurrentHealth <= 0.0f && !bIsDead)
 	{
@@ -1264,5 +1321,15 @@ void AGAME3023_F26_RoshanCharacter::ResetHealth()
 		GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 	}
 	SetHealth(MaxHealth);
+}
+
+void AGAME3023_F26_RoshanCharacter::TestTakeDamage()
+{
+	ApplyDamageToPlayer(15.0f, nullptr);
+}
+
+void AGAME3023_F26_RoshanCharacter::TestHeal()
+{
+	HealPlayer(15.0f);
 }
 

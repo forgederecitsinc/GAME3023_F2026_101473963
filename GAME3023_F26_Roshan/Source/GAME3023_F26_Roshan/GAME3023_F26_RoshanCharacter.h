@@ -47,6 +47,7 @@ struct FOccludingMeshData
 };
 
 class UInteractPromptWidget;
+class UPlayerHealthHUDWidget;
 class USoundBase;
 class UAudioComponent;
 
@@ -295,6 +296,30 @@ public:
 	void UpdateInteractionPrompt(float DeltaTime);
 
 	// ==========================================
+	// LiveWire Player Health HUD Widget (Top-Right)
+	// ==========================================
+
+	// custom widget class to use for player health HUD (defaults to UPlayerHealthHUDWidget)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health HUD", meta = (DisplayName = "Health HUD Widget Class"))
+	TSubclassOf<UPlayerHealthHUDWidget> HealthHUDWidgetClass;
+
+	// active runtime player health HUD widget instance (anchored to top-right of screen)
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "LiveWire|Health HUD")
+	TObjectPtr<UPlayerHealthHUDWidget> HealthHUDWidget;
+
+	// toggle to enable or disable the on-screen top-right player health HUD
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health HUD", meta = (DisplayName = "Show Health HUD"))
+	bool bShowHealthHUD = true;
+
+	// initialize and spawn player health HUD widget on the viewport
+	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health HUD")
+	void InitHealthHUDWidget();
+
+	// updates the player health HUD widget with current health points
+	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health HUD")
+	void UpdateHealthHUD();
+
+	// ==========================================
 	// LiveWire Background Music (BGM)
 	// ==========================================
 
@@ -402,6 +427,13 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Health", meta = (DisplayName = "Get Max HP"))
 	float GetMaxHP() const { return MaxHealth; }
+
+	// Debug key actions to test damage and healing on the health HUD
+	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
+	void TestTakeDamage();
+
+	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
+	void TestHeal();
 
 public:
 
