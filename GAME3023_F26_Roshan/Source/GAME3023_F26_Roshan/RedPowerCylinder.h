@@ -155,6 +155,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Laser", meta = (DisplayName = "Preview Laser In Editor"))
 	bool bPreviewLaserInEditor = false;
 
+	// Target actor that this laser should detect - assignable per instance in the Details panel
+	UPROPERTY(EditInstanceOnly, BlueprintReadWrite, Category = "LiveWire|Laser", meta = (DisplayName = "Target Object"))
+	TObjectPtr<AActor> TargetObject;
+
+	// Whether the laser beam is currently hitting the assigned target object
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Laser", meta = (DisplayName = "Is Target Detected"))
+	bool bIsTargetDetected = false;
+
 	// whether to show the bottom base plinth and pedestal slab (disable if placing on an existing arena pedestal)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Appearance", meta = (DisplayName = "Show Base Plinth & Pedestal"))
 	bool bShowBaseStructure = true;
@@ -216,4 +224,9 @@ protected:
 
 	void UpdateVisualState();
 	void BuildGunComponents();
+
+private:
+	// one-shot print state latches for laser target detection
+	bool bHasPrintedNoTarget = false;
+	bool bHasPrintedTargetDetected = false;
 };

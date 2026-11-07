@@ -12,8 +12,10 @@
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "BatteryCapsule.h"
+#include "LaserTarget.h"
 #include "GAME3023_F26_RoshanCharacter.h"
 #include "GAME3023_F26_Roshan.h"
+#include "Kismet/KismetSystemLibrary.h"
 
 ARedPowerCylinder::ARedPowerCylinder()
 {
@@ -563,6 +565,13 @@ void ARedPowerCylinder::UpdateLaserBeam()
 	if (!bShouldBeActive)
 	{
 		LaserBeamMesh->SetVisibility(false);
+		bIsTargetDetected = false;
+		bHasPrintedNoTarget = false;
+		bHasPrintedTargetDetected = false;
+		if (ALaserTarget* LaserTarget = Cast<ALaserTarget>(TargetObject))
+		{
+			LaserTarget->SetLaserHit(false);
+		}
 		return;
 	}
 
@@ -573,9 +582,10 @@ void ARedPowerCylinder::UpdateLaserBeam()
 	const FVector DesiredEnd = Start + Forward * LaserLength;
 
 	float ActualDistance = LaserLength;
+	AActor* HitActor = nullptr;
 
-	// raycast forward so the laser beam stops against obstacles
-	if (bLaserStopsAtObstacles && GetWorld())
+	// raycast forward so the laser beam stops against obstacles and detects target
+	if (GetWorld())
 	{
 		FHitResult Hit;
 		FCollisionQueryParams Params;
@@ -585,9 +595,15 @@ void ARedPowerCylinder::UpdateLaserBeam()
 			Params.AddIgnoredActor(InsertedBattery);
 		}
 
-		if (GetWorld()->LineTraceSingleByChannel(Hit, Start, DesiredEnd, ECC_WorldStatic, Params))
+		// Line trace against Visibility channel (hits static geometry, props, and dynamic actors)
+		const bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Start, DesiredEnd, ECC_Visibility, Params);
+		if (bHit)
 		{
-			ActualDistance = FMath::Max(15.0f, Hit.Distance);
+			HitActor = Hit.GetActor();
+			if (bLaserStopsAtObstacles)
+			{
+				ActualDistance = FMath::Max(15.0f, Hit.Distance);
+			}
 		}
 	}
 
@@ -611,6 +627,63 @@ void ARedPowerCylinder::UpdateLaserBeam()
 		LaserDynamicMaterial->SetVectorParameterValue(TEXT("Color"), ChosenColor);
 		LaserDynamicMaterial->SetVectorParameterValue(TEXT("EmissiveColor"), ChosenColor * 20.0f);
 		LaserDynamicMaterial->SetVectorParameterValue(TEXT("Emissive"), ChosenColor * 20.0f); // intense laser glow!
+	}
+
+	// Target detection and print string handling during gameplay
+	if (GetWorld() && GetWorld()->IsGameWorld())
+	{
+		const bool bHitAssignedTarget = (TargetObject != nullptr) && (HitActor == TargetObject || (HitActor && HitActor->IsAttachedTo(TargetObject)));
+		bIsTargetDetected = bHitAssignedTarget;
+
+		if (bHitAssignedTarget)
+		{
+			if (ALaserTarget* LaserTarget = Cast<ALaserTarget>(TargetObject))
+			{
+				LaserTarget->SetLaserHit(true, this);
+			}
+
+			// Laser detects the object assigned to it in the details:
+			// Prints that it detects the object once for 3 seconds
+			bHasPrintedNoTarget = false; // reset so it will print again if we lose target
+
+			if (!bHasPrintedTargetDetected)
+			{
+				bHasPrintedTargetDetected = true;
+
+#if WITH_EDITOR
+				const FString TargetName = TargetObject ? TargetObject->GetActorLabel() : TEXT("Target");
+#else
+				const FString TargetName = TargetObject ? TargetObject->GetName() : TEXT("Target");
+#endif
+				const FString Msg = FString::Printf(TEXT("[TARGET DETECTED] Laser detected target object: %s"), *TargetName);
+
+				UKismetSystemLibrary::PrintString(this, Msg, true, true, FLinearColor(0.1f, 1.0f, 0.2f), 3.0f);
+
+				UE_LOG(LogGAME3023_F26_Roshan, Log, TEXT("[Live Wire] Laser Gun %s: Detected assigned target '%s' (printed for 3s)."), *GetName(), *TargetName);
+			}
+		}
+		else
+		{
+			if (ALaserTarget* LaserTarget = Cast<ALaserTarget>(TargetObject))
+			{
+				LaserTarget->SetLaserHit(false);
+			}
+
+			// Laser emits but does not detect the assigned object:
+			// Prints once
+			bHasPrintedTargetDetected = false; // reset so it will print again once target is acquired
+
+			if (!bHasPrintedNoTarget)
+			{
+				bHasPrintedNoTarget = true;
+
+				const FString Msg = TEXT("[LASER EMITTING] Laser beam emitted - No target detected");
+
+				UKismetSystemLibrary::PrintString(this, Msg, true, true, FLinearColor(1.0f, 0.85f, 0.1f), 2.5f);
+
+				UE_LOG(LogGAME3023_F26_Roshan, Log, TEXT("[Live Wire] Laser Gun %s: Laser emitted - no target detected (printed once)."), *GetName());
+			}
+		}
 	}
 }
 
@@ -769,6 +842,9 @@ ABatteryCapsule* ARedPowerCylinder::RemoveBattery()
 	InsertedBattery = nullptr;
 	bHasBattery = false;
 	bIsPowered = false;
+	bIsTargetDetected = false;
+	bHasPrintedNoTarget = false;
+	bHasPrintedTargetDetected = false;
 
 	UpdateVisualState();
 	UpdateLaserBeam(); // turns off laser!
@@ -790,6 +866,9 @@ bool ARedPowerCylinder::InsertBattery(ABatteryCapsule* Battery)
 	if (Battery->BatteryID == CellID)
 	{
 		bIsPowered = true;
+		bHasPrintedNoTarget = false;
+		bHasPrintedTargetDetected = false;
+		bIsTargetDetected = false;
 		UpdateVisualState(); // glows gun receiver and barrel
 		UpdateLaserBeam();   // fires the laser beam out of the nozzle!
 
