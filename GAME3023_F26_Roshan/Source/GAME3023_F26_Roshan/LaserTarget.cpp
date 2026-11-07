@@ -187,6 +187,14 @@ void ALaserTarget::OnConstruction(const FTransform& Transform)
 		}
 	}
 
+	// Apply custom materials if assigned
+	if (BasePedestalMaterial && BasePedestalMesh) BasePedestalMesh->SetMaterial(0, BasePedestalMaterial);
+	if (PostColumnMaterial && PostColumnMesh) PostColumnMesh->SetMaterial(0, PostColumnMaterial);
+	if (NeckCollarMaterial && NeckCollarMesh) NeckCollarMesh->SetMaterial(0, NeckCollarMaterial);
+	if (TargetBodyMaterial && TargetBodyMesh) TargetBodyMesh->SetMaterial(0, TargetBodyMaterial);
+	if (TopCapMaterial && TopCapMesh) TopCapMesh->SetMaterial(0, TopCapMaterial);
+	if (SensorMaterial && SensorMesh) SensorMesh->SetMaterial(0, SensorMaterial);
+
 	ApplyColors();
 }
 
@@ -225,6 +233,13 @@ FLinearColor ALaserTarget::GetColorForID(int32 InID) const
 
 void ALaserTarget::ApplyColors()
 {
+	// NEVER create transient dynamic material instances on templates or CDOs in Blueprint Editor!
+	// Creating transient MIDs during Blueprint compilation corrupts component template serialization and reverts materials.
+	if (HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject))
+	{
+		return;
+	}
+
 	const FLinearColor BodyColor = GetColorForID(TargetID);
 	const FLinearColor SensorColor = FLinearColor(0.10f, 0.10f, 0.12f);
 	const FLinearColor TopCapColor = FLinearColor(0.12f, 0.12f, 0.14f);
@@ -232,7 +247,9 @@ void ALaserTarget::ApplyColors()
 	const FLinearColor PillarColor = FLinearColor(0.80f, 0.82f, 0.86f);
 	const FLinearColor PedestalColor = FLinearColor(0.82f, 0.82f, 0.85f);
 
-	// Ensure base material is assigned if not set
+	UMaterialInterface* BaseFlatMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/LevelPrototyping/Materials/M_FlatCol.M_FlatCol"));
+
+	// Fallback to BaseMaterial only if component has no material at all
 	if (BaseMaterial)
 	{
 		if (BasePedestalMesh && !BasePedestalMesh->GetMaterial(0)) BasePedestalMesh->SetMaterial(0, BaseMaterial);
@@ -243,24 +260,41 @@ void ALaserTarget::ApplyColors()
 		if (SensorMesh && !SensorMesh->GetMaterial(0)) SensorMesh->SetMaterial(0, BaseMaterial);
 	}
 
-	auto SetMeshColor = [](UStaticMeshComponent* MeshComp, const FLinearColor& BaseCol, const FLinearColor& EmissiveCol) -> UMaterialInstanceDynamic*
+	auto SetMeshColor = [BaseFlatMat](UStaticMeshComponent* MeshComp, const FLinearColor& BaseCol, const FLinearColor& EmissiveCol, bool bForceTint = false) -> UMaterialInstanceDynamic*
 	{
 		if (!MeshComp) return nullptr;
-		UMaterialInstanceDynamic* Dyn = Cast<UMaterialInstanceDynamic>(MeshComp->GetMaterial(0));
+		UMaterialInterface* CurrentMat = MeshComp->GetMaterial(0);
+		if (!CurrentMat) return nullptr;
+
+		const bool bIsDefaultFlatMat = (CurrentMat == BaseFlatMat) || CurrentMat->GetName().Contains(TEXT("FlatCol"));
+
+		const bool bHasEmissive = (EmissiveCol.R > 0.001f || EmissiveCol.G > 0.001f || EmissiveCol.B > 0.001f);
+		if (!bIsDefaultFlatMat && !bForceTint && !bHasEmissive)
+		{
+			return nullptr;
+		}
+
+		UMaterialInstanceDynamic* Dyn = Cast<UMaterialInstanceDynamic>(CurrentMat);
 		if (!Dyn)
 		{
 			Dyn = MeshComp->CreateAndSetMaterialInstanceDynamic(0);
 		}
 		if (Dyn)
 		{
-			// M_FlatCol uses "Base Color" (with space), custom materials may use "BaseColor" or "Color"
-			Dyn->SetVectorParameterValue(TEXT("Base Color"), BaseCol);
-			Dyn->SetVectorParameterValue(TEXT("BaseColor"), BaseCol);
-			Dyn->SetVectorParameterValue(TEXT("Color"), BaseCol);
-			Dyn->SetVectorParameterValue(TEXT("Tint"), BaseCol);
-			Dyn->SetVectorParameterValue(TEXT("Emissive Color"), EmissiveCol);
-			Dyn->SetVectorParameterValue(TEXT("EmissiveColor"), EmissiveCol);
-			Dyn->SetVectorParameterValue(TEXT("Emissive"), EmissiveCol);
+			if (bIsDefaultFlatMat || bForceTint)
+			{
+				Dyn->SetVectorParameterValue(TEXT("Base Color"), BaseCol);
+				Dyn->SetVectorParameterValue(TEXT("BaseColor"), BaseCol);
+				Dyn->SetVectorParameterValue(TEXT("Color"), BaseCol);
+				Dyn->SetVectorParameterValue(TEXT("Tint"), BaseCol);
+			}
+
+			if (bHasEmissive)
+			{
+				Dyn->SetVectorParameterValue(TEXT("Emissive Color"), EmissiveCol);
+				Dyn->SetVectorParameterValue(TEXT("EmissiveColor"), EmissiveCol);
+				Dyn->SetVectorParameterValue(TEXT("Emissive"), EmissiveCol);
+			}
 		}
 		return Dyn;
 	};
@@ -276,14 +310,14 @@ void ALaserTarget::ApplyColors()
 
 	// 4. Main target receiver body box (vibrant target color, glows on hit)
 	const FLinearColor BodyEmissive = (bIsHitByLaser && bGlowWhenHit) ? (BodyColor * 3.0f) : FLinearColor::Black;
-	BodyDynamicMaterial = SetMeshColor(TargetBodyMesh, BodyColor, BodyEmissive);
+	BodyDynamicMaterial = SetMeshColor(TargetBodyMesh, BodyColor, BodyEmissive, true);
 
 	// 5. Top cap box (dark charcoal)
 	CapDynamicMaterial = SetMeshColor(TopCapMesh, TopCapColor, FLinearColor::Black);
 
 	// 6. Side sensor / receiver box (dark charcoal, glows on hit)
 	const FLinearColor SensorEmissive = (bIsHitByLaser && bGlowWhenHit) ? (BodyColor * 5.0f) : FLinearColor::Black;
-	SensorDynamicMaterial = SetMeshColor(SensorMesh, SensorColor, SensorEmissive);
+	SensorDynamicMaterial = SetMeshColor(SensorMesh, SensorColor, SensorEmissive, true);
 }
 
 void ALaserTarget::SetLaserHit(bool bHit, AActor* SourceActor)

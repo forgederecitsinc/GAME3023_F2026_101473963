@@ -172,7 +172,14 @@ void ARedPowerCylinder::BuildGunComponents()
 		BasePlinthMesh->SetRelativeRotation(FRotator::ZeroRotator);
 		BasePlinthMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 		if (CubeMesh && !BasePlinthMesh->GetStaticMesh()) BasePlinthMesh->SetStaticMesh(CubeMesh);
-		if (BaseFlatMat && !BasePlinthMesh->GetMaterial(0)) BasePlinthMesh->SetMaterial(0, BaseFlatMat);
+		if (BasePlinthMaterial)
+		{
+			BasePlinthMesh->SetMaterial(0, BasePlinthMaterial);
+		}
+		else if (BaseFlatMat && !BasePlinthMesh->GetMaterial(0))
+		{
+			BasePlinthMesh->SetMaterial(0, BaseFlatMat);
+		}
 	}
 
 	// ensure base pedestal plate exists
@@ -194,7 +201,14 @@ void ARedPowerCylinder::BuildGunComponents()
 		BasePedestalMesh->SetRelativeRotation(FRotator::ZeroRotator);
 		BasePedestalMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 		if (CubeMesh && !BasePedestalMesh->GetStaticMesh()) BasePedestalMesh->SetStaticMesh(CubeMesh);
-		if (BaseFlatMat && !BasePedestalMesh->GetMaterial(0)) BasePedestalMesh->SetMaterial(0, BaseFlatMat);
+		if (BasePedestalMaterial)
+		{
+			BasePedestalMesh->SetMaterial(0, BasePedestalMaterial);
+		}
+		else if (BaseFlatMat && !BasePedestalMesh->GetMaterial(0))
+		{
+			BasePedestalMesh->SetMaterial(0, BaseFlatMat);
+		}
 	}
 
 	// ensure upright pillar post exists and connects pedestal flush to collar with zero gap
@@ -215,7 +229,14 @@ void ARedPowerCylinder::BuildGunComponents()
 		PostColumnMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 		UStaticMesh* PostMesh = (bUseCylinderPost && CylinderMeshObj) ? CylinderMeshObj : CubeMesh;
 		if (PostMesh && !PostColumnMesh->GetStaticMesh()) PostColumnMesh->SetStaticMesh(PostMesh);
-		if (BaseFlatMat && !PostColumnMesh->GetMaterial(0)) PostColumnMesh->SetMaterial(0, BaseFlatMat);
+		if (PostColumnMaterial)
+		{
+			PostColumnMesh->SetMaterial(0, PostColumnMaterial);
+		}
+		else if (BaseFlatMat && !PostColumnMesh->GetMaterial(0))
+		{
+			PostColumnMesh->SetMaterial(0, BaseFlatMat);
+		}
 	}
 
 	// rotation rotator based on GunYaw for swiveling the gun head
@@ -238,7 +259,14 @@ void ARedPowerCylinder::BuildGunComponents()
 		NeckCollarMesh->SetRelativeRotation(AimRot);
 		NeckCollarMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 		if (CubeMesh && !NeckCollarMesh->GetStaticMesh()) NeckCollarMesh->SetStaticMesh(CubeMesh);
-		if (BaseFlatMat && !NeckCollarMesh->GetMaterial(0)) NeckCollarMesh->SetMaterial(0, BaseFlatMat);
+		if (NeckCollarMaterial)
+		{
+			NeckCollarMesh->SetMaterial(0, NeckCollarMaterial);
+		}
+		else if (BaseFlatMat && !NeckCollarMesh->GetMaterial(0))
+		{
+			NeckCollarMesh->SetMaterial(0, BaseFlatMat);
+		}
 	}
 
 	// configure main gun receiver body (sharp box)
@@ -249,7 +277,14 @@ void ARedPowerCylinder::BuildGunComponents()
 		CylinderMesh->SetRelativeRotation(AimRot);
 		CylinderMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 		if (CubeMesh && !CylinderMesh->GetStaticMesh()) CylinderMesh->SetStaticMesh(CubeMesh);
-		if (BaseFlatMat && !CylinderMesh->GetMaterial(0)) CylinderMesh->SetMaterial(0, BaseFlatMat);
+		if (BodyMaterial)
+		{
+			CylinderMesh->SetMaterial(0, BodyMaterial);
+		}
+		else if (BaseFlatMat && !CylinderMesh->GetMaterial(0))
+		{
+			CylinderMesh->SetMaterial(0, BaseFlatMat);
+		}
 	}
 
 	// ensure front stepped barrel exists
@@ -270,7 +305,14 @@ void ARedPowerCylinder::BuildGunComponents()
 		BarrelMesh->SetRelativeRotation(AimRot);
 		BarrelMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 		if (CubeMesh && !BarrelMesh->GetStaticMesh()) BarrelMesh->SetStaticMesh(CubeMesh);
-		if (BaseFlatMat && !BarrelMesh->GetMaterial(0)) BarrelMesh->SetMaterial(0, BaseFlatMat);
+		if (BarrelMaterial)
+		{
+			BarrelMesh->SetMaterial(0, BarrelMaterial);
+		}
+		else if (BaseFlatMat && !BarrelMesh->GetMaterial(0))
+		{
+			BarrelMesh->SetMaterial(0, BaseFlatMat);
+		}
 	}
 
 	// ensure front emitter nozzle tip exists
@@ -291,7 +333,14 @@ void ARedPowerCylinder::BuildGunComponents()
 		NozzleMesh->SetRelativeRotation(AimRot);
 		NozzleMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 		if (CubeMesh && !NozzleMesh->GetStaticMesh()) NozzleMesh->SetStaticMesh(CubeMesh);
-		if (BaseFlatMat && !NozzleMesh->GetMaterial(0)) NozzleMesh->SetMaterial(0, BaseFlatMat);
+		if (NozzleMaterial)
+		{
+			NozzleMesh->SetMaterial(0, NozzleMaterial);
+		}
+		else if (BaseFlatMat && !NozzleMesh->GetMaterial(0))
+		{
+			NozzleMesh->SetMaterial(0, BaseFlatMat);
+		}
 	}
 
 	// ensure battery cradle socket bracket exists
@@ -312,7 +361,14 @@ void ARedPowerCylinder::BuildGunComponents()
 		BatteryDockMesh->SetRelativeRotation(AimRot);
 		BatteryDockMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 		if (CubeMesh && !BatteryDockMesh->GetStaticMesh()) BatteryDockMesh->SetStaticMesh(CubeMesh);
-		if (BaseFlatMat && !BatteryDockMesh->GetMaterial(0)) BatteryDockMesh->SetMaterial(0, BaseFlatMat);
+		if (BatteryDockMaterial)
+		{
+			BatteryDockMesh->SetMaterial(0, BatteryDockMaterial);
+		}
+		else if (BaseFlatMat && !BatteryDockMesh->GetMaterial(0))
+		{
+			BatteryDockMesh->SetMaterial(0, BaseFlatMat);
+		}
 	}
 
 	// configure battery socket
@@ -335,7 +391,14 @@ void ARedPowerCylinder::BuildGunComponents()
 	if (LaserBeamMesh)
 	{
 		if (CubeMesh && !LaserBeamMesh->GetStaticMesh()) LaserBeamMesh->SetStaticMesh(CubeMesh);
-		if (LaserBaseMat && !LaserBeamMesh->GetMaterial(0)) LaserBeamMesh->SetMaterial(0, LaserBaseMat);
+		if (LaserBeamMaterial)
+		{
+			LaserBeamMesh->SetMaterial(0, LaserBeamMaterial);
+		}
+		else if (LaserBaseMat && !LaserBeamMesh->GetMaterial(0))
+		{
+			LaserBeamMesh->SetMaterial(0, LaserBaseMat);
+		}
 		LaserBeamMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		LaserBeamMesh->SetCastShadow(false);
 	}
@@ -403,6 +466,13 @@ FLinearColor ARedPowerCylinder::GetColorForID(int32 InID) const
 
 void ARedPowerCylinder::ApplyColorFromID()
 {
+	// NEVER create transient dynamic material instances on templates or CDOs in the Blueprint Editor!
+	// Creating transient MIDs during Blueprint compilation corrupts component template serialization and reverts materials.
+	if (HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject))
+	{
+		return;
+	}
+
 	const FLinearColor ChosenColor = GetColorForID(CellID);
 	const FLinearColor PlinthColor = FLinearColor(0.12f, 0.12f, 0.14f);
 	const FLinearColor PedestalColor = FLinearColor(0.82f, 0.82f, 0.85f);
@@ -413,24 +483,45 @@ void ARedPowerCylinder::ApplyColorFromID()
 	const FLinearColor BodyColor = ChosenColor;
 	const FLinearColor BarrelColor = ChosenColor;
 
-	auto SetMeshColor = [](UStaticMeshComponent* MeshComp, const FLinearColor& BaseCol, const FLinearColor& EmissiveCol) -> UMaterialInstanceDynamic*
+	UMaterialInterface* BaseFlatMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/LevelPrototyping/Materials/M_FlatCol.M_FlatCol"));
+
+	auto SetMeshColor = [BaseFlatMat](UStaticMeshComponent* MeshComp, const FLinearColor& BaseCol, const FLinearColor& EmissiveCol, bool bForceTint = false) -> UMaterialInstanceDynamic*
 	{
 		if (!MeshComp) return nullptr;
-		UMaterialInstanceDynamic* Dyn = Cast<UMaterialInstanceDynamic>(MeshComp->GetMaterial(0));
+		UMaterialInterface* CurrentMat = MeshComp->GetMaterial(0);
+		if (!CurrentMat) return nullptr;
+
+		// Check if this is the default prototype flat material
+		const bool bIsDefaultFlatMat = (CurrentMat == BaseFlatMat) || CurrentMat->GetName().Contains(TEXT("FlatCol"));
+
+		// If the user assigned a custom material and there is no emissive glow needed, leave it completely untouched!
+		const bool bHasEmissive = (EmissiveCol.R > 0.001f || EmissiveCol.G > 0.001f || EmissiveCol.B > 0.001f);
+		if (!bIsDefaultFlatMat && !bForceTint && !bHasEmissive)
+		{
+			return nullptr;
+		}
+
+		UMaterialInstanceDynamic* Dyn = Cast<UMaterialInstanceDynamic>(CurrentMat);
 		if (!Dyn)
 		{
 			Dyn = MeshComp->CreateAndSetMaterialInstanceDynamic(0);
 		}
 		if (Dyn)
 		{
-			// M_FlatCol uses "Base Color" (with space), custom materials may use "BaseColor" or "Color"
-			Dyn->SetVectorParameterValue(TEXT("Base Color"), BaseCol);
-			Dyn->SetVectorParameterValue(TEXT("BaseColor"), BaseCol);
-			Dyn->SetVectorParameterValue(TEXT("Color"), BaseCol);
-			Dyn->SetVectorParameterValue(TEXT("Tint"), BaseCol);
-			Dyn->SetVectorParameterValue(TEXT("Emissive Color"), EmissiveCol);
-			Dyn->SetVectorParameterValue(TEXT("EmissiveColor"), EmissiveCol);
-			Dyn->SetVectorParameterValue(TEXT("Emissive"), EmissiveCol);
+			if (bIsDefaultFlatMat || bForceTint)
+			{
+				Dyn->SetVectorParameterValue(TEXT("Base Color"), BaseCol);
+				Dyn->SetVectorParameterValue(TEXT("BaseColor"), BaseCol);
+				Dyn->SetVectorParameterValue(TEXT("Color"), BaseCol);
+				Dyn->SetVectorParameterValue(TEXT("Tint"), BaseCol);
+			}
+
+			if (bHasEmissive)
+			{
+				Dyn->SetVectorParameterValue(TEXT("Emissive Color"), EmissiveCol);
+				Dyn->SetVectorParameterValue(TEXT("EmissiveColor"), EmissiveCol);
+				Dyn->SetVectorParameterValue(TEXT("Emissive"), EmissiveCol);
+			}
 		}
 		return Dyn;
 	};
@@ -457,11 +548,11 @@ void ARedPowerCylinder::ApplyColorFromID()
 
 	// 7. main gun receiver body: rich, 100% saturated full color at all times; glowing bright emissive when powered
 	const FLinearColor BodyEmissive = bIsPowered ? (BodyColor * 4.0f) : FLinearColor::Black;
-	DynamicMaterial = SetMeshColor(CylinderMesh, BodyColor, BodyEmissive);
+	DynamicMaterial = SetMeshColor(CylinderMesh, BodyColor, BodyEmissive, true);
 
 	// 8. front stepped barrel extension: matching full vibrant color; glowing emissive when powered
 	const FLinearColor BarrelEmissive = bIsPowered ? (BarrelColor * 3.5f) : FLinearColor::Black;
-	BarrelDynamicMaterial = SetMeshColor(BarrelMesh, BarrelColor, BarrelEmissive);
+	BarrelDynamicMaterial = SetMeshColor(BarrelMesh, BarrelColor, BarrelEmissive, true);
 }
 
 bool ARedPowerCylinder::CheckActorTargetIDMatch(AActor* ActorToCheck, int32& OutFoundID) const
@@ -592,21 +683,25 @@ void ARedPowerCylinder::UpdateLaserBeam()
 	LaserBeamMesh->SetRelativeRotation(FRotator::ZeroRotator);
 	LaserBeamMesh->SetRelativeScale3D(FVector(ActualDistance / 100.0f, LaserThickness / 100.0f, LaserThickness / 100.0f));
 
-	// create bright emissive laser material
-	if (!LaserDynamicMaterial)
+	// Do not create dynamic material on templates in Blueprint editor
+	if (!HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject))
 	{
-		LaserDynamicMaterial = LaserBeamMesh->CreateAndSetMaterialInstanceDynamic(0);
-	}
+		// create bright emissive laser material
+		if (!LaserDynamicMaterial)
+		{
+			LaserDynamicMaterial = LaserBeamMesh->CreateAndSetMaterialInstanceDynamic(0);
+		}
 
-	if (LaserDynamicMaterial)
-	{
-		const FLinearColor LaserBeamColor = GetColorForID(CellID);
-		LaserDynamicMaterial->SetVectorParameterValue(TEXT("Base Color"), LaserBeamColor);
-		LaserDynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), LaserBeamColor);
-		LaserDynamicMaterial->SetVectorParameterValue(TEXT("Color"), LaserBeamColor);
-		LaserDynamicMaterial->SetVectorParameterValue(TEXT("Emissive Color"), LaserBeamColor * 20.0f);
-		LaserDynamicMaterial->SetVectorParameterValue(TEXT("EmissiveColor"), LaserBeamColor * 20.0f);
-		LaserDynamicMaterial->SetVectorParameterValue(TEXT("Emissive"), LaserBeamColor * 20.0f); // intense laser glow!
+		if (LaserDynamicMaterial)
+		{
+			const FLinearColor LaserBeamColor = GetColorForID(CellID);
+			LaserDynamicMaterial->SetVectorParameterValue(TEXT("Base Color"), LaserBeamColor);
+			LaserDynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), LaserBeamColor);
+			LaserDynamicMaterial->SetVectorParameterValue(TEXT("Color"), LaserBeamColor);
+			LaserDynamicMaterial->SetVectorParameterValue(TEXT("Emissive Color"), LaserBeamColor * 20.0f);
+			LaserDynamicMaterial->SetVectorParameterValue(TEXT("EmissiveColor"), LaserBeamColor * 20.0f);
+			LaserDynamicMaterial->SetVectorParameterValue(TEXT("Emissive"), LaserBeamColor * 20.0f); // intense laser glow!
+		}
 	}
 
 	// Target detection by matching Target ID during gameplay
@@ -686,7 +781,7 @@ void ARedPowerCylinder::UpdateLaserBeam()
 #else
 				const FString TargetName = HitActor ? HitActor->GetName() : TEXT("Target");
 #endif
-				const FString Msg = FString::Printf(TEXT("[TARGET HIT] Laser hit target object: %s"), *TargetName);
+				const FString Msg = FString::Printf(TEXT("[TARGET MATCH: %d] Laser hit matching target object: %s"), CellID, *TargetName);
 
 				UKismetSystemLibrary::PrintString(this, Msg, true, true, FLinearColor(0.1f, 1.0f, 0.2f), 3.0f);
 
@@ -703,7 +798,7 @@ void ARedPowerCylinder::UpdateLaserBeam()
 			{
 				bHasPrintedNoTarget = true;
 
-				const FString Msg = TEXT("[LASER ACTIVE] Laser beam emitting - No target detected");
+				const FString Msg = FString::Printf(TEXT("[LASER EMITTING] Laser beam emitted (ID: %d) - No matching target detected"), CellID);
 
 				UKismetSystemLibrary::PrintString(this, Msg, true, true, FLinearColor(1.0f, 0.85f, 0.1f), 2.5f);
 
@@ -738,7 +833,7 @@ void ARedPowerCylinder::OnInteractionBeginOverlap(UPrimitiveComponent* Overlappe
 					2001,
 					2.5f,
 					FColor::Cyan,
-					TEXT("[Laser Gun] Press [Square] to Remove Battery")
+					FString::Printf(TEXT("[Laser Gun] Press [Square] to Remove Battery (ID: %d)"), CellID)
 				);
 			}
 			else
@@ -749,7 +844,7 @@ void ARedPowerCylinder::OnInteractionBeginOverlap(UPrimitiveComponent* Overlappe
 						2001,
 						2.5f,
 						FColor::Green,
-						TEXT("[Laser Gun] Press [Square] to Attach Battery into Laser Gun")
+						FString::Printf(TEXT("[Laser Gun] Press [Square] to Attach Battery into Laser Gun (ID: %d)"), CellID)
 					);
 				}
 				else
@@ -758,7 +853,7 @@ void ARedPowerCylinder::OnInteractionBeginOverlap(UPrimitiveComponent* Overlappe
 						2001,
 						2.5f,
 						FColor::Orange,
-						TEXT("[Laser Gun] Laser Gun: OFFLINE (Requires Matching Battery)")
+						FString::Printf(TEXT("[Laser Gun] Laser Gun (ID: %d): OFFLINE (Requires Matching Battery)"), CellID)
 					);
 				}
 			}
@@ -811,7 +906,7 @@ bool ARedPowerCylinder::Interact(AGAME3023_F26_RoshanCharacter* Player)
 					-1,
 					4.0f,
 					FColor::Yellow,
-					TEXT("[BATTERY REMOVED] Battery removed! Laser Gun is now OFFLINE."),
+					FString::Printf(TEXT("[BATTERY REMOVED] Battery removed! Laser Gun (ID: %d) is now OFFLINE."), CellID),
 					true,
 					FVector2D(1.3f, 1.3f)
 				);
@@ -848,7 +943,7 @@ bool ARedPowerCylinder::Interact(AGAME3023_F26_RoshanCharacter* Player)
 				-1,
 				3.5f,
 				FColor::Red,
-				TEXT("[POWER OFFLINE] Laser Gun needs a matching Battery!"),
+				FString::Printf(TEXT("[POWER OFFLINE] Laser Gun (ID: %d) needs a matching Battery!"), CellID),
 				true,
 				FVector2D(1.3f, 1.3f)
 			);
@@ -916,7 +1011,7 @@ bool ARedPowerCylinder::InsertBattery(ABatteryCapsule* Battery)
 				-1,
 				4.5f,
 				FColor::Green,
-				TEXT("[POWER MATCH] Battery attached & Laser Gun ONLINE! Laser beam active!"),
+				FString::Printf(TEXT("[ID MATCH: %d] Battery attached & Laser Gun ONLINE! Laser beam active!"), CellID),
 				true,
 				FVector2D(1.4f, 1.4f)
 			);
@@ -938,7 +1033,7 @@ bool ARedPowerCylinder::InsertBattery(ABatteryCapsule* Battery)
 				-1,
 				5.0f,
 				FColor::Orange,
-				TEXT("[MISMATCH] Battery attached, but Laser Gun WON'T POWER ON!"),
+				FString::Printf(TEXT("[ID MISMATCH] Battery (ID: %d) attached, but Laser Gun (ID: %d) WON'T POWER ON!"), Battery->BatteryID, CellID),
 				true,
 				FVector2D(1.4f, 1.4f)
 			);

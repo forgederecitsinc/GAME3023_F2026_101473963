@@ -41,6 +41,36 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Cell ID (4-Digit)"))
 	int32 CellID = 1001;
 
+	// ==========================================
+	// Material Overrides (Editable in BP & Details panel)
+	// ==========================================
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Base Plinth Material"))
+	TObjectPtr<UMaterialInterface> BasePlinthMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Base Pedestal Material"))
+	TObjectPtr<UMaterialInterface> BasePedestalMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Pillar Column Material"))
+	TObjectPtr<UMaterialInterface> PostColumnMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Neck Collar Material"))
+	TObjectPtr<UMaterialInterface> NeckCollarMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Gun Body Material"))
+	TObjectPtr<UMaterialInterface> BodyMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Barrel Material"))
+	TObjectPtr<UMaterialInterface> BarrelMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Nozzle Tip Material"))
+	TObjectPtr<UMaterialInterface> NozzleMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Battery Dock Material"))
+	TObjectPtr<UMaterialInterface> BatteryDockMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Laser Beam Material"))
+	TObjectPtr<UMaterialInterface> LaserBeamMaterial;
+
 
 	// Legacy backward-compatibility aliases
 	UPROPERTY()

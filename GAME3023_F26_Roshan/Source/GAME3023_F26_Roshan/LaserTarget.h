@@ -60,6 +60,24 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Base Material"))
 	TObjectPtr<UMaterialInterface> BaseMaterial;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Base Pedestal Material"))
+	TObjectPtr<UMaterialInterface> BasePedestalMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Pillar Column Material"))
+	TObjectPtr<UMaterialInterface> PostColumnMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Neck Collar Material"))
+	TObjectPtr<UMaterialInterface> NeckCollarMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Target Body Material"))
+	TObjectPtr<UMaterialInterface> TargetBodyMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Top Cap Material"))
+	TObjectPtr<UMaterialInterface> TopCapMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Sensor Box Material"))
+	TObjectPtr<UMaterialInterface> SensorMaterial;
+
 	// Whether to show the bottom base pedestal slab (disable if placing on an existing arena pedestal)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Appearance", meta = (DisplayName = "Show Base Structure"))
 	bool bShowBaseStructure = true;
