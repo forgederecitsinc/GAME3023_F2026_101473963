@@ -15,6 +15,8 @@
 #include "GAME3023_F26_Roshan.h"
 #include "BatteryCapsule.h"
 #include "RedPowerCylinder.h"
+#include "InteractPromptWidget.h"
+#include "Engine/OverlapResult.h"
 #include "InputCoreTypes.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/Engine.h"
@@ -26,6 +28,8 @@
 #include "UObject/UObjectGlobals.h"
 #include "UObject/Package.h"
 #include "UObject/ObjectKey.h"
+
+DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
 AGAME3023_F26_RoshanCharacter::AGAME3023_F26_RoshanCharacter()
 {
@@ -79,6 +83,7 @@ AGAME3023_F26_RoshanCharacter::AGAME3023_F26_RoshanCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
 	FollowCamera->SetFieldOfView(CameraFOV);
+
 }
 
 void AGAME3023_F26_RoshanCharacter::BeginPlay()
@@ -103,6 +108,13 @@ void AGAME3023_F26_RoshanCharacter::BeginPlay()
 	{
 		PC->SetControlRotation(FRotator(0.0f, CameraYaw, 0.0f));
 	}
+
+	// initialize interaction prompt widget for local player
+	if (IsLocallyControlled())
+	{
+		InitInteractionPromptWidget();
+	}
+
 }
 
 void AGAME3023_F26_RoshanCharacter::PossessedBy(AController* NewController)
@@ -113,10 +125,23 @@ void AGAME3023_F26_RoshanCharacter::PossessedBy(AController* NewController)
 	{
 		PC->SetControlRotation(FRotator(0.0f, CameraYaw, 0.0f));
 	}
+
+	if (IsLocallyControlled())
+	{
+		InitInteractionPromptWidget();
+
+	}
 }
 
 void AGAME3023_F26_RoshanCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	// clean up interaction prompt widget
+	if (InteractionPromptWidget)
+	{
+		InteractionPromptWidget->RemoveFromParent();
+		InteractionPromptWidget = nullptr;
+	}
+
 	// put back original materials on any roof meshes before ending play
 	for (auto& Pair : ActiveOccludingMeshes)
 	{
@@ -212,6 +237,12 @@ void AGAME3023_F26_RoshanCharacter::Tick(float DeltaTime)
 
 	// update smooth circular see-through cutout on any roofs or catwalks hiding the player
 	UpdateCameraOcclusionCutout(DeltaTime);
+
+	// update on-screen interaction prompt widget if near an interactable item
+	if (bShowInteractionWidget && IsLocallyControlled())
+	{
+		UpdateInteractionPrompt(DeltaTime);
+	}
 
 	// reset flag at end of frame
 	bMovedViaEnhancedInputThisFrame = false;
@@ -787,3 +818,197 @@ ABatteryCapsule* AGAME3023_F26_RoshanCharacter::DropCurrentBattery()
 
 	return Dropped;
 }
+
+void AGAME3023_F26_RoshanCharacter::InitInteractionPromptWidget()
+{
+	if (InteractionPromptWidget)
+	{
+		return;
+	}
+
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC)
+	{
+		return;
+	}
+
+	UClass* WidgetClassToUse = InteractionPromptWidgetClass ? InteractionPromptWidgetClass.Get() : UInteractPromptWidget::StaticClass();
+	if (WidgetClassToUse)
+	{
+		InteractionPromptWidget = CreateWidget<UInteractPromptWidget>(PC, WidgetClassToUse);
+		if (InteractionPromptWidget)
+		{
+			InteractionPromptWidget->AddToViewport(100);
+			InteractionPromptWidget->HidePrompt();
+			UE_LOG(LogGAME3023_F26_Roshan, Log, TEXT("[Live Wire] Interaction Prompt Widget spawned successfully on Viewport."));
+		}
+	}
+}
+
+void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
+{
+	if (!InteractionPromptWidget)
+	{
+		InitInteractionPromptWidget();
+		if (!InteractionPromptWidget)
+		{
+			return;
+		}
+	}
+
+	AActor* BestCandidate = nullptr;
+	float BestDistSq = MAX_flt;
+	const FVector PlayerLoc = GetActorLocation();
+
+	// 1. Check CurrentInteractable (if previously set by overlap)
+	if (CurrentInteractable && IsValid(CurrentInteractable))
+	{
+		bool bIsValidTarget = true;
+
+		if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(CurrentInteractable))
+		{
+			if (Battery->bIsCarried || Battery->bIsSocketed)
+			{
+				bIsValidTarget = false;
+			}
+			else
+			{
+				const float DistSq = FVector::DistSquared(PlayerLoc, Battery->GetActorLocation());
+				if (DistSq > FMath::Square(InteractionDetectionRadius + 60.0f))
+				{
+					bIsValidTarget = false;
+				}
+				else
+				{
+					BestCandidate = Battery;
+					BestDistSq = DistSq;
+				}
+			}
+		}
+		else if (ARedPowerCylinder* Cylinder = Cast<ARedPowerCylinder>(CurrentInteractable))
+		{
+			const float DistSq = FVector::DistSquared(PlayerLoc, Cylinder->GetActorLocation());
+			if (DistSq > FMath::Square(400.0f))
+			{
+				bIsValidTarget = false;
+			}
+			else
+			{
+				BestCandidate = Cylinder;
+				BestDistSq = DistSq;
+			}
+		}
+
+		if (!bIsValidTarget)
+		{
+			CurrentInteractable = nullptr;
+		}
+	}
+
+	// 2. Proximity sweep for nearby interactables (catches dropped batteries, entering radius, etc.)
+	UWorld* World = GetWorld();
+	if (World)
+	{
+		TArray<FOverlapResult> Overlaps;
+		FCollisionShape Sphere = FCollisionShape::MakeSphere(InteractionDetectionRadius);
+		FCollisionQueryParams Params;
+		Params.AddIgnoredActor(this);
+		if (CarriedBattery)
+		{
+			Params.AddIgnoredActor(CarriedBattery);
+		}
+
+		FCollisionObjectQueryParams ObjectParams;
+		ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+		ObjectParams.AddObjectTypesToQuery(ECC_Pawn);
+
+		if (World->OverlapMultiByObjectType(Overlaps, PlayerLoc, FQuat::Identity, ObjectParams, Sphere, Params))
+		{
+			for (const FOverlapResult& Overlap : Overlaps)
+			{
+				AActor* OverlapActor = Overlap.GetActor();
+				if (!OverlapActor || OverlapActor == this) continue;
+
+				if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(OverlapActor))
+				{
+					if (!Battery->bIsCarried && !Battery->bIsSocketed)
+					{
+						const float DistSq = FVector::DistSquared(PlayerLoc, Battery->GetActorLocation());
+						if (DistSq < BestDistSq)
+						{
+							BestCandidate = Battery;
+							BestDistSq = DistSq;
+						}
+					}
+				}
+				else if (ARedPowerCylinder* Cylinder = Cast<ARedPowerCylinder>(OverlapActor))
+				{
+					const float DistSq = FVector::DistSquared(PlayerLoc, Cylinder->GetActorLocation());
+					if (DistSq < BestDistSq)
+					{
+						BestCandidate = Cylinder;
+						BestDistSq = DistSq;
+					}
+				}
+			}
+		}
+	}
+
+	// 3. Update widget based on best candidate
+	if (BestCandidate)
+	{
+		CurrentInteractable = BestCandidate;
+		InteractionPromptWidget->bAnchorToScreenBottom = bAnchorPromptToScreenBottom;
+
+		FString ActionStr = TEXT("Press Square to Interact");
+		FString TargetStr = BestCandidate->GetName();
+
+		if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(BestCandidate))
+		{
+			if (HasBattery())
+			{
+				ActionStr = TEXT("Hands Full (Drop Battery First)");
+				TargetStr = FString::Printf(TEXT("Battery Capsule (ID: %d)"), Battery->BatteryID);
+			}
+			else
+			{
+				ActionStr = TEXT("Press Square to Collect Battery");
+				TargetStr = FString::Printf(TEXT("Battery Capsule (ID: %d)"), Battery->BatteryID);
+			}
+		}
+		else if (ARedPowerCylinder* Cylinder = Cast<ARedPowerCylinder>(BestCandidate))
+		{
+			if (Cylinder->bHasBattery)
+			{
+				ActionStr = TEXT("Press Square to Remove Battery");
+				TargetStr = FString::Printf(TEXT("Laser Gun (ID: %d) - Online"), Cylinder->CellID);
+			}
+			else if (HasBattery())
+			{
+				ActionStr = TEXT("Press Square to Attach Battery");
+				TargetStr = FString::Printf(TEXT("Laser Gun (ID: %d) - Ready"), Cylinder->CellID);
+			}
+			else
+			{
+				ActionStr = TEXT("Press Square to Inspect");
+				TargetStr = FString::Printf(TEXT("Laser Gun (ID: %d) - Offline"), Cylinder->CellID);
+			}
+		}
+
+		InteractionPromptWidget->ShowPrompt(
+			BestCandidate,
+			FText::FromString(ActionStr),
+			FText::FromString(TargetStr)
+		);
+	}
+	else
+	{
+		if (CurrentInteractable)
+		{
+			CurrentInteractable = nullptr;
+		}
+
+		InteractionPromptWidget->HidePrompt();
+	}
+}
+

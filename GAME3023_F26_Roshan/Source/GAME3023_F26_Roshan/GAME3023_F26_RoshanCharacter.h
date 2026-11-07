@@ -40,6 +40,8 @@ struct FOccludingMeshData
 	bool bHitThisFrame = false;
 };
 
+class UInteractPromptWidget;
+
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 // main player character for the project
@@ -253,6 +255,37 @@ public:
 	// getters and setters for current interactable
 	void SetCurrentInteractable(AActor* Interactable) { CurrentInteractable = Interactable; }
 	AActor* GetCurrentInteractable() const { return CurrentInteractable; }
+
+	// --- Interaction UI Widget ---
+
+	// custom widget class to use for the interaction prompt (defaults to UInteractPromptWidget)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Interaction UI", meta = (DisplayName = "Interaction Prompt Widget Class"))
+	TSubclassOf<UInteractPromptWidget> InteractionPromptWidgetClass;
+
+	// active runtime interaction prompt widget instance
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "LiveWire|Interaction UI")
+	TObjectPtr<UInteractPromptWidget> InteractionPromptWidget;
+
+	// toggle to enable or disable the on-screen interaction prompt widget
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Interaction UI", meta = (DisplayName = "Show Interaction Widget"))
+	bool bShowInteractionWidget = true;
+
+	// radius around character to scan for nearby interactables (batteries, cylinders)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Interaction UI", meta = (DisplayName = "Interaction Detection Radius"))
+	float InteractionDetectionRadius = 260.0f;
+
+	// whether interaction prompt docks at bottom-center of screen (recommended for 2.5d top-down)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Interaction UI", meta = (DisplayName = "Anchor Prompt To Screen Bottom"))
+	bool bAnchorPromptToScreenBottom = true;
+
+	// initialize and spawn the interaction prompt widget on the viewport
+	UFUNCTION(BlueprintCallable, Category = "LiveWire|Interaction UI")
+	void InitInteractionPromptWidget();
+
+	// updates interaction prompt visibility and text based on nearby interactable actors
+	UFUNCTION(BlueprintCallable, Category = "LiveWire|Interaction UI")
+	void UpdateInteractionPrompt(float DeltaTime);
+
 
 public:
 
