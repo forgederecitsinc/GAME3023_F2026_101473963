@@ -299,7 +299,7 @@ void ABatteryCapsule::OnInteractionBeginOverlap(UPrimitiveComponent* OverlappedC
 				1001,
 				2.0f,
 				FColor::Cyan,
-				TEXT("[Live Wire] Press [Square] to Collect Battery")
+				FString::Printf(TEXT("[Live Wire] Press [Square] to Collect Battery (ID: %d)"), BatteryID)
 			);
 		}
 	}

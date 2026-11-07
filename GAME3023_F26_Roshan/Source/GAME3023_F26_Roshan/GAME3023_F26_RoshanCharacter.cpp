@@ -1056,10 +1056,12 @@ void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
 			if (HasBattery())
 			{
 				ActionStr = TEXT("Hands Full (Drop Battery First)");
+				TargetStr = FString::Printf(TEXT("Battery Capsule (ID: %d)"), Battery->BatteryID);
 			}
 			else
 			{
 				ActionStr = TEXT("Press Square to Collect Battery");
+				TargetStr = FString::Printf(TEXT("Battery Capsule (ID: %d)"), Battery->BatteryID);
 			}
 		}
 		else if (ARedPowerCylinder* Cylinder = Cast<ARedPowerCylinder>(BestCandidate))
@@ -1067,14 +1069,17 @@ void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
 			if (Cylinder->bHasBattery)
 			{
 				ActionStr = TEXT("Press Square to Remove Battery");
+				TargetStr = FString::Printf(TEXT("Laser Gun (ID: %d) - Online"), Cylinder->CellID);
 			}
 			else if (HasBattery())
 			{
 				ActionStr = TEXT("Press Square to Attach Battery");
+				TargetStr = FString::Printf(TEXT("Laser Gun (ID: %d) - Ready"), Cylinder->CellID);
 			}
 			else
 			{
 				ActionStr = TEXT("Laser Gun (Requires Battery)");
+				TargetStr = FString::Printf(TEXT("Laser Gun (ID: %d) - Offline"), Cylinder->CellID);
 			}
 		}
 
