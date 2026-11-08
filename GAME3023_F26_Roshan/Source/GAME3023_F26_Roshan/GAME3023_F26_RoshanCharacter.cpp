@@ -16,6 +16,7 @@
 #include "GAME3023_F26_Roshan.h"
 #include "BatteryCapsule.h"
 #include "RedPowerCylinder.h"
+#include "EnemyDrone.h"
 #include "InteractPromptWidget.h"
 #include "PlayerHealthHUDWidget.h"
 #include "Engine/OverlapResult.h"
@@ -1467,6 +1468,23 @@ void AGAME3023_F26_RoshanCharacter::RespawnPlayer()
 
 	// reset hold and interaction state
 	ResetBatteryAttachHold();
+
+	// detach and reset any EnemyDrone that latched onto or was chasing the player back to its starting spawn point
+	if (UWorld* World = GetWorld())
+	{
+		TArray<AActor*> FoundDrones;
+		UGameplayStatics::GetAllActorsOfClass(World, AEnemyDrone::StaticClass(), FoundDrones);
+		for (AActor* Actor : FoundDrones)
+		{
+			if (AEnemyDrone* Drone = Cast<AEnemyDrone>(Actor))
+			{
+				if (Drone->IsAttachedTo(this) || Drone->DroneState != EEnemyDroneState::Patrolling)
+				{
+					Drone->ResetToStartAndResumePatrol();
+				}
+			}
+		}
+	}
 
 	// teleport player to the exact respawn location
 	TeleportTo(RespawnLocation, GetActorRotation(), false, true);

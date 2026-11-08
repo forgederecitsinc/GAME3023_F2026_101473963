@@ -2,7 +2,8 @@
 // enemy drone header - autonomous patrolling drone with empty static mesh slot,
 // downward laser-like spotlight, full-coverage NavMesh patrolling at Z >= 1000,
 // 5-second escape countdown when the player is caught in the light (escaped by hiding under cover),
-// and diving down to latch onto the player and kill them if they fail to hide within 5 seconds
+// diving down to latch onto the player and kill them if they fail to hide within 5 seconds,
+// and automatically resetting to its starting spawn point to resume patrolling when the player respawns
 
 #pragma once
 
@@ -179,6 +180,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Drone|Movement & Patrol")
 	void BuildNavMeshCoveragePoints();
 
+	// Detaches the drone from the player, teleports it back to its starting spawn location/rotation, and resumes NavMesh patrolling
+	UFUNCTION(BlueprintCallable, Category = "Drone|Movement & Patrol")
+	void ResetToStartAndResumePatrol();
+
 	// Returns true if the given pawn is currently illuminated under the downward laser light cone
 	UFUNCTION(BlueprintPure, Category = "Drone|Player Detection & Latch Kill")
 	bool IsPawnUnderLight(const APawn* TargetPawn) const;
@@ -208,6 +213,11 @@ private:
 
 	// Origin on the NavMesh when patrolling begins
 	FVector PatrolOrigin = FVector::ZeroVector;
+
+	// Saved initial spawn location & rotation so the drone can reset when the player respawns
+	FVector InitialSpawnLocation = FVector::ZeroVector;
+	FRotator InitialSpawnRotation = FRotator::ZeroRotator;
+	float InitialGroundZ = 0.0f;
 
 	// Timer tracking pause at waypoint
 	float WaitTimer = 0.0f;

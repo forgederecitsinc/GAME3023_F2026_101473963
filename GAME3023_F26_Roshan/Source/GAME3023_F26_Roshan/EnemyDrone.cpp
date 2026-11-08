@@ -103,16 +103,42 @@ void AEnemyDrone::BeginPlay()
 
 	const FVector StartLocation = GetActorLocation();
 	CurrentGroundZ = SampleNavMeshGroundZ(StartLocation);
+	InitialGroundZ = CurrentGroundZ;
 	bHasValidGroundZ = true;
 
 	PatrolOrigin = FVector(StartLocation.X, StartLocation.Y, CurrentGroundZ);
 
-	// Snap initial Z to >= 1000 above the NavMesh
+	// Snap initial Z to >= 1000 above the NavMesh and record starting transform for respawn reset
 	const float InitialHoverZ = FMath::Max(ComputeHoverAltitudeZ(), StartLocation.Z);
-	SetActorLocation(FVector(StartLocation.X, StartLocation.Y, InitialHoverZ));
+	InitialSpawnLocation = FVector(StartLocation.X, StartLocation.Y, InitialHoverZ);
+	InitialSpawnRotation = GetActorRotation();
+	SetActorLocationAndRotation(InitialSpawnLocation, InitialSpawnRotation, false, nullptr, ETeleportType::TeleportPhysics);
 
 	DroneState = EEnemyDroneState::Patrolling;
 	BuildNavMeshCoveragePoints();
+	AdvanceToNextPatrolDestination();
+}
+
+void AEnemyDrone::ResetToStartAndResumePatrol()
+{
+	// Detach from the player character if latched on
+	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+
+	// Restore initial state and timers
+	DroneState = EEnemyDroneState::Patrolling;
+	bIsFollowingPlayer = false;
+	EscapeTimerRemaining = 0.0f;
+	WaitTimer = 0.0f;
+	ParticleDropCooldown = 0.0f;
+	CurrentGroundZ = InitialGroundZ;
+	bHasValidGroundZ = true;
+	CurrentPatrolIndex = -1;
+
+	// Teleport back to the exact starting point and rotation where the drone began
+	SetActorLocationAndRotation(InitialSpawnLocation, InitialSpawnRotation, false, nullptr, ETeleportType::TeleportPhysics);
+
+	// Restore normal laser light intensity/settings and resume NavMesh patrol from the start
+	RefreshDroneSettings();
 	AdvanceToNextPatrolDestination();
 }
 
@@ -504,9 +530,16 @@ void AEnemyDrone::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// Once latched onto the killed player, stay attached
+	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0);
+	const AGAME3023_F26_RoshanCharacter* PlayerChar = Cast<AGAME3023_F26_RoshanCharacter>(PlayerPawn);
+
+	// While latched onto the killed player, wait until the player respawns; once alive again, detach and reset to start
 	if (DroneState == EEnemyDroneState::LatchedKilled)
 	{
+		if (!IsValid(PlayerPawn) || (PlayerChar && !PlayerChar->IsDead()))
+		{
+			ResetToStartAndResumePatrol();
+		}
 		return;
 	}
 
@@ -516,18 +549,15 @@ void AEnemyDrone::Tick(float DeltaTime)
 	}
 
 	const FVector CurrentLocation = GetActorLocation();
-	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0);
 
 	// ==========================================
 	// STATE 3: Diving Down To Latch Onto Player & Kill Them (5s timer expired)
 	// ==========================================
 	if (DroneState == EEnemyDroneState::DivingToLatch)
 	{
-		if (!IsValid(PlayerPawn))
+		if (!IsValid(PlayerPawn) || (PlayerChar && PlayerChar->IsDead()))
 		{
-			DroneState = EEnemyDroneState::Patrolling;
-			bIsFollowingPlayer = false;
-			AdvanceToNextPatrolDestination();
+			ResetToStartAndResumePatrol();
 			return;
 		}
 
@@ -556,18 +586,22 @@ void AEnemyDrone::Tick(float DeltaTime)
 	// ==========================================
 	if (DroneState == EEnemyDroneState::TrackingPlayer)
 	{
-		const AGAME3023_F26_RoshanCharacter* PlayerChar = Cast<AGAME3023_F26_RoshanCharacter>(PlayerPawn);
 		const bool bPlayerDead = PlayerChar && PlayerChar->IsDead();
+		if (bPlayerDead)
+		{
+			ResetToStartAndResumePatrol();
+			return;
+		}
 
 		// Check if the player escaped by hiding under a roof, catwalk, or overhead structure
-		if (!IsValid(PlayerPawn) || bPlayerDead || IsPawnHidingUnderCover(PlayerPawn))
+		if (!IsValid(PlayerPawn) || IsPawnHidingUnderCover(PlayerPawn))
 		{
 			DroneState = EEnemyDroneState::Patrolling;
 			bIsFollowingPlayer = false;
 			EscapeTimerRemaining = 0.0f;
 			RefreshDroneSettings();
 
-			if (!bPlayerDead && GEngine)
+			if (GEngine)
 			{
 				GEngine->AddOnScreenDebugMessage(
 					4201,
