@@ -1,7 +1,9 @@
 // roshan - 101473963 - game3023 game engines 3
 // ground battery saboteur / battery thief enemy header
-// stage 1: spawns at the substation vent/hatch location (default X=-878, Y=-3679, Z=10)
-// and patrols the ground NavMesh with instance-editable settings for BP customization
+// spawns at (X=-878, Y=-3679, Z=10), patrols the ground NavMesh, detects ONLY working batteries
+// that have activated a laser (ARedPowerCylinder::bIsPowered == true), navigates to the nearest working
+// battery laser device, runs a 10-second removal timer to detach the battery, scans the NavMesh to find
+// the closest BP_BatteryDropSpot actor placed in the level, carries the battery there on its back, drops it, and resumes patrol
 
 #pragma once
 
@@ -14,6 +16,17 @@ class USceneComponent;
 class UStaticMeshComponent;
 class USpotLightComponent;
 class UFloatingPawnMovement;
+class ARedPowerCylinder;
+class ABatteryCapsule;
+
+UENUM(BlueprintType)
+enum class EBatteryThiefState : uint8
+{
+	Patrolling		UMETA(DisplayName = "Patrolling NavMesh"),
+	Approaching		UMETA(DisplayName = "Moving To Working Battery"),
+	Removing		UMETA(DisplayName = "Removing Battery (10s Timer)"),
+	Carrying		UMETA(DisplayName = "Carrying Stolen Battery To Closest BP_BatteryDropSpot")
+};
 
 UCLASS()
 class GAME3023_F26_ROSHAN_API AEnemyBatteryThief : public APawn
@@ -52,6 +65,10 @@ public:
 	// Main chassis static mesh (assign custom mesh in BP or use default crawler blockout)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (DisplayName = "Thief Body Mesh"))
 	TObjectPtr<UStaticMeshComponent> ThiefMesh;
+
+	// Socket on top of the chassis where a stolen battery is mounted after the 10s removal completes
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (DisplayName = "Carried Battery Mount"))
+	TObjectPtr<USceneComponent> CarriedBatterySocket;
 
 	// Forward-facing scanner light
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (DisplayName = "Scanner Light"))
@@ -98,14 +115,58 @@ public:
 	float InitialSpawnDelay = 0.5f;
 
 	// ==========================================
+	// Instance Editable Working-Battery Detection, 10s Removal & Drop-Spot Settings
+	// ==========================================
+
+	// Detection range (in cm) to scan for active/powered laser guns (where the battery works with the laser)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Working Battery Detection Radius", ClampMin = "100.0"))
+	float BatteryDetectionRadius = 10000.0f;
+
+	// Distance (in cm) from the powered laser turret at which the enemy stops and starts the 10-second battery removal timer
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Battery Removal Reach Distance", ClampMin = "50.0"))
+	float RemovalInteractionDistance = 230.0f;
+
+	// Duration in seconds required to disconnect and remove the working battery from the laser (defaults to 10.0 seconds)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Battery Removal Duration (Seconds)", ClampMin = "0.5"))
+	float BatteryRemovalDuration = 10.0f;
+
+	// Drop spot Actor class to scan for in the level (automatically defaults to /Game/_Blueprints/LevelAssets/BP_BatteryDropSpot)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Battery Drop Spot Class"))
+	TSubclassOf<AActor> BatteryDropSpotClass;
+
+	// Distance threshold (in cm) from the chosen BP_BatteryDropSpot actor at which the enemy deposits the stolen battery
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Drop-Off Reach Distance", ClampMin = "20.0"))
+	float DropOffAcceptanceRadius = 75.0f;
+
+	// Current AI state of the Battery Thief
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Current Thief State"))
+	EBatteryThiefState CurrentState = EBatteryThiefState::Patrolling;
+
+	// Currently targeted laser device that has a working battery attached
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Target Powered Laser"))
+	TObjectPtr<ARedPowerCylinder> TargetLaserCylinder = nullptr;
+
+	// Closest BP_BatteryDropSpot actor found on the NavMesh where the stolen battery is being carried
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Target Drop Spot Actor"))
+	TObjectPtr<AActor> TargetDropSpotActor = nullptr;
+
+	// Remaining seconds on the 10-second removal countdown while in the Removing state
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Removal Time Remaining"))
+	float RemovalTimerRemaining = 0.0f;
+
+	// Battery currently stolen and carried by this enemy after the 10-second removal completes
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Stolen Battery"))
+	TObjectPtr<ABatteryCapsule> StolenBattery = nullptr;
+
+	// ==========================================
 	// Instance Editable Ground Movement & NavMesh Patrol Settings
 	// ==========================================
 
-	// Ground travel speed while patrolling the NavMesh (in cm/s; 250 cm/s = 2.5 m/s)
+	// Ground travel speed while patrolling the NavMesh and approaching a working battery (in cm/s)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Patrol & Movement", meta = (DisplayName = "Ground Patrol Speed", ClampMin = "10.0"))
 	float PatrolSpeed = 260.0f;
 
-	// Carry travel speed (prepared for future battery-carrying stage, instance editable)
+	// Carry travel speed while holding a removed battery (in cm/s)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Patrol & Movement", meta = (DisplayName = "Carry Movement Speed", ClampMin = "10.0"))
 	float CarrySpeed = 160.0f;
 
@@ -142,8 +203,12 @@ public:
 	FVector BodyMeshScale = FVector(0.65f, 0.50f, 0.35f);
 
 	// Color of the forward scanning light while patrolling
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Scanner Light", meta = (DisplayName = "Scanner Light Color"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Scanner Light", meta = (DisplayName = "Patrol Scanner Light Color"))
 	FLinearColor ScannerLightColor = FLinearColor(1.0f, 0.35f, 0.05f);
+
+	// Color of the scanner light when a working battery is detected or being removed
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Scanner Light", meta = (DisplayName = "Target Locked / Removing Light Color"))
+	FLinearColor AlertLightColor = FLinearColor(1.0f, 0.05f, 0.05f);
 
 	// Intensity of the forward scanning light
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Scanner Light", meta = (DisplayName = "Scanner Light Intensity", ClampMin = "0.0"))
@@ -165,6 +230,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Patrol & Movement")
 	void PickNextNavMeshPatrolDestination();
 
+	// Scans the level for the nearest ARedPowerCylinder that has a working battery and active laser (bIsPowered && bHasBattery)
+	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Sabotage & Removal")
+	ARedPowerCylinder* FindNearestWorkingBatteryLaser() const;
+
+	// Scans all BP_BatteryDropSpot actors in the level and returns the one with the shortest NavMesh path from the enemy
+	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Sabotage & Removal")
+	AActor* FindClosestBatteryDropSpot() const;
+
+	// Returns true if the given laser cylinder currently has a working battery that activated its laser
+	UFUNCTION(BlueprintPure, Category = "Battery Thief|Sabotage & Removal")
+	bool DoesLaserHaveWorkingBattery(const ARedPowerCylinder* Cylinder) const;
+
+	// Drops the currently carried battery at TargetDropSpotActor and returns to patrolling
+	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Sabotage & Removal")
+	void DepositStolenBatteryAtDropOff();
+
 	// Spawns a new Battery Thief unit at SpawnLocation (when acting as a spawner)
 	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Spawning")
 	AEnemyBatteryThief* SpawnThiefAtTargetLocation();
@@ -173,7 +254,7 @@ public:
 	void MarkAsSpawnedUnit(const FVector& InHomeOrigin);
 
 private:
-	// Current NavMesh corridor points to the chosen patrol destination
+	// Current NavMesh corridor points to the chosen patrol or target destination
 	UPROPERTY(Transient)
 	TArray<FVector> CurrentPathPoints;
 
@@ -193,10 +274,25 @@ private:
 	// Pause timer at patrol destination
 	float WaitTimer = 0.0f;
 
+	// Periodic path refresh timer when approaching a target laser or drop-off spot
+	float PathRepathTimer = 0.0f;
+
 	// Spawner state tracking
 	bool bIsSpawnedChildUnit = false;
 	int32 TotalSpawnedCount = 0;
 	FTimerHandle SpawnTimerHandle;
+
+	// Builds a NavMesh ground path from our current location to a target world location
+	bool BuildPathToWorldLocation(const FVector& DestinationWorldPos);
+
+	// Advances movement along CurrentPathPoints at the given speed
+	void FollowCurrentNavPath(float DeltaTime, float SpeedToUse);
+
+	// Completes the 10-second removal and detaches the working battery from TargetLaserCylinder
+	void CompleteBatteryRemoval();
+
+	// Cancels the current target/removal and returns to patrolling the NavMesh
+	void ReturnToPatrol();
 
 	// Samples the NavMesh / floor Z directly underneath the given world position
 	float SampleGroundNavMeshZ(const FVector& WorldPos) const;
