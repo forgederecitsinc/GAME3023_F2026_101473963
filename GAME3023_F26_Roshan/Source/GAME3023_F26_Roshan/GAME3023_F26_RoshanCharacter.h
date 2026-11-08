@@ -140,6 +140,9 @@ public:
 	bool bEnableRightStickAiming = true; // twin-stick style aiming fallback if in top-down mode
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller")
+	bool bInvertRightStickAimY = true; // inverts right stick Y axis so stick UP turns character forward / screen-up and stick DOWN turns backward
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller")
 	bool bEnableControllerVibration = true; // rumble feedback when picking up or plugging in batteries
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller", meta = (ClampMin = "0.0", ClampMax = "1.0"))
@@ -236,9 +239,23 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpEnd();
 
-	// pressing E
+	// pressing E / Square
 	UFUNCTION(BlueprintCallable, Category="Interaction")
 	virtual void DoInteract();
+
+	// releasing E / Square - cancels any active 5-second battery attach hold immediately
+	UFUNCTION(BlueprintCallable, Category="Interaction")
+	virtual void DoInteractRelease();
+
+	// returns normalized 0.0 to 1.0 progress for the 5-second battery attach hold
+	UFUNCTION(BlueprintPure, Category="Interaction")
+	float GetBatteryAttachHoldProgress() const;
+
+	// returns true if any interact button (Square, R1, E, or Enhanced Input InteractAction) is currently held down
+	bool IsInteractInputHeld() const;
+
+	// immediately resets the 5-second battery attach hold timer and UI progress ring back to 0
+	void ResetBatteryAttachHold();
 
 	// pressing R - drops battery on floor in front of player
 	UFUNCTION(BlueprintCallable, Category="Inventory")
@@ -294,6 +311,38 @@ public:
 	// updates interaction prompt visibility and text based on nearby interactable actors
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Interaction UI")
 	void UpdateInteractionPrompt(float DeltaTime);
+
+	// duration in seconds the player must hold Square / E to attach a battery to a RedPowerCylinder
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Interaction UI", meta = (ClampMin = "0.5", DisplayName = "Battery Attach Hold Duration (Seconds)"))
+	float BatteryAttachHoldDuration = 5.0f;
+
+	// current elapsed hold time (0.0 to BatteryAttachHoldDuration) while attaching a battery
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Interaction UI", meta = (DisplayName = "Current Attach Hold Time"))
+	float CurrentAttachHoldTime = 0.0f;
+
+	// whether the player is currently holding the interact button to attach a battery to a RedPowerCylinder
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Interaction UI", meta = (DisplayName = "Is Holding To Attach Battery"))
+	bool bIsHoldingToAttach = false;
+
+protected:
+	// cylinder currently being targeted during a 5-second hold attachment
+	UPROPERTY(Transient)
+	TObjectPtr<class ARedPowerCylinder> HoldingTargetCylinder = nullptr;
+
+	// tracks whether the interact input is currently held
+	bool bEnhancedInteractHeld = false;
+	bool bRawInteractKeyHeld = false;
+
+	// prevents an instant pickup/collect press from immediately chaining into an attach hold without releasing first
+	bool bRequireFreshPressForHold = false;
+
+	// prevents duplicate DoInteract triggers on the same frame when both EnhancedInput and raw key bindings fire
+	uint64 LastInteractPressFrame = 0;
+
+	// timer for subtle haptic feedback ticks while holding to attach the battery
+	float HoldRumblePulseTimer = 0.0f;
+
+public:
 
 	// ==========================================
 	// LiveWire Player Health HUD Widget (Top-Right)
@@ -407,6 +456,21 @@ public:
 	// Resets player health back to MaxHealth (100) and revives player
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
 	void ResetHealth();
+
+	// Location where the player respawns when health reaches zero (defaults to X=56, Y=0, Z=745)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (DisplayName = "Respawn Location"))
+	FVector RespawnLocation = FVector(56.0f, 0.0f, 745.0f);
+
+	// Delay in seconds before respawning at RespawnLocation after death (0.0 = instant respawn)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (ClampMin = "0.0", ClampMax = "10.0", DisplayName = "Respawn Delay (Seconds)"))
+	float RespawnDelay = 1.0f;
+
+	// Timer handle for scheduling the respawn
+	FTimerHandle RespawnTimerHandle;
+
+	// Respawns the player character at RespawnLocation, restores health to 100, and re-enables movement
+	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
+	void RespawnPlayer();
 
 	// Health getters
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Health")

@@ -11,6 +11,7 @@
 class SWidget;
 class SBox;
 class STextBlock;
+class SCircularHoldBadge;
 
 UCLASS(BlueprintType, Blueprintable)
 class GAME3023_F26_ROSHAN_API UInteractPromptWidget : public UUserWidget
@@ -32,6 +33,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Interaction Prompt")
 	void UpdatePromptText(const FText& InActionText, const FText& InTargetName);
 
+	/** Update the 0.0 to 1.0 circular hold progress around the Square button logo */
+	UFUNCTION(BlueprintCallable, Category = "Interaction Prompt")
+	void SetHoldProgress(float InProgress);
+
+	/** Query current 0.0 to 1.0 hold progress */
+	UFUNCTION(BlueprintPure, Category = "Interaction Prompt")
+	float GetHoldProgress() const { return HoldProgress; }
+
 	/** Query whether the prompt is currently visible */
 	UFUNCTION(BlueprintPure, Category = "Interaction Prompt")
 	bool IsPromptVisible() const { return bIsPromptVisible; }
@@ -51,6 +60,10 @@ public:
 	/** Keyboard alternative hint text (e.g. "E") */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction Prompt")
 	FText KeyboardKeyText;
+
+	/** Current 0..1 progress for circular hold indicator (0 = not holding, 1 = 5s complete) */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction Prompt")
+	float HoldProgress = 0.0f;
 
 	/** Whether to dock at bottom center of screen (true) or follow target actor in screen space (false) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction Prompt")
@@ -72,6 +85,9 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Interaction Prompt")
 	void OnHidePrompt();
 
+	UFUNCTION(BlueprintImplementableEvent, Category = "Interaction Prompt")
+	void OnHoldProgressChanged(float NewProgress);
+
 	/** Slate bindings */
 	FText GetActionText() const { return ActionText; }
 	FText GetTargetNameText() const { return TargetNameText; }
@@ -86,8 +102,9 @@ private:
 	float CurrentAlpha = 0.0f;
 	float TargetAlpha = 0.0f;
 
-	// Cached slate root box and text blocks
+	// Cached slate root box, circular button badge, and text blocks
 	TSharedPtr<SBox> PromptContainerBox;
+	TSharedPtr<SCircularHoldBadge> CircularHoldBadge;
 	TSharedPtr<STextBlock> ActionTextBlock;
 	TSharedPtr<STextBlock> TargetTextBlock;
 	TSharedPtr<STextBlock> KeyTextBlock;

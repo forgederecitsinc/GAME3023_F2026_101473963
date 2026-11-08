@@ -205,6 +205,11 @@ void AGAME3023_F26_RoshanCharacter::EndPlay(const EEndPlayReason::Type EndPlayRe
 	}
 	ActiveOccludingMeshes.Empty();
 
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(RespawnTimerHandle);
+	}
+
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -245,7 +250,8 @@ void AGAME3023_F26_RoshanCharacter::Tick(float DeltaTime)
 			if (bEnableRightStickAiming)
 			{
 				const float RightX = PC->GetInputAnalogKeyState(EKeys::Gamepad_RightX);
-				const float RightY = PC->GetInputAnalogKeyState(EKeys::Gamepad_RightY);
+				const float RawRightY = PC->GetInputAnalogKeyState(EKeys::Gamepad_RightY);
+				const float RightY = bInvertRightStickAimY ? -RawRightY : RawRightY;
 				const FVector2D AimVec(RightX, RightY);
 
 				if (AimVec.Size() > ControllerStickDeadZone)
@@ -584,10 +590,12 @@ void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* P
 		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AGAME3023_F26_RoshanCharacter::Look);
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AGAME3023_F26_RoshanCharacter::Look);
 
-		// interact (E)
+		// interact (E / Square)
 		if (InteractAction)
 		{
 			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Completed, this, &AGAME3023_F26_RoshanCharacter::DoInteractRelease);
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Canceled, this, &AGAME3023_F26_RoshanCharacter::DoInteractRelease);
 		}
 
 		// drop (R)
@@ -603,6 +611,7 @@ void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* P
 
 	// hardcoded key fallbacks so E (interact) and R/Q (drop) work without needing to setup IMC assets
 	PlayerInputComponent->BindKey(EKeys::E, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
+	PlayerInputComponent->BindKey(EKeys::E, IE_Released, this, &AGAME3023_F26_RoshanCharacter::DoInteractRelease);
 	PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
 	PlayerInputComponent->BindKey(EKeys::Q, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery); // Q also works as drop backup
 
@@ -615,13 +624,12 @@ void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* P
 	// PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoJumpStart);
 	// PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Released, this, &AGAME3023_F26_RoshanCharacter::DoJumpEnd);
 
-	// square button OR R1 bumper -> interact (pick up battery / plug into cylinder)
+	// square button -> interact (pick up battery instantly / hold 5s to attach to cylinder)
 	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Left, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
-	PlayerInputComponent->BindKey(EKeys::Gamepad_RightShoulder, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
+	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Left, IE_Released, this, &AGAME3023_F26_RoshanCharacter::DoInteractRelease);
 
-	// circle button OR L1 bumper -> drop battery onto floor
+	// circle button -> drop battery onto floor
 	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Right, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
-	PlayerInputComponent->BindKey(EKeys::Gamepad_LeftShoulder, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
 }
 
 void AGAME3023_F26_RoshanCharacter::Move(const FInputActionValue& Value)
@@ -689,17 +697,68 @@ void AGAME3023_F26_RoshanCharacter::StopJumping()
 
 void AGAME3023_F26_RoshanCharacter::DoInteract()
 {
+	if (bIsDead)
+	{
+		return;
+	}
+
+	// guard against duplicate firing on the same frame when both Enhanced Input and raw key bindings are active
+	if (LastInteractPressFrame == GFrameCounter)
+	{
+		return;
+	}
+	LastInteractPressFrame = GFrameCounter;
+
+	bEnhancedInteractHeld = true;
+	bRawInteractKeyHeld = true;
+	bRequireFreshPressForHold = false;
+
+	auto HandleRedCylinderInteract = [this](ARedPowerCylinder* RedCell) -> bool
+	{
+		if (!RedCell)
+		{
+			return false;
+		}
+
+		// Case 1: Cylinder already has a battery -> collect it back INSTANTLY without holding!
+		if (RedCell->bHasBattery)
+		{
+			ResetBatteryAttachHold();
+			bRequireFreshPressForHold = true;
+			RedCell->Interact(this);
+			return true;
+		}
+
+		// Case 2: Cylinder is empty and player is carrying a battery -> start 5-second hold to attach!
+		if (HasBattery())
+		{
+			bIsHoldingToAttach = true;
+			HoldingTargetCylinder = RedCell;
+			CurrentAttachHoldTime = 0.0f;
+			HoldRumblePulseTimer = 0.0f;
+			TriggerControllerRumble(0.25f, 0.08f, false, true);
+			return true;
+		}
+
+		// Case 3: Cylinder is empty and player has no battery -> show offline warning immediately
+		ResetBatteryAttachHold();
+		RedCell->Interact(this);
+		return true;
+	};
+
 	// step 1: check if we are currently inside an overlap trigger
 	if (CurrentInteractable)
 	{
 		if (ARedPowerCylinder* RedCell = Cast<ARedPowerCylinder>(CurrentInteractable))
 		{
-			RedCell->Interact(this);
+			HandleRedCylinderInteract(RedCell);
 			return;
 		}
 
 		if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(CurrentInteractable))
 		{
+			ResetBatteryAttachHold();
+			bRequireFreshPressForHold = true;
 			Battery->Interact(this);
 			return;
 		}
@@ -719,28 +778,77 @@ void AGAME3023_F26_RoshanCharacter::DoInteract()
 
 	if (World->SweepMultiByChannel(HitResults, TraceStart, TraceEnd, FQuat::Identity, ECC_WorldDynamic, Sphere, QueryParams))
 	{
-		// prioritize cylinder if player is holding a battery
+		// prioritize cylinder if nearby
 		for (const FHitResult& Hit : HitResults)
 		{
 			if (ARedPowerCylinder* RedCell = Cast<ARedPowerCylinder>(Hit.GetActor()))
 			{
-				RedCell->Interact(this);
+				HandleRedCylinderInteract(RedCell);
 				return;
 			}
 		}
 
-		// otherwise grab nearby battery
+		// otherwise grab nearby battery instantly (no hold required)
 		for (const FHitResult& Hit : HitResults)
 		{
 			if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(Hit.GetActor()))
 			{
 				if (!Battery->bIsCarried && !Battery->bIsSocketed)
 				{
+					ResetBatteryAttachHold();
+					bRequireFreshPressForHold = true;
 					Battery->Interact(this);
 					return;
 				}
 			}
 		}
+	}
+}
+
+void AGAME3023_F26_RoshanCharacter::DoInteractRelease()
+{
+	bEnhancedInteractHeld = false;
+	bRawInteractKeyHeld = false;
+	bRequireFreshPressForHold = false;
+	ResetBatteryAttachHold();
+}
+
+bool AGAME3023_F26_RoshanCharacter::IsInteractInputHeld() const
+{
+	if (const APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		const bool bDirectKeyDown =
+			PC->IsInputKeyDown(EKeys::Gamepad_FaceButton_Left) ||
+			PC->IsInputKeyDown(EKeys::E);
+
+		if (bDirectKeyDown)
+		{
+			return true;
+		}
+	}
+
+	return bEnhancedInteractHeld || bRawInteractKeyHeld;
+}
+
+float AGAME3023_F26_RoshanCharacter::GetBatteryAttachHoldProgress() const
+{
+	if (!bIsHoldingToAttach || BatteryAttachHoldDuration <= 0.0f)
+	{
+		return 0.0f;
+	}
+	return FMath::Clamp(CurrentAttachHoldTime / BatteryAttachHoldDuration, 0.0f, 1.0f);
+}
+
+void AGAME3023_F26_RoshanCharacter::ResetBatteryAttachHold()
+{
+	bIsHoldingToAttach = false;
+	CurrentAttachHoldTime = 0.0f;
+	HoldingTargetCylinder = nullptr;
+	HoldRumblePulseTimer = 0.0f;
+
+	if (InteractionPromptWidget)
+	{
+		InteractionPromptWidget->SetHoldProgress(0.0f);
 	}
 }
 
@@ -833,6 +941,8 @@ void AGAME3023_F26_RoshanCharacter::DoDropBattery()
 ABatteryCapsule* AGAME3023_F26_RoshanCharacter::DropCurrentBattery()
 {
 	if (!HasBattery()) return nullptr;
+
+	ResetBatteryAttachHold();
 
 	ABatteryCapsule* Dropped = CarriedBattery;
 	CarriedBattery = nullptr;
@@ -1042,7 +1152,17 @@ void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
 		}
 	}
 
-	// 3. Update widget based on best candidate
+	// 3. Update 5-second battery attach hold timer & widget based on best candidate
+	const bool bInputCurrentlyHeld = IsInteractInputHeld();
+	if (!bInputCurrentlyHeld)
+	{
+		bRequireFreshPressForHold = false;
+		if (bIsHoldingToAttach || CurrentAttachHoldTime > 0.0f)
+		{
+			ResetBatteryAttachHold();
+		}
+	}
+
 	if (BestCandidate)
 	{
 		CurrentInteractable = BestCandidate;
@@ -1053,6 +1173,12 @@ void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
 
 		if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(BestCandidate))
 		{
+			if (bIsHoldingToAttach || CurrentAttachHoldTime > 0.0f)
+			{
+				ResetBatteryAttachHold();
+			}
+			InteractionPromptWidget->SetHoldProgress(0.0f);
+
 			if (HasBattery())
 			{
 				ActionStr = TEXT("Hands Full (Drop Battery First)");
@@ -1068,16 +1194,80 @@ void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
 		{
 			if (Cylinder->bHasBattery)
 			{
-				ActionStr = TEXT("Press Square to Remove Battery");
+				// Collecting battery back from the cylinder is instant (no hold needed)
+				if (bIsHoldingToAttach || CurrentAttachHoldTime > 0.0f)
+				{
+					ResetBatteryAttachHold();
+				}
+				InteractionPromptWidget->SetHoldProgress(0.0f);
+
+				ActionStr = TEXT("Press Square to Collect Battery");
 				TargetStr = FString::Printf(TEXT("Laser Gun (ID: %d) - Online"), Cylinder->CellID);
 			}
 			else if (HasBattery())
 			{
-				ActionStr = TEXT("Press Square to Attach Battery");
-				TargetStr = FString::Printf(TEXT("Laser Gun (ID: %d) - Ready"), Cylinder->CellID);
+				// Attaching a battery to any RedPowerCylinder requires holding for 5 seconds
+				if (bInputCurrentlyHeld && !bRequireFreshPressForHold && !bIsDead)
+				{
+					if (!bIsHoldingToAttach || HoldingTargetCylinder != Cylinder)
+					{
+						bIsHoldingToAttach = true;
+						HoldingTargetCylinder = Cylinder;
+						CurrentAttachHoldTime = 0.0f;
+						HoldRumblePulseTimer = 0.0f;
+					}
+
+					CurrentAttachHoldTime += DeltaTime;
+					HoldRumblePulseTimer += DeltaTime;
+
+					const float SafeHoldDuration = FMath::Max(BatteryAttachHoldDuration, 0.5f);
+					const float Progress = FMath::Clamp(CurrentAttachHoldTime / SafeHoldDuration, 0.0f, 1.0f);
+					InteractionPromptWidget->SetHoldProgress(Progress);
+
+					// Gentle rising haptic pulse while charging the 5-second attachment ring
+					if (HoldRumblePulseTimer >= 0.25f)
+					{
+						HoldRumblePulseTimer = 0.0f;
+						TriggerControllerRumble(0.15f + 0.35f * Progress, 0.06f, false, true);
+					}
+
+					if (CurrentAttachHoldTime >= SafeHoldDuration)
+					{
+						// 5 seconds reached! Attach the battery to the RedPowerCylinder
+						ResetBatteryAttachHold();
+						bRequireFreshPressForHold = true;
+						TriggerControllerRumble(0.85f, 0.25f, true, true);
+						Cylinder->Interact(this);
+
+						ActionStr = TEXT("Press Square to Collect Battery");
+						TargetStr = FString::Printf(TEXT("Laser Gun (ID: %d) - Online"), Cylinder->CellID);
+					}
+					else
+					{
+						ActionStr = FString::Printf(TEXT("Attaching Battery... %.1fs / %.0fs"), CurrentAttachHoldTime, SafeHoldDuration);
+						TargetStr = FString::Printf(TEXT("Laser Gun (ID: %d) - Charging"), Cylinder->CellID);
+					}
+				}
+				else
+				{
+					if (bIsHoldingToAttach || CurrentAttachHoldTime > 0.0f)
+					{
+						ResetBatteryAttachHold();
+					}
+					InteractionPromptWidget->SetHoldProgress(0.0f);
+
+					ActionStr = FString::Printf(TEXT("Hold Square (%.0fs) to Attach Battery"), FMath::Max(BatteryAttachHoldDuration, 0.5f));
+					TargetStr = FString::Printf(TEXT("Laser Gun (ID: %d) - Ready"), Cylinder->CellID);
+				}
 			}
 			else
 			{
+				if (bIsHoldingToAttach || CurrentAttachHoldTime > 0.0f)
+				{
+					ResetBatteryAttachHold();
+				}
+				InteractionPromptWidget->SetHoldProgress(0.0f);
+
 				ActionStr = TEXT("Laser Gun (Requires Battery)");
 				TargetStr = FString::Printf(TEXT("Laser Gun (ID: %d) - Offline"), Cylinder->CellID);
 			}
@@ -1091,6 +1281,11 @@ void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
 	}
 	else
 	{
+		if (bIsHoldingToAttach || CurrentAttachHoldTime > 0.0f)
+		{
+			ResetBatteryAttachHold();
+		}
+
 		if (CurrentInteractable)
 		{
 			CurrentInteractable = nullptr;
@@ -1213,6 +1408,7 @@ void AGAME3023_F26_RoshanCharacter::ApplyDamage(float Damage, AActor* DamageCaus
 void AGAME3023_F26_RoshanCharacter::HandleDeath()
 {
 	bIsDead = true;
+	ResetBatteryAttachHold();
 	UE_LOG(LogTemplateCharacter, Warning, TEXT("[LiveWire Health] Player '%s' died!"), *GetNameSafe(this));
 
 	OnPlayerDied.Broadcast();
@@ -1234,6 +1430,71 @@ void AGAME3023_F26_RoshanCharacter::HandleDeath()
 	if (bEnableControllerVibration)
 	{
 		TriggerControllerRumble(1.0f, 0.5f, true, true);
+	}
+
+	// schedule respawn at the designated respawn location (X=56, Y=0, Z=745)
+	if (UWorld* World = GetWorld())
+	{
+		if (RespawnDelay > 0.0f)
+		{
+			World->GetTimerManager().SetTimer(
+				RespawnTimerHandle,
+				this,
+				&AGAME3023_F26_RoshanCharacter::RespawnPlayer,
+				RespawnDelay,
+				false
+			);
+		}
+		else
+		{
+			RespawnPlayer();
+		}
+	}
+}
+
+void AGAME3023_F26_RoshanCharacter::RespawnPlayer()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(RespawnTimerHandle);
+	}
+
+	// reset death state and revive player with full health
+	bIsDead = false;
+	CurrentHealth = MaxHealth;
+	UpdateHealthHUD();
+	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth, MaxHealth);
+
+	// reset hold and interaction state
+	ResetBatteryAttachHold();
+
+	// teleport player to the exact respawn location
+	TeleportTo(RespawnLocation, GetActorRotation(), false, true);
+
+	// re-enable and reset character movement
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		MoveComp->Velocity = FVector::ZeroVector;
+		MoveComp->SetMovementMode(MOVE_Walking);
+	}
+
+	// reset camera occlusion smoothed target to avoid sudden lens drag
+	SmoothedOcclusionTargetPos = RespawnLocation + FVector(0.0f, 0.0f, 35.0f);
+
+	UE_LOG(LogTemplateCharacter, Log, TEXT("[LiveWire Health] Player '%s' respawned at %s with full health (%.0f HP)!"),
+		*GetNameSafe(this), *RespawnLocation.ToString(), CurrentHealth);
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(
+			-1,
+			4.0f,
+			FColor::Green,
+			FString::Printf(TEXT("[RESPAWN] Player respawned at (X=%.0f, Y=%.0f, Z=%.0f) with %.0f HP!"),
+				RespawnLocation.X, RespawnLocation.Y, RespawnLocation.Z, CurrentHealth),
+			true,
+			FVector2D(1.2f, 1.2f)
+		);
 	}
 }
 
@@ -1320,6 +1581,10 @@ void AGAME3023_F26_RoshanCharacter::SetHealth(float NewHealth)
 
 void AGAME3023_F26_RoshanCharacter::ResetHealth()
 {
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(RespawnTimerHandle);
+	}
 	bIsDead = false;
 	if (GetCharacterMovement())
 	{
