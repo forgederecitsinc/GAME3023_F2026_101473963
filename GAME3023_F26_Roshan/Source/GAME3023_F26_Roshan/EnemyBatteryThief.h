@@ -219,6 +219,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Patrol & Movement", meta = (DisplayName = "Ground Height Offset"))
 	float GroundHeightOffset = 0.0f;
 
+	// Maximum vertical step deviation from the ground floor Z allowed on the NavMesh (prevents climbing onto walls, boxes, or pedestals)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Patrol & Movement", meta = (DisplayName = "Max Ground Step Height", ClampMin = "5.0", ClampMax = "80.0"))
+	float MaxGroundStepHeight = 40.0f;
+
+	// Collision sweep radius on the ground floor so the spider thief never clips through walls or obstacles
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Patrol & Movement", meta = (DisplayName = "Ground Obstacle Collision Radius", ClampMin = "8.0", ClampMax = "60.0"))
+	float GroundCollisionRadius = 20.0f;
+
 	// Radius around the spawn point on the NavMesh to patrol (in cm)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Patrol & Movement", meta = (DisplayName = "NavMesh Patrol Radius", ClampMin = "100.0"))
 	float PatrolRadius = 4500.0f;
@@ -308,9 +316,15 @@ private:
 	// Home/spawn origin on the NavMesh used as the center of the patrol territory
 	FVector PatrolOrigin = FVector(-878.0f, -3679.0f, 10.0f);
 
-	// Smoothed ground Z height on the NavMesh
+	// Locked ground floor Z height so the spider thief never climbs or flies above ground level
+	float GroundFloorZ = 10.0f;
+
+	// Smoothed ground Z height on the NavMesh (always clamped to GroundFloorZ)
 	float CurrentGroundZ = 10.0f;
 	bool bHasValidGroundZ = false;
+
+	// Ground-level NavMesh point beneath/beside TargetLaserCylinder's trigger box that this thief routes to
+	FVector CurrentLaserGroundApproachPoint = FVector::ZeroVector;
 
 	// Pause timer at patrol destination
 	float WaitTimer = 0.0f;
@@ -322,6 +336,21 @@ private:
 	bool bIsSpawnedChildUnit = false;
 	int32 TotalSpawnedCount = 0;
 	FTimerHandle SpawnTimerHandle;
+
+	// Returns true if a NavMesh point is on the ground floor surface (not on top of a wall, box, or pedestal)
+	bool IsPointOnGroundFloor(const FVector& Point) const;
+
+	// Returns true if the entire navigation path is valid, non-partial, and stays strictly on the ground floor surface
+	bool IsGroundNavPathValid(const class UNavigationPath* NavPath) const;
+
+	// Returns the horizontal (X, Y) center of the cylinder's trigger box projected onto GroundFloorZ
+	FVector GetCylinderTriggerGroundCenter(const ARedPowerCylinder* Cylinder) const;
+
+	// Computes the best reachable ground-level NavMesh approach point and ground route length to steal from Cylinder
+	bool ComputeGroundStealApproachPoint(const ARedPowerCylinder* Cylinder, FVector& OutGroundPoint, float& OutNavPathLength) const;
+
+	// Returns true if this pawn is the single nearest available Battery Thief along the ground NavMesh for Cylinder
+	bool IsNearestThiefForCylinder(const ARedPowerCylinder* Cylinder, float MyGroundPathLength) const;
 
 	// Builds a NavMesh ground path from our current location to a target world location
 	bool BuildPathToWorldLocation(const FVector& DestinationWorldPos);
