@@ -1,6 +1,6 @@
 // roshan - 101473963 - game3023 game engines 3
 // ground battery saboteur / battery thief enemy implementation
-// spawns at (X=-878.0, Y=-3679.0, Z=10.0), patrols the ground NavMesh, ignores loose or mismatched
+// spawns at (X=-878.0, Y=-3679.0, Z=10.0) at speed 300, patrols the ground NavMesh, ignores loose or mismatched
 // batteries, detects ONLY batteries that work with a laser (bIsPowered && bHasBattery), navigates to
 // the nearest active laser battery, runs a 10-second removal timer to detach the battery, scans the NavMesh
 // for the closest placed BP_BatteryDropSpot actor in the level, carries the battery there on its back, drops it, and returns to patrol
@@ -35,7 +35,7 @@ AEnemyBatteryThief::AEnemyBatteryThief()
 	ThiefMesh->SetupAttachment(SceneRoot);
 	ThiefMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 18.0f));
 	ThiefMesh->SetRelativeScale3D(BodyMeshScale);
-	ThiefMesh->SetCollisionProfileName(TEXT("NoCollision"));
+	ThiefMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeFinder(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	if (CubeFinder.Succeeded())
@@ -134,6 +134,19 @@ void AEnemyBatteryThief::BeginPlay()
 {
 	Super::BeginPlay();
 
+	CurrentHealth = MaxHealth;
+	bIsDead = false;
+
+	// Ensure existing Blueprint assets that saved the earlier 260/160 default speed use the requested 300 speed
+	if (FMath::IsNearlyEqual(PatrolSpeed, 260.0f))
+	{
+		PatrolSpeed = 300.0f;
+	}
+	if (FMath::IsNearlyEqual(CarrySpeed, 160.0f))
+	{
+		CarrySpeed = 300.0f;
+	}
+
 	RefreshEnemySettings();
 
 	// If configured to snap to the target spawn coordinates (X=-878, Y=-3679, Z=10)
@@ -185,7 +198,94 @@ void AEnemyBatteryThief::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		World->GetTimerManager().ClearTimer(SpawnTimerHandle);
 	}
+
+	// If destroyed while carrying a stolen battery, safely drop the battery onto the ground so the puzzle is never unwinnable
+	if (IsValid(StolenBattery))
+	{
+		const FVector SafeDropPos(GetActorLocation().X, GetActorLocation().Y, CurrentGroundZ);
+		StolenBattery->OnDropped(SafeDropPos);
+		StolenBattery = nullptr;
+	}
+
+	if (!bIsDead && EndPlayReason == EEndPlayReason::Destroyed)
+	{
+		bIsDead = true;
+		OnBatteryThiefKilled.Broadcast(this);
+	}
+
 	Super::EndPlay(EndPlayReason);
+}
+
+float AEnemyBatteryThief::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	if (bIsDead || DamageAmount <= 0.0f)
+	{
+		return 0.0f;
+	}
+
+	const float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	ApplyDamage(ActualDamage, DamageCauser, GetActorLocation(), FVector::ZeroVector);
+	return ActualDamage;
+}
+
+void AEnemyBatteryThief::ApplyDamage(float Damage, AActor* DamageCauser, const FVector& DamageLocation, const FVector& DamageImpulse)
+{
+	if (bIsDead || Damage <= 0.0f)
+	{
+		return;
+	}
+
+	CurrentHealth = FMath::Clamp(CurrentHealth - Damage, 0.0f, MaxHealth);
+	if (CurrentHealth <= 0.0f)
+	{
+		HandleDeath();
+	}
+}
+
+void AEnemyBatteryThief::HandleDeath()
+{
+	KillBatteryThief();
+}
+
+void AEnemyBatteryThief::ApplyHealing(float Healing, AActor* Healer)
+{
+	if (bIsDead || Healing <= 0.0f)
+	{
+		return;
+	}
+
+	CurrentHealth = FMath::Clamp(CurrentHealth + Healing, 0.0f, MaxHealth);
+}
+
+void AEnemyBatteryThief::NotifyDanger(const FVector& DangerLocation, AActor* DangerSource)
+{
+	// No-op for Battery Thief
+}
+
+void AEnemyBatteryThief::KillBatteryThief()
+{
+	if (bIsDead)
+	{
+		return;
+	}
+
+	bIsDead = true;
+
+	// Safely drop any carried battery at our current ground position so the player can recover it
+	if (IsValid(StolenBattery))
+	{
+		const FVector SafeDropPos(GetActorLocation().X, GetActorLocation().Y, CurrentGroundZ);
+		StolenBattery->OnDropped(SafeDropPos);
+		StolenBattery = nullptr;
+	}
+
+	TargetLaserCylinder = nullptr;
+	TargetDropSpotActor = nullptr;
+
+	// Notify the GameMode / Spawner so a replacement spawns in 60 seconds
+	OnBatteryThiefKilled.Broadcast(this);
+
+	Destroy();
 }
 
 AEnemyBatteryThief* AEnemyBatteryThief::SpawnThiefAtTargetLocation()
@@ -196,9 +296,21 @@ AEnemyBatteryThief* AEnemyBatteryThief::SpawnThiefAtTargetLocation()
 		return nullptr;
 	}
 
-	if (TotalSpawnedCount >= MaxEnemiesToSpawn)
+	// Count currently living Battery Thieves in the NavMesh so at most MaxEnemiesToSpawn (5) stay inside at all times
+	TArray<AActor*> LivingThieves;
+	UGameplayStatics::GetAllActorsOfClass(World, AEnemyBatteryThief::StaticClass(), LivingThieves);
+	int32 ActiveCount = 0;
+	for (AActor* Act : LivingThieves)
 	{
-		World->GetTimerManager().ClearTimer(SpawnTimerHandle);
+		AEnemyBatteryThief* Existing = Cast<AEnemyBatteryThief>(Act);
+		if (IsValid(Existing) && !Existing->bIsDead)
+		{
+			++ActiveCount;
+		}
+	}
+
+	if (ActiveCount >= MaxEnemiesToSpawn)
+	{
 		return nullptr;
 	}
 
@@ -230,11 +342,6 @@ AEnemyBatteryThief* AEnemyBatteryThief::SpawnThiefAtTargetLocation()
 		NewThief->RefreshEnemySettings();
 		NewThief->MarkAsSpawnedUnit(FVector(SpawnLocation.X, SpawnLocation.Y, GroundZAtSpawn));
 		NewThief->PickNextNavMeshPatrolDestination();
-
-		if (TotalSpawnedCount >= MaxEnemiesToSpawn)
-		{
-			World->GetTimerManager().ClearTimer(SpawnTimerHandle);
-		}
 	}
 
 	return NewThief;
@@ -693,6 +800,11 @@ void AEnemyBatteryThief::DepositStolenBatteryAtDropOff()
 void AEnemyBatteryThief::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	if (bIsDead)
+	{
+		return;
+	}
 
 	// ==========================================
 	// STATE 1: Patrolling the NavMesh

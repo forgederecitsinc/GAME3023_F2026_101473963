@@ -1,6 +1,6 @@
 // roshan - 101473963 - game3023 game engines 3
 // ground battery saboteur / battery thief enemy header
-// spawns at (X=-878, Y=-3679, Z=10), patrols the ground NavMesh, detects ONLY working batteries
+// spawns at (X=-878, Y=-3679, Z=10) at speed 300, patrols the ground NavMesh, detects ONLY working batteries
 // that have activated a laser (ARedPowerCylinder::bIsPowered == true), navigates to the nearest working
 // battery laser device, runs a 10-second removal timer to detach the battery, scans the NavMesh to find
 // the closest BP_BatteryDropSpot actor placed in the level, carries the battery there on its back, drops it, and resumes patrol
@@ -9,6 +9,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
+#include "CombatDamageable.h"
 #include "Engine/TimerHandle.h"
 #include "EnemyBatteryThief.generated.h"
 
@@ -18,6 +19,8 @@ class USpotLightComponent;
 class UFloatingPawnMovement;
 class ARedPowerCylinder;
 class ABatteryCapsule;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBatteryThiefKilled, class AEnemyBatteryThief*, KilledThief);
 
 UENUM(BlueprintType)
 enum class EBatteryThiefState : uint8
@@ -29,7 +32,7 @@ enum class EBatteryThiefState : uint8
 };
 
 UCLASS()
-class GAME3023_F26_ROSHAN_API AEnemyBatteryThief : public APawn
+class GAME3023_F26_ROSHAN_API AEnemyBatteryThief : public APawn, public ICombatDamageable
 {
 	GENERATED_BODY()
 
@@ -53,6 +56,20 @@ public:
 
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+
+	// Standard Unreal damage handler
+	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
+
+	// ~Begin ICombatDamageable Interface
+	virtual void ApplyDamage(float Damage, AActor* DamageCauser, const FVector& DamageLocation, const FVector& DamageImpulse) override;
+	virtual void HandleDeath() override;
+	virtual void ApplyHealing(float Healing, AActor* Healer) override;
+	virtual void NotifyDanger(const FVector& DangerLocation, AActor* DangerSource) override;
+	// ~End ICombatDamageable Interface
+
+	// Broadcast when this Battery Thief is killed or destroyed so the GameMode / Spawner can schedule a 60s replacement
+	UPROPERTY(BlueprintAssignable, Category = "Battery Thief|Health & Death")
+	FOnBatteryThiefKilled OnBatteryThiefKilled;
 
 	// ==========================================
 	// Components
@@ -79,10 +96,30 @@ public:
 	TObjectPtr<UFloatingPawnMovement> MovementComponent;
 
 	// ==========================================
-	// Instance Editable Spawner Settings
+	// Health & Death Settings
 	// ==========================================
 
-	// World location where the Battery Thief spawns/starts out of the vent hatch (defaults to X=-878, Y=-3679, Z=10)
+	// Maximum health of this Battery Thief
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Health & Death", meta = (DisplayName = "Max Health", ClampMin = "1.0"))
+	float MaxHealth = 50.0f;
+
+	// Current health of this Battery Thief
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Battery Thief|Health & Death", meta = (DisplayName = "Current Health"))
+	float CurrentHealth = 50.0f;
+
+	// True once this Battery Thief has been killed
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Battery Thief|Health & Death")
+	bool bIsDead = false;
+
+	// Kills this Battery Thief, safely drops any carried battery on the ground, and triggers the 60s replacement timer
+	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Health & Death")
+	void KillBatteryThief();
+
+	// ==========================================
+	// Spawner Settings (Spawn at X=-878, Y=-3679, Z=10; every 10s up to 5 max; 60s respawn on death)
+	// ==========================================
+
+	// World location where the Battery Thief spawns out of the vent hatch (defaults to X=-878, Y=-3679, Z=10)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Spawn Location"))
 	FVector SpawnLocation = FVector(-878.0f, -3679.0f, 10.0f);
 
@@ -90,7 +127,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Spawn Rotation"))
 	FRotator SpawnRotation = FRotator::ZeroRotator;
 
-	// If true, this actor snaps to SpawnLocation on BeginPlay (or acts as a spawner at SpawnLocation if MaxSpawnCount > 1)
+	// If true, this actor snaps to SpawnLocation on BeginPlay
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Use Target Spawn Location"))
 	bool bSnapToSpawnLocationOnStart = false;
 
@@ -102,20 +139,24 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Enemy Class To Spawn"))
 	TSubclassOf<AEnemyBatteryThief> EnemyClassToSpawn;
 
-	// Maximum number of enemies to spawn from SpawnLocation (when bActAsSpawner is true)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Max Enemies To Spawn", ClampMin = "1", ClampMax = "50"))
-	int32 MaxEnemiesToSpawn = 3;
+	// Maximum number of Battery Thieves allowed inside the NavMesh at all times (defaults to 5)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Max Active Enemies In NavMesh", ClampMin = "1", ClampMax = "50"))
+	int32 MaxEnemiesToSpawn = 5;
 
-	// Time interval in seconds between spawning enemies at SpawnLocation
+	// Time interval in seconds between spawning initial enemies up to MaxEnemiesToSpawn (defaults to 10.0 seconds)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Spawn Interval (Seconds)", ClampMin = "0.5"))
-	float SpawnInterval = 6.0f;
+	float SpawnInterval = 10.0f;
+
+	// Delay in seconds to spawn a replacement enemy after one is killed (defaults to 60.0 seconds)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Replacement Respawn Delay After Death (Seconds)", ClampMin = "1.0"))
+	float RespawnDelayAfterDeath = 60.0f;
 
 	// Delay in seconds before the first enemy spawns
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Initial Spawn Delay (Seconds)", ClampMin = "0.0"))
 	float InitialSpawnDelay = 0.5f;
 
 	// ==========================================
-	// Instance Editable Working-Battery Detection, 10s Removal & Drop-Spot Settings
+	// Working-Battery Detection, 10s Removal & Drop-Spot Settings
 	// ==========================================
 
 	// Detection range (in cm) to scan for active/powered laser guns (where the battery works with the laser)
@@ -159,16 +200,16 @@ public:
 	TObjectPtr<ABatteryCapsule> StolenBattery = nullptr;
 
 	// ==========================================
-	// Instance Editable Ground Movement & NavMesh Patrol Settings
+	// Ground Movement & NavMesh Patrol Settings (Speed = 300)
 	// ==========================================
 
-	// Ground travel speed while patrolling the NavMesh and approaching a working battery (in cm/s)
+	// Ground travel speed while patrolling the NavMesh and approaching a working battery (defaults to 300.0 cm/s)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Patrol & Movement", meta = (DisplayName = "Ground Patrol Speed", ClampMin = "10.0"))
-	float PatrolSpeed = 260.0f;
+	float PatrolSpeed = 300.0f;
 
-	// Carry travel speed while holding a removed battery (in cm/s)
+	// Carry travel speed while holding a removed battery (defaults to 300.0 cm/s)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Patrol & Movement", meta = (DisplayName = "Carry Movement Speed", ClampMin = "10.0"))
-	float CarrySpeed = 160.0f;
+	float CarrySpeed = 300.0f;
 
 	// How quickly the ground robot turns to face its travel direction along the NavMesh path
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Patrol & Movement", meta = (DisplayName = "Turn Interpolation Speed", ClampMin = "0.5"))
@@ -195,7 +236,7 @@ public:
 	TArray<TObjectPtr<AActor>> CustomPatrolWaypoints;
 
 	// ==========================================
-	// Instance Editable Visual & Scanner Light Settings
+	// Visual & Scanner Light Settings
 	// ==========================================
 
 	// Scale of the default crawler body mesh

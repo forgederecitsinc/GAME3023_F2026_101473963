@@ -1,7 +1,8 @@
 // roshan - 101473963 - game3023 game engines 3
 // enemy drone header - autonomous patrolling drone with empty static mesh slot,
-// downward laser-like spotlight, full-coverage NavMesh patrolling, light-cone player detection & pursuit,
-// and periodic laser/bomb particle drops that damage the player while in range
+// downward laser-like spotlight, full-coverage NavMesh patrolling at Z >= 1000,
+// 5-second escape countdown when the player is caught in the light (escaped by hiding under cover),
+// and diving down to latch onto the player and kill them if they fail to hide within 5 seconds
 
 #pragma once
 
@@ -14,6 +15,15 @@ class UStaticMeshComponent;
 class USpotLightComponent;
 class APawn;
 class ADroneLaserParticle;
+
+UENUM(BlueprintType)
+enum class EEnemyDroneState : uint8
+{
+	Patrolling		UMETA(DisplayName = "Patrolling At Z >= 1000"),
+	TrackingPlayer	UMETA(DisplayName = "Player Caught (5s Escape Timer)"),
+	DivingToLatch	UMETA(DisplayName = "Diving Down To Latch & Kill"),
+	LatchedKilled	UMETA(DisplayName = "Latched Onto Player (Killed)")
+};
 
 UCLASS()
 class GAME3023_F26_ROSHAN_API AEnemyDrone : public AActor
@@ -54,16 +64,24 @@ public:
 	TObjectPtr<USpotLightComponent> DownwardLaserLight;
 
 	// ==========================================
-	// Instance Editable Patrol & Movement Settings
+	// Instance Editable Patrol & Movement Settings (Stays at Z >= 1000)
 	// ==========================================
 
-	// Height above the NavMesh floor at which the drone hovers and patrols (in cm)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Drone|Movement & Patrol", meta = (DisplayName = "Patrol Height Above NavMesh", ClampMin = "0.0"))
-	float PatrolHeight = 350.0f;
+	// Minimum world Z position the drone stays at while patrolling and tracking (defaults to 1000.0)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Drone|Movement & Patrol", meta = (DisplayName = "Minimum World Z Height", ClampMin = "1000.0"))
+	float MinimumFlightZ = 1000.0f;
 
-	// Movement speed of the drone while patrolling (in cm/s)
+	// Height above the NavMesh floor at which the drone hovers (clamped so world Z is always >= MinimumFlightZ = 1000)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Drone|Movement & Patrol", meta = (DisplayName = "Patrol Height Above NavMesh", ClampMin = "1000.0"))
+	float PatrolHeight = 1000.0f;
+
+	// Movement speed of the drone while patrolling and tracking (in cm/s)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Drone|Movement & Patrol", meta = (DisplayName = "Movement Speed", ClampMin = "10.0"))
 	float MovementSpeed = 450.0f;
+
+	// Speed at which the drone dives down to latch onto and kill the player after the 5-second escape timer expires (in cm/s)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Drone|Movement & Patrol", meta = (DisplayName = "Dive To Latch Speed", ClampMin = "200.0"))
+	float DiveLatchSpeed = 2200.0f;
 
 	// Rotation interpolation speed so the drone smoothly faces its travel direction
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Drone|Movement & Patrol", meta = (DisplayName = "Rotation Turn Speed", ClampMin = "0.5"))
@@ -105,9 +123,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Drone|Laser Light", meta = (DisplayName = "Laser Outer Cone Angle", ClampMin = "0.5", ClampMax = "80.0"))
 	float LaserOuterConeAngle = 18.0f;
 
-	// Maximum range/attenuation radius of the downward laser light
+	// Maximum range/attenuation radius of the downward laser light (scaled to reach the floor from Z >= 1000)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Drone|Laser Light", meta = (DisplayName = "Laser Light Attenuation Radius", ClampMin = "100.0"))
-	float LaserAttenuationRadius = 1500.0f;
+	float LaserAttenuationRadius = 2500.0f;
 
 	// ==========================================
 	// Instance Editable Laser Bomb / Particle Attack Settings
@@ -130,15 +148,27 @@ public:
 	TSubclassOf<ADroneLaserParticle> LaserParticleClass;
 
 	// ==========================================
-	// Player Detection Under Light
+	// Player Catch, 5-Second Escape Under Cover & Dive-Latch Kill
 	// ==========================================
 
+	// Time in seconds the player has to escape by hiding under cover once caught by the drone's light (defaults to 5.0 seconds)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Drone|Player Detection & Latch Kill", meta = (DisplayName = "Escape Countdown Duration (Seconds)", ClampMin = "0.5"))
+	float EscapeTimeLimit = 5.0f;
+
+	// Remaining seconds on the 5-second escape timer while the drone has caught the player
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Drone|Player Detection & Latch Kill", meta = (DisplayName = "Escape Time Remaining"))
+	float EscapeTimerRemaining = 0.0f;
+
+	// Current state of the drone (Patrolling, TrackingPlayer, DivingToLatch, LatchedKilled)
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Drone|Player Detection & Latch Kill", meta = (DisplayName = "Current Drone State"))
+	EEnemyDroneState DroneState = EEnemyDroneState::Patrolling;
+
 	// Extra horizontal padding (in cm) added to the light cone radius on the ground to account for the player capsule width
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Drone|Player Detection", meta = (DisplayName = "Detection Capsule Padding", ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Drone|Player Detection & Latch Kill", meta = (DisplayName = "Detection Capsule Padding", ClampMin = "0.0"))
 	float DetectionRadiusPadding = 55.0f;
 
-	// True only while the player is inside the downward light beam and being followed
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Drone|Player Detection")
+	// True while the drone has caught the player and is pursuing / diving on them
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Drone|Player Detection & Latch Kill")
 	bool bIsFollowingPlayer = false;
 
 	// Applies current light settings to the downward laser spotlight component
@@ -150,8 +180,12 @@ public:
 	void BuildNavMeshCoveragePoints();
 
 	// Returns true if the given pawn is currently illuminated under the downward laser light cone
-	UFUNCTION(BlueprintPure, Category = "Drone|Player Detection")
+	UFUNCTION(BlueprintPure, Category = "Drone|Player Detection & Latch Kill")
 	bool IsPawnUnderLight(const APawn* TargetPawn) const;
+
+	// Returns true if the player is currently hiding under a roof, catwalk, or overhead cover structure
+	UFUNCTION(BlueprintPure, Category = "Drone|Player Detection & Latch Kill")
+	bool IsPawnHidingUnderCover(const APawn* TargetPawn) const;
 
 	// Spawns a single laser/bomb particle dropping from the drone toward the detected player
 	UFUNCTION(BlueprintCallable, Category = "Drone|Laser Bomb Attack")
@@ -184,6 +218,12 @@ private:
 	// Tracks current smoothed ground Z on the NavMesh underneath the drone
 	float CurrentGroundZ = 0.0f;
 	bool bHasValidGroundZ = false;
+
+	// Computes the desired patrol/tracking hover Z (always >= MinimumFlightZ = 1000.0)
+	float ComputeHoverAltitudeZ() const;
+
+	// Latches the drone onto the player's head/back and kills the player immediately
+	void LatchAndKillPlayer(APawn* TargetPawn);
 
 	// Selects the next unvisited NavMesh area point and computes a valid NavMesh path to it
 	void AdvanceToNextPatrolDestination();
