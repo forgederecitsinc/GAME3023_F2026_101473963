@@ -6,6 +6,7 @@
 // for the closest placed BP_BatteryDropSpot actor in the level, carries the battery there on its back, drops it, and returns to patrol
 
 #include "EnemyBatteryThief.h"
+#include "GAME3023_F26_RoshanGameMode.h"
 #include "RedPowerCylinder.h"
 #include "BatteryCapsule.h"
 #include "Components/SceneComponent.h"
@@ -83,6 +84,8 @@ AEnemyBatteryThief::AEnemyBatteryThief()
 	MovementComponent->MaxSpeed = PatrolSpeed;
 	MovementComponent->Acceleration = 1200.0f;
 	MovementComponent->Deceleration = 2000.0f;
+	MovementComponent->NavAgentProps.AgentRadius = 34.0f;
+	MovementComponent->NavAgentProps.AgentHeight = 44.0f;
 
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 }
@@ -150,6 +153,10 @@ void AEnemyBatteryThief::MarkAsSpawnedUnit(const FVector& InHomeOrigin)
 	bHasValidGroundZ = true;
 	PatrolOrigin = FVector(InHomeOrigin.X, InHomeOrigin.Y, GroundFloorZ);
 	SetActorLocation(FVector(GetActorLocation().X, GetActorLocation().Y, GroundFloorZ + GroundHeightOffset));
+
+	LastStuckCheckPosition = GetActorLocation();
+	StuckWatchdogTimer = 0.0f;
+	WallContactTimer = 0.0f;
 }
 
 void AEnemyBatteryThief::BeginPlay()
@@ -204,6 +211,10 @@ void AEnemyBatteryThief::BeginPlay()
 
 	// Snap cleanly onto the ground NavMesh surface — never above ground level
 	SetActorLocation(FVector(StartPos.X, StartPos.Y, GroundFloorZ + GroundHeightOffset));
+
+	LastStuckCheckPosition = GetActorLocation();
+	StuckWatchdogTimer = 0.0f;
+	WallContactTimer = 0.0f;
 
 	// Start patrolling the ground NavMesh right away
 	CurrentState = EBatteryThiefState::Patrolling;
@@ -323,6 +334,29 @@ void AEnemyBatteryThief::KillBatteryThief()
 	OnBatteryThiefKilled.Broadcast(this);
 
 	Destroy();
+}
+
+void AEnemyBatteryThief::KillPermanently()
+{
+	if (bIsDead)
+	{
+		return;
+	}
+
+	// Reduce max enemies in GameMode so neither initial wave nor 60s timer respawns this thief
+	if (UWorld* World = GetWorld())
+	{
+		if (AGAME3023_F26_RoshanGameMode* GM = Cast<AGAME3023_F26_RoshanGameMode>(World->GetAuthGameMode()))
+		{
+			GM->MaxActiveBatteryThieves = FMath::Max(0, GM->MaxActiveBatteryThieves - 1);
+		}
+	}
+
+	// Unbind all listeners so no respawn timer is scheduled
+	OnBatteryThiefKilled.Clear();
+
+	// Kill thief (drops carried battery and destroys actor)
+	KillBatteryThief();
 }
 
 AEnemyBatteryThief* AEnemyBatteryThief::SpawnThiefAtTargetLocation()
@@ -879,6 +913,12 @@ void AEnemyBatteryThief::PickNextNavMeshPatrolDestination()
 		IsPointOnGroundFloor(ProjectedStart.Location))
 	{
 		PathStartPos = ProjectedStart.Location;
+		// If current position is slightly embedded into a wall boundary, gently pull it onto the valid NavMesh corridor
+		const float OffsetDist = FVector::Dist2D(CurrentGroundPos, ProjectedStart.Location);
+		if (OffsetDist > 3.0f && OffsetDist < 75.0f)
+		{
+			SetActorLocation(FVector(ProjectedStart.Location.X, ProjectedStart.Location.Y, GroundFloorZ + GroundHeightOffset));
+		}
 	}
 
 	// 1. If custom patrol waypoints are assigned on the instance, cycle through them using ground-only paths
@@ -955,13 +995,82 @@ void AEnemyBatteryThief::FollowCurrentNavPath(float DeltaTime, float SpeedToUse)
 	const float LockedGroundZ = GroundFloorZ + GroundHeightOffset;
 
 	const FVector CurrentLocation = GetActorLocation();
-	const FVector TargetCorner = CurrentPathPoints[CurrentPathCornerIndex];
 
+	// ==========================================
+	// 1. Anti-Stuck Watchdog: detect if physically blocked or stationary while trying to move
+	// ==========================================
+	const float DistMoved2D = FVector::Dist2D(CurrentLocation, LastStuckCheckPosition);
+	if (DistMoved2D < (SpeedToUse * DeltaTime * 0.20f))
+	{
+		StuckWatchdogTimer += DeltaTime;
+	}
+	else
+	{
+		StuckWatchdogTimer = FMath::Max(0.0f, StuckWatchdogTimer - DeltaTime * 2.0f);
+		LastStuckCheckPosition = CurrentLocation;
+	}
+
+	if (StuckWatchdogTimer >= 0.35f)
+	{
+		StuckWatchdogTimer = 0.0f;
+		WallContactTimer = 0.0f;
+		LastStuckCheckPosition = CurrentLocation;
+
+		if (CurrentState == EBatteryThiefState::Patrolling)
+		{
+			// Pick a fresh patrol destination away from this obstacle
+			CurrentPathPoints.Reset();
+			CurrentPathCornerIndex = 0;
+			WaitTimer = 0.0f;
+			PickNextNavMeshPatrolDestination();
+			return;
+		}
+		else if (CurrentState == EBatteryThiefState::Approaching)
+		{
+			if (CurrentPathPoints.IsValidIndex(CurrentPathCornerIndex + 1))
+			{
+				++CurrentPathCornerIndex;
+			}
+			else
+			{
+				PathRepathTimer = 0.0f;
+				if (IsValid(TargetLaserCylinder))
+				{
+					BuildPathToWorldLocation(CurrentLaserGroundApproachPoint);
+				}
+			}
+			return;
+		}
+		else if (CurrentState == EBatteryThiefState::Carrying)
+		{
+			if (CurrentPathPoints.IsValidIndex(CurrentPathCornerIndex + 1))
+			{
+				++CurrentPathCornerIndex;
+			}
+			else
+			{
+				PathRepathTimer = 0.0f;
+				TargetDropSpotActor = FindClosestBatteryDropSpot();
+				const FVector DropLoc = IsValid(TargetDropSpotActor) ? TargetDropSpotActor->GetActorLocation() : PatrolOrigin;
+				BuildPathToWorldLocation(DropLoc);
+			}
+			return;
+		}
+	}
+
+	// ==========================================
+	// 2. Corner Reached & Corner Rounding Check
+	// ==========================================
+	const FVector TargetCorner = CurrentPathPoints[CurrentPathCornerIndex];
 	const FVector ToTarget2D(TargetCorner.X - CurrentLocation.X, TargetCorner.Y - CurrentLocation.Y, 0.0f);
 	const float Dist2D = ToTarget2D.Size();
 	const float StepDist = SpeedToUse * DeltaTime;
 
-	if (Dist2D <= FMath::Max(StepDist, AcceptanceRadius))
+	const bool bHasNextCorner = CurrentPathPoints.IsValidIndex(CurrentPathCornerIndex + 1);
+	// For intermediate corners, allow a generous turning zone (55 cm) so we smoothly round corners without running into the apex
+	const float CornerAcceptance = bHasNextCorner ? FMath::Max(AcceptanceRadius * 1.6f, 55.0f) : AcceptanceRadius;
+
+	if (Dist2D <= FMath::Max(StepDist, CornerAcceptance))
 	{
 		++CurrentPathCornerIndex;
 		SetActorLocation(FVector(CurrentLocation.X, CurrentLocation.Y, LockedGroundZ));
@@ -978,7 +1087,9 @@ void AEnemyBatteryThief::FollowCurrentNavPath(float DeltaTime, float SpeedToUse)
 		LockedGroundZ
 	);
 
-	// Sweep at ground level against walls/obstacles so the spider thief can never clip through or go over walls
+	// ==========================================
+	// 3. Ground Obstacle Sweep & Anti-Stick Sliding
+	// ==========================================
 	if (UWorld* World = GetWorld())
 	{
 		const float SweepHeightZ = GroundFloorZ + FMath::Max(22.0f, GroundCollisionRadius + 4.0f);
@@ -999,7 +1110,16 @@ void AEnemyBatteryThief::FollowCurrentNavPath(float DeltaTime, float SpeedToUse)
 			const bool bIgnoreHit = HitActor && (HitActor->IsA(AEnemyBatteryThief::StaticClass()) || HitActor->IsA(ABatteryCapsule::StaticClass()));
 			if (!bIgnoreHit && WallHit.bBlockingHit)
 			{
-				// Slide along the ground wall normal instead of going through or over the obstacle
+				WallContactTimer += DeltaTime;
+
+				// If we have another corner in the path, brushing against a wall corner means we can round to the next corner!
+				if (bHasNextCorner)
+				{
+					++CurrentPathCornerIndex;
+					WallContactTimer = 0.0f;
+				}
+
+				// Calculate safe stopping point just outside the collision
 				const FVector SafeStopXY(
 					SweepStart.X + (SweepEnd.X - SweepStart.X) * FMath::Max(0.0f, WallHit.Time - 0.02f),
 					SweepStart.Y + (SweepEnd.Y - SweepStart.Y) * FMath::Max(0.0f, WallHit.Time - 0.02f),
@@ -1011,6 +1131,7 @@ void AEnemyBatteryThief::FollowCurrentNavPath(float DeltaTime, float SpeedToUse)
 				const float RemainingDist = StepDist * (1.0f - WallHit.Time);
 
 				FVector FinalGroundPos = SafeStopXY;
+				bool bSlideSucceeded = false;
 				if (!SlideDir2D.IsNearlyZero() && RemainingDist > 0.5f)
 				{
 					const FVector SlideStart(SafeStopXY.X, SafeStopXY.Y, SweepHeightZ);
@@ -1020,17 +1141,39 @@ void AEnemyBatteryThief::FollowCurrentNavPath(float DeltaTime, float SpeedToUse)
 					{
 						FinalGroundPos.X = SlideEnd.X;
 						FinalGroundPos.Y = SlideEnd.Y;
+						bSlideSucceeded = true;
 					}
 				}
 
+				// Push 5 cm away from the wall along the normal to prevent being embedded
+				FinalGroundPos.X += WallNormal2D.X * 5.0f;
+				FinalGroundPos.Y += WallNormal2D.Y * 5.0f;
+
 				SetActorLocation(FVector(FinalGroundPos.X, FinalGroundPos.Y, LockedGroundZ));
-				// Force a fresh NavMesh path calculation around the obstacle
-				PathRepathTimer = 0.0f;
+
+				// If sliding failed or if wall contact persists:
+				if (!bSlideSucceeded || WallContactTimer > 0.2f)
+				{
+					WallContactTimer = 0.0f;
+					if (CurrentState == EBatteryThiefState::Patrolling)
+					{
+						// Immediately pick a new direction away from this wall!
+						CurrentPathPoints.Reset();
+						CurrentPathCornerIndex = 0;
+						PickNextNavMeshPatrolDestination();
+						return;
+					}
+					else
+					{
+						PathRepathTimer = 0.0f;
+					}
+				}
 				return;
 			}
 		}
 	}
 
+	WallContactTimer = 0.0f;
 	SetActorLocation(FVector(DesiredNewXY.X, DesiredNewXY.Y, LockedGroundZ));
 }
 

@@ -139,7 +139,7 @@ ARedPowerCylinder::ARedPowerCylinder()
 	// 12. interaction trigger zone for player E / controller square (broad radius around turret)
 	InteractionZone = CreateDefaultSubobject<USphereComponent>(TEXT("InteractionZone"));
 	InteractionZone->SetupAttachment(RootComponent);
-	InteractionZone->SetRelativeLocation(FVector(0.0f, 0.0f, 150.0f));
+	InteractionZone->SetRelativeLocation(FVector(0.0f, 0.0f, 300.0f));
 	InteractionZone->SetSphereRadius(350.0f);
 	InteractionZone->SetCollisionProfileName(TEXT("Trigger"));
 }
@@ -406,7 +406,7 @@ void ARedPowerCylinder::BuildGunComponents()
 	// configure interaction trigger zone
 	if (InteractionZone)
 	{
-		InteractionZone->SetRelativeLocation(FVector(0.0f, 0.0f, 150.0f));
+		InteractionZone->SetRelativeLocation(FVector(0.0f, 0.0f, 300.0f));
 		InteractionZone->SetSphereRadius(350.0f);
 	}
 }

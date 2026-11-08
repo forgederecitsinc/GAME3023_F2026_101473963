@@ -115,6 +115,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Health & Death")
 	void KillBatteryThief();
 
+	// Kills this Battery Thief permanently without triggering a replacement respawn (e.g. laser grid death)
+	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Health & Death")
+	void KillPermanently();
+
 	// ==========================================
 	// Spawner Settings (Spawn at X=-878, Y=-3679, Z=10; every 10s up to 5 max; 60s respawn on death)
 	// ==========================================
@@ -331,6 +335,11 @@ private:
 
 	// Periodic path refresh timer when approaching a target laser or drop-off spot
 	float PathRepathTimer = 0.0f;
+
+	// Anti-stuck watchdog tracking to guarantee enemies never get pinned on wall corners or obstacles
+	FVector LastStuckCheckPosition = FVector::ZeroVector;
+	float StuckWatchdogTimer = 0.0f;
+	float WallContactTimer = 0.0f;
 
 	// Spawner state tracking
 	bool bIsSpawnedChildUnit = false;
