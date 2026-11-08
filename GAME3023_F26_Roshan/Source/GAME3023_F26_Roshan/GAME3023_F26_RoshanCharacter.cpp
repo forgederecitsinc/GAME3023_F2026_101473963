@@ -17,6 +17,7 @@
 #include "BatteryCapsule.h"
 #include "RedPowerCylinder.h"
 #include "EnemyDrone.h"
+#include "EnemyBatteryThief.h"
 #include "InteractPromptWidget.h"
 #include "PlayerHealthHUDWidget.h"
 #include "Engine/OverlapResult.h"
@@ -716,7 +717,7 @@ void AGAME3023_F26_RoshanCharacter::DoInteract()
 
 	auto HandleRedCylinderInteract = [this](ARedPowerCylinder* RedCell) -> bool
 	{
-		if (!RedCell)
+		if (!RedCell || !RedCell->CanPlayerInteract(this))
 		{
 			return false;
 		}
@@ -784,8 +785,10 @@ void AGAME3023_F26_RoshanCharacter::DoInteract()
 		{
 			if (ARedPowerCylinder* RedCell = Cast<ARedPowerCylinder>(Hit.GetActor()))
 			{
-				HandleRedCylinderInteract(RedCell);
-				return;
+				if (HandleRedCylinderInteract(RedCell))
+				{
+					return;
+				}
 			}
 		}
 
@@ -1086,15 +1089,14 @@ void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
 		}
 		else if (ARedPowerCylinder* Cylinder = Cast<ARedPowerCylinder>(CurrentInteractable))
 		{
-			const float DistSq = FVector::DistSquared(PlayerLoc, Cylinder->GetActorLocation());
-			if (DistSq > FMath::Square(400.0f))
+			if (!Cylinder->CanPlayerInteract(this))
 			{
 				bIsValidTarget = false;
 			}
 			else
 			{
 				BestCandidate = Cylinder;
-				BestDistSq = DistSq;
+				BestDistSq = FVector::DistSquared(PlayerLoc, Cylinder->GetActorLocation());
 			}
 		}
 
@@ -1142,11 +1144,14 @@ void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
 				}
 				else if (ARedPowerCylinder* Cylinder = Cast<ARedPowerCylinder>(OverlapActor))
 				{
-					const float DistSq = FVector::DistSquared(PlayerLoc, Cylinder->GetActorLocation());
-					if (DistSq < BestDistSq)
+					if (Cylinder->CanPlayerInteract(this))
 					{
-						BestCandidate = Cylinder;
-						BestDistSq = DistSq;
+						const float DistSq = FVector::DistSquared(PlayerLoc, Cylinder->GetActorLocation());
+						if (DistSq < BestDistSq)
+						{
+							BestCandidate = Cylinder;
+							BestDistSq = DistSq;
+						}
 					}
 				}
 			}
@@ -1481,6 +1486,20 @@ void AGAME3023_F26_RoshanCharacter::RespawnPlayer()
 				if (Drone->IsAttachedTo(this) || Drone->DroneState != EEnemyDroneState::Patrolling)
 				{
 					Drone->ResetToStartAndResumePatrol();
+				}
+			}
+		}
+
+		// Reset any EnemyBatteryThief that was following the player back to ground NavMesh patrol
+		TArray<AActor*> FoundThieves;
+		UGameplayStatics::GetAllActorsOfClass(World, AEnemyBatteryThief::StaticClass(), FoundThieves);
+		for (AActor* Actor : FoundThieves)
+		{
+			if (AEnemyBatteryThief* Thief = Cast<AEnemyBatteryThief>(Actor))
+			{
+				if (Thief->IsFollowingPlayer())
+				{
+					Thief->StopFollowingPlayerAndResumePatrol();
 				}
 			}
 		}

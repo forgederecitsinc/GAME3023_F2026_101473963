@@ -136,11 +136,11 @@ ARedPowerCylinder::ARedPowerCylinder()
 	if (LaserBaseMat) LaserBeamMesh->SetMaterial(0, LaserBaseMat);
 	LaserBeamMesh->SetVisibility(false); // off until battery is attached
 
-	// 12. interaction trigger zone for player E / controller square (broad radius around turret)
+	// 12. interaction trigger zone for player E / controller square (focused around upper gun deck)
 	InteractionZone = CreateDefaultSubobject<USphereComponent>(TEXT("InteractionZone"));
 	InteractionZone->SetupAttachment(RootComponent);
-	InteractionZone->SetRelativeLocation(FVector(0.0f, 0.0f, 300.0f));
-	InteractionZone->SetSphereRadius(350.0f);
+	InteractionZone->SetRelativeLocation(FVector(0.0f, 0.0f, 220.0f));
+	InteractionZone->SetSphereRadius(240.0f);
 	InteractionZone->SetCollisionProfileName(TEXT("Trigger"));
 }
 
@@ -406,8 +406,8 @@ void ARedPowerCylinder::BuildGunComponents()
 	// configure interaction trigger zone
 	if (InteractionZone)
 	{
-		InteractionZone->SetRelativeLocation(FVector(0.0f, 0.0f, 300.0f));
-		InteractionZone->SetSphereRadius(350.0f);
+		InteractionZone->SetRelativeLocation(FVector(0.0f, 0.0f, 220.0f));
+		InteractionZone->SetSphereRadius(240.0f);
 	}
 }
 
@@ -819,10 +819,73 @@ void ARedPowerCylinder::Tick(float DeltaTime)
 	}
 }
 
+bool ARedPowerCylinder::CanPlayerInteract(const AActor* InPlayerActor) const
+{
+	if (!InPlayerActor)
+	{
+		return false;
+	}
+
+	const FVector PlayerLoc = InPlayerActor->GetActorLocation();
+	const FVector CylinderLoc = GetActorLocation();
+
+	// 1. Elevation check:
+	// In Unreal, player capsule center is ~90-100 units above player feet.
+	// Cylinder base origin (Z=0 relative) sits on top of the platform/ledge.
+	// If player is on the platform, PlayerLoc.Z >= CylinderLoc.Z + 50.0f.
+	// If player is on the lower floor/path beneath the platform, PlayerLoc.Z will be below (CylinderLoc.Z + 20.0f).
+	if (PlayerLoc.Z < (CylinderLoc.Z + 20.0f))
+	{
+		return false;
+	}
+
+	// Player shouldn't be way above the cylinder either
+	if (PlayerLoc.Z > (CylinderLoc.Z + 400.0f))
+	{
+		return false;
+	}
+
+	// 2. 2D Horizontal distance check: player must be next to the cylinder
+	const float Dist2DSq = FVector::DistSquared2D(PlayerLoc, CylinderLoc);
+	if (Dist2DSq > FMath::Square(280.0f))
+	{
+		return false;
+	}
+
+	// 3. Line of sight check:
+	// Verify that the platform floor or walls do not block the path between the player and cylinder gun
+	UWorld* World = GetWorld();
+	if (World)
+	{
+		FHitResult HitResult;
+		FCollisionQueryParams QueryParams;
+		QueryParams.AddIgnoredActor(this);
+		QueryParams.AddIgnoredActor(InPlayerActor);
+
+		const FVector EyeLoc = PlayerLoc + FVector(0.0f, 0.0f, 40.0f);
+		const FVector CylinderTargetLoc = CylinderLoc + FVector(0.0f, 0.0f, 286.0f);
+
+		if (World->LineTraceSingleByChannel(HitResult, EyeLoc, CylinderTargetLoc, ECC_Visibility, QueryParams))
+		{
+			if (HitResult.bBlockingHit && HitResult.GetActor() && HitResult.GetActor() != this && HitResult.GetActor() != InPlayerActor)
+			{
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
 void ARedPowerCylinder::OnInteractionBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (AGAME3023_F26_RoshanCharacter* Player = Cast<AGAME3023_F26_RoshanCharacter>(OtherActor))
 	{
+		if (!CanPlayerInteract(Player))
+		{
+			return;
+		}
+
 		Player->SetCurrentInteractable(this);
 
 		if (GEngine)
@@ -874,7 +937,7 @@ void ARedPowerCylinder::OnInteractionEndOverlap(UPrimitiveComponent* OverlappedC
 
 bool ARedPowerCylinder::Interact(AGAME3023_F26_RoshanCharacter* Player)
 {
-	if (!Player) return false;
+	if (!Player || !CanPlayerInteract(Player)) return false;
 
 	// 1. remove battery if already plugged in
 	if (bHasBattery)

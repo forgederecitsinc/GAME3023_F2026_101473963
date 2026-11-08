@@ -7,6 +7,7 @@
 
 #include "EnemyBatteryThief.h"
 #include "GAME3023_F26_RoshanGameMode.h"
+#include "GAME3023_F26_RoshanCharacter.h"
 #include "RedPowerCylinder.h"
 #include "BatteryCapsule.h"
 #include "Components/SceneComponent.h"
@@ -87,6 +88,16 @@ AEnemyBatteryThief::AEnemyBatteryThief()
 	MovementComponent->NavAgentProps.AgentRadius = 34.0f;
 	MovementComponent->NavAgentProps.AgentHeight = 44.0f;
 
+	// Overlap trigger so physical touch by the player triggers follow mode
+	PlayerTouchTrigger = CreateDefaultSubobject<USphereComponent>(TEXT("PlayerTouchTrigger"));
+	PlayerTouchTrigger->SetupAttachment(SceneRoot);
+	PlayerTouchTrigger->SetRelativeLocation(FVector(0.0f, 0.0f, 20.0f));
+	PlayerTouchTrigger->InitSphereRadius(52.0f);
+	PlayerTouchTrigger->SetCollisionProfileName(TEXT("Trigger"));
+	PlayerTouchTrigger->SetCollisionResponseToAllChannels(ECR_Ignore);
+	PlayerTouchTrigger->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	PlayerTouchTrigger->OnComponentBeginOverlap.AddDynamic(this, &AEnemyBatteryThief::OnPlayerTouchBeginOverlap);
+
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 }
 
@@ -114,7 +125,7 @@ void AEnemyBatteryThief::RefreshEnemySettings()
 	if (ScannerLight)
 	{
 		ScannerLight->SetIntensity(ScannerLightIntensity);
-		const FLinearColor ActiveColor = (CurrentState == EBatteryThiefState::Approaching || CurrentState == EBatteryThiefState::Removing)
+		const FLinearColor ActiveColor = (CurrentState == EBatteryThiefState::Approaching || CurrentState == EBatteryThiefState::Removing || CurrentState == EBatteryThiefState::FollowingPlayer)
 			? AlertLightColor
 			: ScannerLightColor;
 		ScannerLight->SetLightColor(ActiveColor);
@@ -125,7 +136,16 @@ void AEnemyBatteryThief::RefreshEnemySettings()
 
 	if (MovementComponent)
 	{
-		MovementComponent->MaxSpeed = (CurrentState == EBatteryThiefState::Carrying) ? CarrySpeed : PatrolSpeed;
+		float ActiveSpeed = PatrolSpeed;
+		if (CurrentState == EBatteryThiefState::FollowingPlayer)
+		{
+			ActiveSpeed = PatrolSpeed + FollowPlayerSpeedBonus;
+		}
+		else if (CurrentState == EBatteryThiefState::Carrying)
+		{
+			ActiveSpeed = CarrySpeed;
+		}
+		MovementComponent->MaxSpeed = ActiveSpeed;
 	}
 }
 
@@ -329,6 +349,8 @@ void AEnemyBatteryThief::KillBatteryThief()
 
 	TargetLaserCylinder = nullptr;
 	TargetDropSpotActor = nullptr;
+	TargetPlayerPawn = nullptr;
+	bIsFollowingPlayer = false;
 
 	// Notify the GameMode / Spawner so a replacement spawns in 60 seconds
 	OnBatteryThiefKilled.Broadcast(this);
@@ -413,6 +435,7 @@ AEnemyBatteryThief* AEnemyBatteryThief::SpawnThiefAtTargetLocation()
 		NewThief->BatteryDropSpotClass = BatteryDropSpotClass;
 		NewThief->DropOffAcceptanceRadius = DropOffAcceptanceRadius;
 		NewThief->CustomPatrolWaypoints = CustomPatrolWaypoints;
+		NewThief->FollowPlayerSpeedBonus = FollowPlayerSpeedBonus;
 		NewThief->RefreshEnemySettings();
 		NewThief->MarkAsSpawnedUnit(FVector(SpawnLocation.X, SpawnLocation.Y, GroundZAtSpawn));
 		NewThief->PickNextNavMeshPatrolDestination();
@@ -608,8 +631,8 @@ bool AEnemyBatteryThief::IsNearestThiefForCylinder(const ARedPowerCylinder* Cyli
 			return false;
 		}
 
-		// Thieves carrying a stolen battery or busy removing/approaching a DIFFERENT working cylinder are occupied
-		if (Other->CurrentState == EBatteryThiefState::Carrying)
+		// Thieves carrying a stolen battery or busy following the player are occupied
+		if (Other->CurrentState == EBatteryThiefState::Carrying || Other->CurrentState == EBatteryThiefState::FollowingPlayer)
 		{
 			continue;
 		}
@@ -1056,6 +1079,22 @@ void AEnemyBatteryThief::FollowCurrentNavPath(float DeltaTime, float SpeedToUse)
 			}
 			return;
 		}
+		else if (CurrentState == EBatteryThiefState::FollowingPlayer)
+		{
+			if (CurrentPathPoints.IsValidIndex(CurrentPathCornerIndex + 1))
+			{
+				++CurrentPathCornerIndex;
+			}
+			else
+			{
+				PathRepathTimer = 0.0f;
+				if (IsValid(TargetPlayerPawn))
+				{
+					BuildPathToWorldLocation(TargetPlayerPawn->GetActorLocation());
+				}
+			}
+			return;
+		}
 	}
 
 	// ==========================================
@@ -1306,6 +1345,26 @@ void AEnemyBatteryThief::Tick(float DeltaTime)
 		SetActorLocation(FVector(LockedLoc.X, LockedLoc.Y, GroundFloorZ + GroundHeightOffset));
 	}
 
+	// Check if the player physically touches this Battery Thief (backup to PlayerTouchTrigger overlap)
+	if (!bIsFollowingPlayer && !bIsDead)
+	{
+		if (APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0))
+		{
+			if (AGAME3023_F26_RoshanCharacter* PlayerChar = Cast<AGAME3023_F26_RoshanCharacter>(PlayerPawn))
+			{
+				if (!PlayerChar->IsDead())
+				{
+					const float Dist2D = FVector::Dist2D(GetActorLocation(), PlayerPawn->GetActorLocation());
+					const float DistZ = FMath::Abs(GetActorLocation().Z - PlayerPawn->GetActorLocation().Z);
+					if (Dist2D <= 75.0f && DistZ <= 110.0f)
+					{
+						StartFollowingPlayer(PlayerPawn);
+					}
+				}
+			}
+		}
+	}
+
 	// ==========================================
 	// STATE 1: Patrolling the Ground NavMesh
 	// ==========================================
@@ -1533,6 +1592,161 @@ void AEnemyBatteryThief::Tick(float DeltaTime)
 		{
 			CompleteBatteryRemoval();
 		}
+	}
+
+	// ==========================================
+	// STATE 5: Following the Player (Move Speed = PatrolSpeed + 70.0f)
+	// ==========================================
+	if (CurrentState == EBatteryThiefState::FollowingPlayer)
+	{
+		// If player became invalid or dead, stop following and resume patrol
+		if (!IsValid(TargetPlayerPawn))
+		{
+			StopFollowingPlayerAndResumePatrol();
+			return;
+		}
+
+		if (AGAME3023_F26_RoshanCharacter* PlayerChar = Cast<AGAME3023_F26_RoshanCharacter>(TargetPlayerPawn))
+		{
+			if (PlayerChar->IsDead())
+			{
+				StopFollowingPlayerAndResumePatrol();
+				return;
+			}
+		}
+
+		const FVector PlayerLoc = TargetPlayerPawn->GetActorLocation();
+		const FVector TargetGroundPos(PlayerLoc.X, PlayerLoc.Y, GroundFloorZ);
+		const float Dist2DToPlayer = FVector::Dist2D(GetActorLocation(), TargetGroundPos);
+
+		// Re-path towards the player on the ground NavMesh periodically
+		PathRepathTimer -= DeltaTime;
+		if (PathRepathTimer <= 0.0f || !CurrentPathPoints.IsValidIndex(CurrentPathCornerIndex))
+		{
+			PathRepathTimer = 0.35f;
+			BuildPathToWorldLocation(TargetGroundPos);
+		}
+
+		// Move along the ground NavMesh at PatrolSpeed + FollowPlayerSpeedBonus (defaults to 300 + 70 = 370 cm/s)
+		const float FollowSpeed = PatrolSpeed + FollowPlayerSpeedBonus;
+
+		// If within close reach of the player, face player smoothly
+		if (Dist2DToPlayer <= 60.0f)
+		{
+			const FVector ToPlayer2D(PlayerLoc.X - GetActorLocation().X, PlayerLoc.Y - GetActorLocation().Y, 0.0f);
+			if (!ToPlayer2D.IsNearlyZero())
+			{
+				const FRotator FaceRot(0.0f, ToPlayer2D.Rotation().Yaw, 0.0f);
+				SetActorRotation(FMath::RInterpTo(GetActorRotation(), FaceRot, DeltaTime, TurnSpeed));
+			}
+		}
+		else
+		{
+			FollowCurrentNavPath(DeltaTime, FollowSpeed);
+		}
+
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(
+				3107,
+				0.15f,
+				FColor::Red,
+				FString::Printf(TEXT("[BATTERY THIEF FOLLOWING PLAYER] Touched by player! Speed: %.0f (Base: %.0f + %.0f) | Dist: %.0f"),
+					FollowSpeed, PatrolSpeed, FollowPlayerSpeedBonus, Dist2DToPlayer),
+				true,
+				FVector2D(1.2f, 1.2f)
+			);
+		}
+		return;
+	}
+}
+
+void AEnemyBatteryThief::StartFollowingPlayer(APawn* InPlayerPawn)
+{
+	if (!IsValid(InPlayerPawn) || bIsDead)
+	{
+		return;
+	}
+
+	if (bIsFollowingPlayer && TargetPlayerPawn == InPlayerPawn)
+	{
+		return;
+	}
+
+	TargetPlayerPawn = InPlayerPawn;
+	bIsFollowingPlayer = true;
+	CurrentState = EBatteryThiefState::FollowingPlayer;
+
+	// Reset any in-progress battery removal interaction
+	TargetLaserCylinder = nullptr;
+	RemovalTimerRemaining = 0.0f;
+	CurrentLaserGroundApproachPoint = FVector::ZeroVector;
+
+	// Clear current path and trigger immediate path computation
+	CurrentPathPoints.Reset();
+	CurrentPathCornerIndex = INDEX_NONE;
+	PathRepathTimer = 0.0f;
+
+	RefreshEnemySettings();
+
+	const float FollowSpeed = PatrolSpeed + FollowPlayerSpeedBonus;
+	UE_LOG(LogTemp, Warning, TEXT("[AEnemyBatteryThief] Touched by player '%s'! Following player at speed %.1f (Base %.1f + Bonus %.1f)."),
+		*GetNameSafe(InPlayerPawn), FollowSpeed, PatrolSpeed, FollowPlayerSpeedBonus);
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(
+			3108,
+			3.5f,
+			FColor::Orange,
+			FString::Printf(TEXT("[BATTERY THIEF ALERT] Touched by player! Following player at Speed %.0f (+%.0f)!"),
+				FollowSpeed, FollowPlayerSpeedBonus),
+			true,
+			FVector2D(1.3f, 1.3f)
+		);
+	}
+}
+
+void AEnemyBatteryThief::StopFollowingPlayerAndResumePatrol()
+{
+	bIsFollowingPlayer = false;
+	TargetPlayerPawn = nullptr;
+	CurrentPathPoints.Reset();
+	CurrentPathCornerIndex = INDEX_NONE;
+	ReturnToPatrol();
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(
+			3109,
+			2.5f,
+			FColor::Green,
+			TEXT("[BATTERY THIEF] Stopped following player — resuming ground NavMesh patrol."),
+			true,
+			FVector2D(1.2f, 1.2f)
+		);
+	}
+}
+
+void AEnemyBatteryThief::OnPlayerTouchBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (bIsDead || bIsFollowingPlayer || !IsValid(OtherActor))
+	{
+		return;
+	}
+
+	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (OtherActor == PlayerPawn || OtherActor->IsA<AGAME3023_F26_RoshanCharacter>())
+	{
+		if (AGAME3023_F26_RoshanCharacter* PlayerChar = Cast<AGAME3023_F26_RoshanCharacter>(OtherActor))
+		{
+			if (PlayerChar->IsDead())
+			{
+				return;
+			}
+		}
+
+		StartFollowingPlayer(Cast<APawn>(OtherActor));
 	}
 }
 

@@ -224,6 +224,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Cell|Actions")
 	bool Interact(AGAME3023_F26_RoshanCharacter* Player);
 
+	// Check whether player is close enough, on the cylinder's level (not under it), and has clear line of sight
+	UFUNCTION(BlueprintPure, Category = "Cell|Actions")
+	bool CanPlayerInteract(const AActor* InPlayerActor) const;
+
 	UFUNCTION(BlueprintCallable, Category = "Cell|Actions")
 	bool InsertBattery(ABatteryCapsule* Battery);
 

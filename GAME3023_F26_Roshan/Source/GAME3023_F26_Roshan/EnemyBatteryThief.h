@@ -16,6 +16,7 @@
 class USceneComponent;
 class UStaticMeshComponent;
 class USpotLightComponent;
+class USphereComponent;
 class UFloatingPawnMovement;
 class ARedPowerCylinder;
 class ABatteryCapsule;
@@ -28,7 +29,8 @@ enum class EBatteryThiefState : uint8
 	Patrolling		UMETA(DisplayName = "Patrolling NavMesh"),
 	Approaching		UMETA(DisplayName = "Moving To Working Battery"),
 	Removing		UMETA(DisplayName = "Removing Battery (10s Timer)"),
-	Carrying		UMETA(DisplayName = "Carrying Stolen Battery To Closest BP_BatteryDropSpot")
+	Carrying		UMETA(DisplayName = "Carrying Stolen Battery To Closest BP_BatteryDropSpot"),
+	FollowingPlayer	UMETA(DisplayName = "Following Player (Speed +70)")
 };
 
 UCLASS()
@@ -94,6 +96,38 @@ public:
 	// Floating pawn movement component for smooth ground velocity
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (DisplayName = "Pawn Movement"))
 	TObjectPtr<UFloatingPawnMovement> MovementComponent;
+
+	// Overlap trigger to detect physical touch by the player
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (DisplayName = "Player Touch Trigger"))
+	TObjectPtr<USphereComponent> PlayerTouchTrigger;
+
+	// ==========================================
+	// Player Touch & Follow Settings (+70 Speed)
+	// ==========================================
+
+	// Extra speed added to regular PatrolSpeed when following the player after being touched (defaults to 70.0 cm/s)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Player Follow", meta = (DisplayName = "Follow Player Speed Bonus", ClampMin = "0.0"))
+	float FollowPlayerSpeedBonus = 70.0f;
+
+	// True if the player has touched this Battery Thief and it is currently following the player
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Battery Thief|Player Follow", meta = (DisplayName = "Is Following Player"))
+	bool bIsFollowingPlayer = false;
+
+	// Target player pawn currently being followed
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Battery Thief|Player Follow", meta = (DisplayName = "Target Player"))
+	TObjectPtr<APawn> TargetPlayerPawn = nullptr;
+
+	// Triggers follow mode when touched by the player
+	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Player Follow")
+	void StartFollowingPlayer(APawn* InPlayerPawn);
+
+	// Stops following the player and resumes normal ground NavMesh patrolling
+	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Player Follow")
+	void StopFollowingPlayerAndResumePatrol();
+
+	// Returns true if this thief is currently following the player
+	UFUNCTION(BlueprintPure, Category = "Battery Thief|Player Follow")
+	bool IsFollowingPlayer() const { return bIsFollowingPlayer; }
 
 	// ==========================================
 	// Health & Death Settings
@@ -375,4 +409,8 @@ private:
 
 	// Samples the NavMesh / floor Z directly underneath the given world position
 	float SampleGroundNavMeshZ(const FVector& WorldPos) const;
+
+	// Overlap callback when player touches the Battery Thief
+	UFUNCTION()
+	void OnPlayerTouchBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 };
