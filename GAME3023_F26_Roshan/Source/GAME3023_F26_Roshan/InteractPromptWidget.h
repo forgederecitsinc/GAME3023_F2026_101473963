@@ -1,6 +1,11 @@
-// roshan - 101473963 - game3023 game engines 3
-// interact prompt widget - displays a sleek "Press [Square] to Interact" prompt
-// with playstation square button glyph, optional keyboard hint [E], and context-aware action text
+// =============================================================================
+// Student: Roshan - 101473963
+// Course: GAME3023 - Game Engines 3
+// File: InteractPromptWidget.h
+// Description: Interaction Prompt HUD Widget.
+// Displays an on-screen prompt when the player approaches an interactable actor
+// (Battery Capsule or Red Power Cylinder).
+// =============================================================================
 
 #pragma once
 

@@ -1,7 +1,12 @@
-// roshan - 101473963 - game3023 game engines 3
-// red power cylinder header - redesigned as an industrial sharp-edged laser gun turret
-// shoots out a bright focused laser beam from the front nozzle once matching battery is attached
-// sharp-edged box geometry throughout to match the substation arena blockout aesthetic
+// =============================================================================
+// Student: Roshan - 101473963
+// Course: GAME3023 - Game Engines 3
+// File: RedPowerCylinder.h
+// Description: Industrial Sharp-Edged Laser Gun Turret (Red Power Cylinder).
+// Designed as an industrial emitter turret. When the player inserts a Battery
+// with the matching 4-digit ID (5-second hold interaction), the turret powers ON
+// and shoots out a glowing focused laser beam from its front nozzle!
+// =============================================================================
 
 #pragma once
 
@@ -41,33 +46,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Cell ID (4-Digit)"))
 	int32 CellID = 1001;
 
-	// ==========================================
-	// Material Overrides (Editable in BP & Details panel)
-	// ==========================================
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Base Plinth Material"))
-	TObjectPtr<UMaterialInterface> BasePlinthMaterial;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Base Pedestal Material"))
-	TObjectPtr<UMaterialInterface> BasePedestalMaterial;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Pillar Column Material"))
-	TObjectPtr<UMaterialInterface> PostColumnMaterial;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Neck Collar Material"))
-	TObjectPtr<UMaterialInterface> NeckCollarMaterial;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Gun Body Material"))
-	TObjectPtr<UMaterialInterface> BodyMaterial;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Barrel Material"))
-	TObjectPtr<UMaterialInterface> BarrelMaterial;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Nozzle Tip Material"))
-	TObjectPtr<UMaterialInterface> NozzleMaterial;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Battery Dock Material"))
-	TObjectPtr<UMaterialInterface> BatteryDockMaterial;
-
+	// Optional laser beam material override
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Laser Beam Material"))
 	TObjectPtr<UMaterialInterface> LaserBeamMaterial;
 
@@ -105,39 +84,6 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USceneComponent> SceneRoot;
 
-	// base bottom plinth - sharp dark square slab on floor
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> BasePlinthMesh;
-
-	// base pedestal plate - sharp middle tier slab
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> BasePedestalMesh;
-
-	// upright pillar post - sharp square column
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> PostColumnMesh;
-
-	// neck collar - square plate beneath the gun head
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> NeckCollarMesh;
-
-	// main gun receiver body - sharp rectangular box tinted with cell color
-	// kept named CylinderMesh so existing code and blueprints continue working cleanly
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> CylinderMesh;
-
-	// front stepped barrel extension - sharp rectangular box
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> BarrelMesh;
-
-	// front emitter nozzle tip - sharp dark box
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> NozzleMesh;
-
-	// battery cradle socket bracket on top deck of the gun
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> BatteryDockMesh;
-
 	// socket where the battery snaps in when inserted
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<USceneComponent> BatterySocket;
@@ -146,7 +92,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<USceneComponent> LaserEmitter;
 
-	// visual laser beam mesh - sharp rectangular laser beam
+	// visual laser beam mesh
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> LaserBeamMesh;
 
@@ -182,14 +128,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Laser")
 	bool CheckActorTargetIDMatch(AActor* ActorToCheck, int32& OutFoundID) const;
 
-	// whether to show the bottom base plinth and pedestal slab (disable if placing on an existing arena pedestal)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Appearance", meta = (DisplayName = "Show Base Plinth & Pedestal"))
-	bool bShowBaseStructure = true;
-
-	// whether the upright pillar post uses a round cylinder (matches arena turrets in the level) or a sharp square box
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Appearance", meta = (DisplayName = "Use Cylinder Post (Arena Style)"))
-	bool bUseCylinderPost = true;
-
 	// rotates the gun head by given angle (default 90 deg clockwise)
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Laser")
 	void RotateGun(float AngleDegrees = 90.0f);
@@ -201,13 +139,6 @@ public:
 	// trigger zone for pressing E
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USphereComponent> InteractionZone;
-
-	// optional material overrides
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cell|Materials")
-	TObjectPtr<UMaterialInterface> UnpoweredMaterial;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cell|Materials")
-	TObjectPtr<UMaterialInterface> PoweredMaterial;
 
 	// power flags
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cell|State")

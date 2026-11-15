@@ -1,9 +1,15 @@
-// roshan - 101473963 - game3023 game engines 3
-// enemy drone header - autonomous patrolling drone with empty static mesh slot,
-// downward laser-like spotlight, full-coverage NavMesh patrolling at Z >= 1000,
-// 5-second escape countdown when the player is caught in the light (escaped by hiding under cover),
-// diving down to latch onto the player and kill them if they fail to hide within 5 seconds,
-// and automatically resetting to its starting spawn point to resume patrolling when the player respawns
+// =============================================================================
+// Student: Roshan - 101473963
+// Course: GAME3023 - Game Engines 3
+// File: EnemyDrone.h
+// Description: Flying Enemy Surveillance Drone.
+// Hovers high up in the sky (Z >= 1000cm), shines a red spotlight down at the floor,
+// and systematically patrols the entire arena.
+// If the player walks into the spotlight, a 5-second countdown starts and the drone
+// drops laser bomb projectiles. If the player does NOT break line-of-sight by running
+// under an umbrella/catwalk/roof within 5 seconds, the drone dives down at high speed,
+// latches onto the player's head, and kills them instantly!
+// =============================================================================
 
 #pragma once
 

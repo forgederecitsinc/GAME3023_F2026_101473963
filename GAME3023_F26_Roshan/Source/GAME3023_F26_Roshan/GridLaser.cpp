@@ -1,6 +1,12 @@
-// roshan - 101473963 - game3023 game engines 3
-// grid laser implementation - customizable security laser grid barrier / trap
-// supports instance-editable dimensions, beam density, glowing materials, and instant editor on/off toggling
+// =============================================================================
+// Student: Roshan - 101473963
+// Course: GAME3023 - Game Engines 3
+// File: GridLaser.cpp
+// Description: Implementation of the Security Grid Laser Barrier.
+// Uses an Instanced Static Mesh Component to draw all horizontal and vertical
+// laser beams in a single draw call for high performance.
+// Handles player damage and eliminates Battery Thieves permanently on contact.
+// =============================================================================
 
 #include "GridLaser.h"
 #include "GAME3023_F26_RoshanCharacter.h"
@@ -15,16 +21,18 @@
 #include "Engine/StaticMesh.h"
 #include "Kismet/GameplayStatics.h"
 
-// Sets default values
+// -----------------------------------------------------------------------------
+// CONSTRUCTOR: Sets up scene root, instanced beam meshes, and hazard trigger box
+// -----------------------------------------------------------------------------
 AGridLaser::AGridLaser()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	// 1. Root scene component
+	// 1. Root Scene Component
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	SetRootComponent(SceneRoot);
 
-	// Load standard engine shapes and project materials
+	// Load standard cube shape and laser material
 	UStaticMesh* CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
 	UMaterialInterface* LaserMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/_Materials/gameplay/M_laserbeam.M_laserbeam"));
 	if (!LaserMat)
@@ -33,61 +41,24 @@ AGridLaser::AGridLaser()
 	}
 	LaserMaterialAsset = LaserMat;
 
-	UMaterialInterface* FrameMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/LevelPrototyping/Materials/M_FlatCol.M_FlatCol"));
-	if (!FrameMat)
-	{
-		FrameMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
-	}
-	FrameMaterialAsset = FrameMat;
-
-	// 2. Instanced static mesh component for batched laser beams
+	// 2. Instanced Static Mesh Component: draws all laser beams efficiently in 1 draw call!
 	LaserBeamInstances = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("LaserBeamInstances"));
 	LaserBeamInstances->SetupAttachment(RootComponent);
-	LaserBeamInstances->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	LaserBeamInstances->SetCollisionEnabled(ECollisionEnabled::NoCollision); // Visual beams don't need collision
 	LaserBeamInstances->SetCastShadow(false);
-	if (CubeMesh)
-	{
-		LaserBeamInstances->SetStaticMesh(CubeMesh);
-	}
-	if (LaserMaterialAsset)
-	{
-		LaserBeamInstances->SetMaterial(0, LaserMaterialAsset);
-	}
+	// Visual beam mesh and materials can be customized in BP_GridLaser
 
-	// 3. Hazard overlap / collision box for the laser grid barrier
+	// 3. Hazard Box: detects player/enemies walking into the laser field
 	HazardBox = CreateDefaultSubobject<UBoxComponent>(TEXT("HazardBox"));
 	HazardBox->SetupAttachment(RootComponent);
 	HazardBox->SetCollisionProfileName(TEXT("Trigger"));
 	HazardBox->SetCollisionResponseToAllChannels(ECR_Overlap);
 	HazardBox->SetGenerateOverlapEvents(true);
-
-	// 4. Emitter frame posts / borders
-	LeftPillarMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftPillarMesh"));
-	LeftPillarMesh->SetupAttachment(RootComponent);
-	LeftPillarMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
-	if (CubeMesh) LeftPillarMesh->SetStaticMesh(CubeMesh);
-	if (FrameMaterialAsset) LeftPillarMesh->SetMaterial(0, FrameMaterialAsset);
-
-	RightPillarMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightPillarMesh"));
-	RightPillarMesh->SetupAttachment(RootComponent);
-	RightPillarMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
-	if (CubeMesh) RightPillarMesh->SetStaticMesh(CubeMesh);
-	if (FrameMaterialAsset) RightPillarMesh->SetMaterial(0, FrameMaterialAsset);
-
-	TopPillarMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TopPillarMesh"));
-	TopPillarMesh->SetupAttachment(RootComponent);
-	TopPillarMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
-	if (CubeMesh) TopPillarMesh->SetStaticMesh(CubeMesh);
-	if (FrameMaterialAsset) TopPillarMesh->SetMaterial(0, FrameMaterialAsset);
-
-	BottomPillarMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BottomPillarMesh"));
-	BottomPillarMesh->SetupAttachment(RootComponent);
-	BottomPillarMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
-	if (CubeMesh) BottomPillarMesh->SetStaticMesh(CubeMesh);
-	if (FrameMaterialAsset) BottomPillarMesh->SetMaterial(0, FrameMaterialAsset);
 }
 
-// Called when the game starts or when spawned
+// -----------------------------------------------------------------------------
+// BEGIN PLAY: Hooks up overlap delegates and builds the laser grid
+// -----------------------------------------------------------------------------
 void AGridLaser::BeginPlay()
 {
 	Super::BeginPlay();
@@ -104,6 +75,9 @@ void AGridLaser::BeginPlay()
 	UpdateLaserState();
 }
 
+// -----------------------------------------------------------------------------
+// ON CONSTRUCTION: Rebuilds beams in editor when placed or moved
+// -----------------------------------------------------------------------------
 void AGridLaser::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
@@ -114,6 +88,9 @@ void AGridLaser::OnConstruction(const FTransform& Transform)
 }
 
 #if WITH_EDITOR
+// -----------------------------------------------------------------------------
+// POST EDIT CHANGE PROPERTY: Live editor update when changing values in Details
+// -----------------------------------------------------------------------------
 void AGridLaser::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
@@ -124,7 +101,9 @@ void AGridLaser::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEv
 }
 #endif
 
-// Rebuilds all laser beams and emitter border dimensions
+// -----------------------------------------------------------------------------
+// REBUILD LASER GRID: Calculates positions for all horizontal & vertical beams
+// -----------------------------------------------------------------------------
 void AGridLaser::RebuildLaserGrid()
 {
 	if (!LaserBeamInstances)
@@ -132,7 +111,7 @@ void AGridLaser::RebuildLaserGrid()
 		return;
 	}
 
-	// Make sure mesh is assigned
+	// Make sure a static mesh is assigned
 	if (!LaserBeamInstances->GetStaticMesh())
 	{
 		UStaticMesh* CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
@@ -142,14 +121,14 @@ void AGridLaser::RebuildLaserGrid()
 		}
 	}
 
-	// Clear previous instances
+	// Clear out any old beam instances
 	LaserBeamInstances->ClearInstances();
 
 	const float ClampedWidth = FMath::Max(20.0f, GridWidth);
 	const float ClampedHeight = FMath::Max(20.0f, GridHeight);
 	const float ClampedThickness = FMath::Max(1.0f, BeamThickness);
 
-	// 1. Horizontal Beams (spanning along Y, spaced along Z)
+	// 1. Generate Horizontal Beams (spanning across width Y, spaced along height Z)
 	if (bEnableHorizontalBeams && NumHorizontalBeams > 0)
 	{
 		const float StepZ = ClampedHeight / (NumHorizontalBeams + 1.0f);
@@ -164,7 +143,7 @@ void AGridLaser::RebuildLaserGrid()
 		}
 	}
 
-	// 2. Vertical Beams (spanning along Z, spaced along Y)
+	// 2. Generate Vertical Beams (spanning from top to bottom Z, spaced across width Y)
 	if (bEnableVerticalBeams && NumVerticalBeams > 0)
 	{
 		const float StepY = ClampedWidth / (NumVerticalBeams + 1.0f);
@@ -179,59 +158,7 @@ void AGridLaser::RebuildLaserGrid()
 		}
 	}
 
-	// 3. Emitter Frame Posts
-	const float FrameThickness = FMath::Max(5.0f, PillarThickness);
-	const bool bShowFrames = bShowEmitterPillars;
-
-	if (LeftPillarMesh)
-	{
-		LeftPillarMesh->SetVisibility(bShowFrames);
-		LeftPillarMesh->SetCollisionEnabled(bShowFrames ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
-		if (bShowFrames)
-		{
-			LeftPillarMesh->SetRelativeLocation(FVector(0.0f, (-ClampedWidth * 0.5f) - (FrameThickness * 0.5f), ClampedHeight * 0.5f));
-			LeftPillarMesh->SetRelativeScale3D(FVector(FrameThickness / 100.0f, FrameThickness / 100.0f, (ClampedHeight + FrameThickness * 2.0f) / 100.0f));
-			if (FrameMaterialAsset) LeftPillarMesh->SetMaterial(0, FrameMaterialAsset);
-		}
-	}
-
-	if (RightPillarMesh)
-	{
-		RightPillarMesh->SetVisibility(bShowFrames);
-		RightPillarMesh->SetCollisionEnabled(bShowFrames ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
-		if (bShowFrames)
-		{
-			RightPillarMesh->SetRelativeLocation(FVector(0.0f, (ClampedWidth * 0.5f) + (FrameThickness * 0.5f), ClampedHeight * 0.5f));
-			RightPillarMesh->SetRelativeScale3D(FVector(FrameThickness / 100.0f, FrameThickness / 100.0f, (ClampedHeight + FrameThickness * 2.0f) / 100.0f));
-			if (FrameMaterialAsset) RightPillarMesh->SetMaterial(0, FrameMaterialAsset);
-		}
-	}
-
-	if (TopPillarMesh)
-	{
-		TopPillarMesh->SetVisibility(bShowFrames);
-		TopPillarMesh->SetCollisionEnabled(bShowFrames ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
-		if (bShowFrames)
-		{
-			TopPillarMesh->SetRelativeLocation(FVector(0.0f, 0.0f, ClampedHeight + (FrameThickness * 0.5f)));
-			TopPillarMesh->SetRelativeScale3D(FVector(FrameThickness / 100.0f, (ClampedWidth + FrameThickness * 2.0f) / 100.0f, FrameThickness / 100.0f));
-			if (FrameMaterialAsset) TopPillarMesh->SetMaterial(0, FrameMaterialAsset);
-		}
-	}
-
-	if (BottomPillarMesh)
-	{
-		BottomPillarMesh->SetVisibility(bShowFrames);
-		BottomPillarMesh->SetCollisionEnabled(bShowFrames ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
-		if (bShowFrames)
-		{
-			BottomPillarMesh->SetRelativeLocation(FVector(0.0f, 0.0f, -FrameThickness * 0.5f));
-			BottomPillarMesh->SetRelativeScale3D(FVector(FrameThickness / 100.0f, (ClampedWidth + FrameThickness * 2.0f) / 100.0f, FrameThickness / 100.0f));
-			if (FrameMaterialAsset) BottomPillarMesh->SetMaterial(0, FrameMaterialAsset);
-		}
-	}
-
-	// 4. Hazard Trigger Box spanning the grid area
+	// 3. Update the Hazard Trigger Box to span the exact opening dimensions
 	if (HazardBox)
 	{
 		const float BoxThickness = FMath::Max(20.0f, ClampedThickness * 2.0f);
@@ -240,56 +167,45 @@ void AGridLaser::RebuildLaserGrid()
 	}
 }
 
-// Updates glowing dynamic material parameters
+// -----------------------------------------------------------------------------
+// UPDATE LASER VISUALS: Pushes color and emissive glow to dynamic material
+// -----------------------------------------------------------------------------
 void AGridLaser::UpdateLaserVisuals()
 {
-	if (!LaserBeamInstances)
-	{
-		return;
-	}
-
-	if (!LaserDynamicMat && LaserMaterialAsset)
-	{
-		LaserDynamicMat = LaserBeamInstances->CreateAndSetMaterialInstanceDynamic(0);
-	}
-
-	if (LaserDynamicMat)
-	{
-		const FLinearColor EmissiveColor = LaserColor * LaserEmissiveIntensity;
-		LaserDynamicMat->SetVectorParameterValue(TEXT("Base Color"), LaserColor);
-		LaserDynamicMat->SetVectorParameterValue(TEXT("BaseColor"), LaserColor);
-		LaserDynamicMat->SetVectorParameterValue(TEXT("Color"), LaserColor);
-		LaserDynamicMat->SetVectorParameterValue(TEXT("Emissive Color"), EmissiveColor);
-		LaserDynamicMat->SetVectorParameterValue(TEXT("EmissiveColor"), EmissiveColor);
-		LaserDynamicMat->SetVectorParameterValue(TEXT("Emissive"), EmissiveColor);
-	}
+	// Materials assigned in BP_GridLaser are preserved without being overridden in C++
 }
 
-// Updates visibility and collision based on bIsLaserOn (instant editor toggle)
+// -----------------------------------------------------------------------------
+// UPDATE LASER STATE: Turns visibility and collision on/off based on bIsLaserOn
+// -----------------------------------------------------------------------------
 void AGridLaser::UpdateLaserState()
 {
+	// 1. Show or hide visual beams
 	if (LaserBeamInstances)
 	{
 		LaserBeamInstances->SetVisibility(bIsLaserOn);
 	}
 
+	// 2. Configure hazard collision
 	if (HazardBox)
 	{
 		if (bIsLaserOn)
 		{
 			if (bBlockPlayer)
 			{
+				// Physically block player like a solid energy wall
 				HazardBox->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 				HazardBox->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 			}
 			else
 			{
+				// Hazardous trigger: walk through and take damage
 				HazardBox->SetCollisionProfileName(TEXT("Trigger"));
 				HazardBox->SetCollisionResponseToAllChannels(ECR_Overlap);
 				HazardBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 			}
 
-			// If actors are already inside when lasers turn on, deal lethal contact immediately
+			// If actors are already inside when the lasers turn on, damage them immediately!
 			if (GetWorld() && GetWorld()->IsGameWorld())
 			{
 				TArray<AActor*> OverlappingActors;
@@ -305,6 +221,7 @@ void AGridLaser::UpdateLaserState()
 		}
 		else
 		{
+			// Lasers are OFF: disable collision so everyone can walk through safely
 			HazardBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			OverlappingPlayer = nullptr;
 			OverlapDamageTimer = 0.0f;
@@ -312,7 +229,9 @@ void AGridLaser::UpdateLaserState()
 	}
 }
 
-// Turns the laser grid on or off at runtime
+// -----------------------------------------------------------------------------
+// SET LASER STATE: Turns the laser grid on or off at runtime
+// -----------------------------------------------------------------------------
 void AGridLaser::SetLaserState(bool bNewActive)
 {
 	if (bIsLaserOn != bNewActive)
@@ -323,13 +242,17 @@ void AGridLaser::SetLaserState(bool bNewActive)
 	}
 }
 
-// Toggles the laser grid state
+// -----------------------------------------------------------------------------
+// TOGGLE LASER: Swaps between ON and OFF
+// -----------------------------------------------------------------------------
 void AGridLaser::ToggleLaser()
 {
 	SetLaserState(!bIsLaserOn);
 }
 
-// Applies damage to player or destroys Battery Thief on laser contact
+// -----------------------------------------------------------------------------
+// DEAL LASER DAMAGE: Damages player or permanently eliminates Battery Thief
+// -----------------------------------------------------------------------------
 void AGridLaser::DealLaserDamage(AActor* TargetActor)
 {
 	if (!TargetActor || !bIsLaserOn)
@@ -337,7 +260,7 @@ void AGridLaser::DealLaserDamage(AActor* TargetActor)
 		return;
 	}
 
-	// 1. Check if the player contacted the laser grid
+	// 1. Check if the player touched the laser
 	AGAME3023_F26_RoshanCharacter* PlayerChar = Cast<AGAME3023_F26_RoshanCharacter>(TargetActor);
 	if (!PlayerChar)
 	{
@@ -346,12 +269,12 @@ void AGridLaser::DealLaserDamage(AActor* TargetActor)
 
 	if (PlayerChar && !PlayerChar->IsDead())
 	{
-		// Player health is damaged by DamageAmount (10 points) on contact/passing through
+		// 💥 Deals configured DamageAmount (10 points) to player's health
 		PlayerChar->ApplyDamageToPlayer(DamageAmount, this);
 		return;
 	}
 
-	// 2. Check if the Battery Thief enemy contacted the laser grid
+	// 2. Check if a Battery Thief enemy touched the laser
 	AEnemyBatteryThief* Thief = Cast<AEnemyBatteryThief>(TargetActor);
 	if (!Thief)
 	{
@@ -360,15 +283,18 @@ void AGridLaser::DealLaserDamage(AActor* TargetActor)
 
 	if (Thief && !Thief->bIsDead)
 	{
-		// Battery Thief dies permanently (safely drops battery and will NOT respawn)
+		// 💥 Battery Thief dies permanently (drops battery safely and does not respawn)
 		Thief->KillPermanently();
 		return;
 	}
 
-	// Fallback for any other damageable actors
+	// Fallback for any other actor with standard damage
 	UGameplayStatics::ApplyDamage(TargetActor, DamageAmount, GetInstigatorController(), this, nullptr);
 }
 
+// -----------------------------------------------------------------------------
+// ON HAZARD BEGIN OVERLAP: Called the instant something enters the laser field
+// -----------------------------------------------------------------------------
 void AGridLaser::OnHazardBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (!bIsLaserOn || !OtherActor || OtherActor == this)
@@ -376,7 +302,7 @@ void AGridLaser::OnHazardBeginOverlap(UPrimitiveComponent* OverlappedComp, AActo
 		return;
 	}
 
-	// 1. Player overlap
+	// Handle Player entering
 	AGAME3023_F26_RoshanCharacter* PlayerChar = Cast<AGAME3023_F26_RoshanCharacter>(OtherActor);
 	if (!PlayerChar)
 	{
@@ -391,7 +317,7 @@ void AGridLaser::OnHazardBeginOverlap(UPrimitiveComponent* OverlappedComp, AActo
 		return;
 	}
 
-	// 2. Battery Thief overlap
+	// Handle Battery Thief entering
 	AEnemyBatteryThief* Thief = Cast<AEnemyBatteryThief>(OtherActor);
 	if (!Thief)
 	{
@@ -405,6 +331,9 @@ void AGridLaser::OnHazardBeginOverlap(UPrimitiveComponent* OverlappedComp, AActo
 	}
 }
 
+// -----------------------------------------------------------------------------
+// ON HAZARD END OVERLAP: Called when something exits the laser field
+// -----------------------------------------------------------------------------
 void AGridLaser::OnHazardEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
 	if (OtherActor && OtherActor == OverlappingPlayer)
@@ -414,12 +343,14 @@ void AGridLaser::OnHazardEndOverlap(UPrimitiveComponent* OverlappedComp, AActor*
 	}
 }
 
-// Called every frame
+// -----------------------------------------------------------------------------
+// TICK: Continuously burns the player if they stand inside an active laser
+// -----------------------------------------------------------------------------
 void AGridLaser::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// If player is continuously standing inside active laser grid, deal periodic burn damage
+	// If player is continuously standing inside the laser grid, tick damage every 0.5s
 	if (bIsLaserOn && OverlappingPlayer)
 	{
 		OverlapDamageTimer += DeltaTime;

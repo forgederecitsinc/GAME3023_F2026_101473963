@@ -1,4 +1,12 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// =============================================================================
+// Student: Roshan - 101473963
+// Course: GAME3023 - Game Engines 3
+// File: GridLaserButton.h
+// Description: Security Grid Laser Toggle Button actor.
+// This is the C++ base actor for BP_GridLaserButton placed in the level.
+// When the player interacts with or steps on this button, it toggles the security
+// laser grid (AGridLaser) on or off!
+// =============================================================================
 
 #pragma once
 
@@ -16,7 +24,7 @@ public:
 	AGridLaserButton();
 
 protected:
-	// Called when the game starts or when spawned
+	// Called when the game starts or when spawned into the level
 	virtual void BeginPlay() override;
 
 public:	

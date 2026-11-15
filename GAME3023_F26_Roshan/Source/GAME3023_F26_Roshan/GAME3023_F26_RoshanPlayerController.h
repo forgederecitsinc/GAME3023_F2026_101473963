@@ -1,4 +1,11 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// =============================================================================
+// Student: Roshan - 101473963
+// Course: GAME3023 - Game Engines 3
+// File: GAME3023_F26_RoshanPlayerController.h
+// Description: Main Player Controller for the project.
+// Manages Enhanced Input subsystems, Input Mapping Contexts (IMC), and
+// optional touch / mobile controls.
+// =============================================================================
 
 #pragma once
 
@@ -10,8 +17,9 @@ class UInputMappingContext;
 class UUserWidget;
 
 /**
- *  Basic PlayerController class for a third person game
- *  Manages input mappings
+ * AGAME3023_F26_RoshanPlayerController
+ * PlayerController class for our 2.5D / Third-Person game.
+ * Sets up Enhanced Input subsystems and applies default Input Mapping Contexts.
  */
 UCLASS(abstract)
 class AGAME3023_F26_RoshanPlayerController : public APlayerController
@@ -20,33 +28,41 @@ class AGAME3023_F26_RoshanPlayerController : public APlayerController
 	
 protected:
 
-	/** Input Mapping Contexts */
+	// -------------------------------------------------------------------------
+	// 🎮 INPUT MAPPINGS (Enhanced Input Contexts)
+	// -------------------------------------------------------------------------
+
+	// Default Input Mapping Contexts (IMC_Default with WASD, Jump, Interact, Drop, etc.)
 	UPROPERTY(EditAnywhere, Category ="Input|Input Mappings")
 	TArray<UInputMappingContext*> DefaultMappingContexts;
 
-	/** Input Mapping Contexts */
+	// Mapping contexts that should only be active when NOT on mobile/touch
 	UPROPERTY(EditAnywhere, Category="Input|Input Mappings")
 	TArray<UInputMappingContext*> MobileExcludedMappingContexts;
 
-	/** Mobile controls widget to spawn */
+	// Mobile on-screen controls widget class (virtual joystick)
 	UPROPERTY(EditAnywhere, Category="Input|Touch Controls")
 	TSubclassOf<UUserWidget> MobileControlsWidgetClass;
 
-	/** Pointer to the mobile controls widget */
+	// Instance of the mobile controls widget
 	UPROPERTY()
 	TObjectPtr<UUserWidget> MobileControlsWidget;
 
-	/** If true, the player will use UMG touch controls even if not playing on mobile platforms */
+	// ✏️ CHANGE THIS: Set to true if you want to test virtual touch controls on your desktop/Mac!
 	UPROPERTY(EditAnywhere, Config, Category = "Input|Touch Controls")
 	bool bForceTouchControls = false;
 
-	/** Gameplay initialization */
+	// -------------------------------------------------------------------------
+	// 🧠 LIFECYCLE FUNCTIONS
+	// -------------------------------------------------------------------------
+
+	// Called on game start: initializes UI and controls
 	virtual void BeginPlay() override;
 
-	/** Input mapping context setup */
+	// Binds input components and applies IMCs to the local player subsystem
 	virtual void SetupInputComponent() override;
 
-	/** Returns true if the player should use UMG touch controls */
+	// Helper function: returns true if touch controls should be spawned
 	bool ShouldUseTouchControls() const;
 
 };

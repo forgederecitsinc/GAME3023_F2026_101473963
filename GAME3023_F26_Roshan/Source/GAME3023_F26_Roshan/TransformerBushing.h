@@ -1,6 +1,11 @@
-// roshan - 101473963 - game3023 game engines 3
-// transformer bushing header - lights up like a neon light when the matching target is hit
-// supports custom user-chosen neon colors and authentic neon tube bloom
+// =============================================================================
+// Student: Roshan - 101473963
+// Course: GAME3023 - Game Engines 3
+// File: TransformerBushing.h
+// Description: Transformer Bushing Neon Indicator.
+// Sits on top of the transformer or wall and lights up like an intense neon tube
+// when the laser strikes the matching ALaserTarget!
+// =============================================================================
 
 #pragma once
 

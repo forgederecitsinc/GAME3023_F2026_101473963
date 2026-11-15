@@ -1,9 +1,19 @@
-// roshan - 101473963 - game3023 game engines 3
-// ground battery saboteur / battery thief enemy header
-// spawns at (X=-878, Y=-3679, Z=10) at speed 300, patrols the ground NavMesh, detects ONLY working batteries
-// that have activated a laser (ARedPowerCylinder::bIsPowered == true), navigates to the nearest working
-// battery laser device, runs a 10-second removal timer to detach the battery, scans the NavMesh to find
-// the closest BP_BatteryDropSpot actor placed in the level, carries the battery there on its back, drops it, and resumes patrol
+// =============================================================================
+// Student: Roshan - 101473963
+// Course: GAME3023 - Game Engines 3
+// File: EnemyBatteryThief.h
+// Description: Ground Battery Saboteur / Battery Thief enemy.
+//
+// 📌 HOW THIS ENEMY WORKS:
+// 1. Spawns out of the ground hatch at (X=-878, Y=-3679, Z=10) with 300 cm/s move speed.
+// 2. Patrols the NavMesh until a battery is inserted into a laser turret (ARedPowerCylinder).
+// 3. Detects ONLY working batteries that are powering an active laser beam.
+// 4. Walks over to the turret, stands in the interaction zone, and runs a 10-second removal timer.
+// 5. Pops the battery out, mounts it onto its back, and carries it to the nearest BP_BatteryDropSpot!
+// 6. Drops the battery on the drop pad, and resumes patrolling.
+// 7. If physically bumped into by the player, enters FollowingPlayer mode (speed +70 cm/s)!
+// 8. If killed, the GameMode waits 60 seconds before spawning a replacement.
+// =============================================================================
 
 #pragma once
 
@@ -354,10 +364,10 @@ private:
 	// Home/spawn origin on the NavMesh used as the center of the patrol territory
 	FVector PatrolOrigin = FVector(-878.0f, -3679.0f, 10.0f);
 
-	// Locked ground floor Z height so the spider thief never climbs or flies above ground level
-	float GroundFloorZ = 10.0f;
+	// Initial spawn height reference on the NavMesh
+	float InitialSpawnZ = 10.0f;
 
-	// Smoothed ground Z height on the NavMesh (always clamped to GroundFloorZ)
+	// Smoothed ground Z height on the NavMesh / stairs / walkable surfaces
 	float CurrentGroundZ = 10.0f;
 	bool bHasValidGroundZ = false;
 
@@ -380,13 +390,13 @@ private:
 	int32 TotalSpawnedCount = 0;
 	FTimerHandle SpawnTimerHandle;
 
-	// Returns true if a NavMesh point is on the ground floor surface (not on top of a wall, box, or pedestal)
-	bool IsPointOnGroundFloor(const FVector& Point) const;
+	// Returns true if a NavMesh point is on a valid walkable surface (navigable by pedestrians)
+	bool IsPointOnWalkableSurface(const FVector& Point) const;
 
-	// Returns true if the entire navigation path is valid, non-partial, and stays strictly on the ground floor surface
+	// Returns true if the navigation path is valid, non-partial, and follows walkable surfaces (stairs, ramps, floors; cannot scale vertical walls)
 	bool IsGroundNavPathValid(const class UNavigationPath* NavPath) const;
 
-	// Returns the horizontal (X, Y) center of the cylinder's trigger box projected onto GroundFloorZ
+	// Returns the walkable surface center at/beneath the cylinder's trigger box
 	FVector GetCylinderTriggerGroundCenter(const ARedPowerCylinder* Cylinder) const;
 
 	// Computes the best reachable ground-level NavMesh approach point and ground route length to steal from Cylinder

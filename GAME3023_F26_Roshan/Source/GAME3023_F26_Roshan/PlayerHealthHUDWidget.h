@@ -1,5 +1,9 @@
-// roshan - 101473963 - game3023 game engines 3
-// player health hud widget - sleek top-right hud displaying player health points
+// =============================================================================
+// Student: Roshan - 101473963
+// Course: GAME3023 - Game Engines 3
+// File: PlayerHealthHUDWidget.h
+// Description: Sleek top-right Player Health HUD widget.
+// =============================================================================
 
 #pragma once
 
@@ -14,8 +18,11 @@ class STextBlock;
 
 /**
  * UPlayerHealthHUDWidget
- * Top-right minimalist HUD widget showing the player's health points,
- * animated damage lag bar, dynamic health color transitions, and vital icon badge.
+ * Minimalist top-right HUD widget that displays:
+ * - Current / Max Health numeric text (e.g. "100 / 100")
+ * - Smooth orange health fill bar
+ * - Delayed "damage lag" trail bar (gives game-feel visual feedback when hit)
+ * - Pulsing warning effect when below 25% HP!
  */
 UCLASS(BlueprintType, Blueprintable)
 class GAME3023_F26_ROSHAN_API UPlayerHealthHUDWidget : public UUserWidget
@@ -23,9 +30,14 @@ class GAME3023_F26_ROSHAN_API UPlayerHealthHUDWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
+	// Constructor
 	UPlayerHealthHUDWidget(const FObjectInitializer& ObjectInitializer);
 
-	/** Updates the health display with new current and max health values */
+	// =========================================================================
+	// 🎮 PUBLIC API (Called by Character or GameMode to update health)
+	// =========================================================================
+
+	/** Call this whenever the player takes damage or heals to update the UI */
 	UFUNCTION(BlueprintCallable, Category = "Player Health HUD")
 	void UpdateHealth(float NewCurrentHealth, float NewMaxHealth);
 
@@ -33,35 +45,39 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Player Health HUD")
 	void SetHealthPercent(float InPercent);
 
-	/** Current health points */
+	/** Getter: Returns current health points */
 	UFUNCTION(BlueprintPure, Category = "Player Health HUD")
 	float GetCurrentHealth() const { return CurrentHealth; }
 
-	/** Max health points */
+	/** Getter: Returns max health points */
 	UFUNCTION(BlueprintPure, Category = "Player Health HUD")
 	float GetMaxHealth() const { return MaxHealth; }
 
-	/** Current health percent (0.0 to 1.0) */
+	/** Getter: Returns health percent (0.0 to 1.0) */
 	UFUNCTION(BlueprintPure, Category = "Player Health HUD")
 	float GetHealthPercent() const { return HealthPercent; }
 
-	/** Current health points */
+	// =========================================================================
+	// 🎮 TWEAKABLE HUD SETTINGS
+	// =========================================================================
+
+	// ✏️ CHANGE THIS: Current health points of the player (starts at 100)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player Health HUD")
 	float CurrentHealth = 100.0f;
 
-	/** Maximum health points */
+	// ✏️ CHANGE THIS: Maximum health points of the player
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player Health HUD")
 	float MaxHealth = 100.0f;
 
-	/** Health percentage 0.0 to 1.0 */
+	// Health percentage 0.0 to 1.0 (read-only in inspector, calculated automatically)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player Health HUD")
 	float HealthPercent = 1.0f;
 
-	/** Width of the health bar in Slate units */
+	// ✏️ CHANGE THIS: Width of the health bar on screen in Slate units (default 340)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player Health HUD")
 	float HealthBarWidth = 340.0f;
 
-	/** Height of the health bar in Slate units */
+	// ✏️ CHANGE THIS: Height of the health bar on screen in Slate units (default 24)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player Health HUD")
 	float HealthBarHeight = 24.0f;
 
@@ -70,25 +86,29 @@ protected:
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 
-	/** Blueprint hook when health is updated */
+	// =========================================================================
+	// 🔔 BLUEPRINT EVENTS (Override these in a Widget Blueprint if desired)
+	// =========================================================================
+
+	/** Blueprint hook triggered whenever health is updated */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Player Health HUD")
 	void OnHealthUpdated(float NewCurrentHealth, float NewMaxHealth, float NewPercent);
 
-	/** Blueprint hook when player takes damage */
+	/** Blueprint hook triggered when player takes damage */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Player Health HUD")
 	void OnPlayerDamaged(float DamageAmount);
 
 private:
-	/** Animated visual percentage for smooth health bar transitions */
+	// Smoothly animated percentage for the main health bar
 	float DisplayedPercent = 1.0f;
 
-	/** Damage lag ghost bar percentage (catches up more slowly) */
+	// Slower animated percentage for the damage catch-up ghost bar
 	float LaggedPercent = 1.0f;
 
-	/** Pulsing timer for critical health state */
+	// Timer tracking the pulse speed when health is critical (< 25%)
 	float PulseTimer = 0.0f;
 
-	/** Slate widget handles */
+	// Internal Slate UI component pointers
 	TSharedPtr<SBox> HealthBarFillBox;
 	TSharedPtr<SBox> HealthBarLagBox;
 	TSharedPtr<SBorder> HealthBarFillBorder;
@@ -97,5 +117,6 @@ private:
 	TSharedPtr<SBorder> HealthIconBorder;
 	TSharedPtr<STextBlock> HealthIconTextBlock;
 
+	// Helper to refresh the numeric text label ("CurHP / MaxHP")
 	void RefreshVisuals();
 };

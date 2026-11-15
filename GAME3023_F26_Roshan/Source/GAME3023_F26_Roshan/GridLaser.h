@@ -1,6 +1,11 @@
-// roshan - 101473963 - game3023 game engines 3
-// grid laser header - customizable security laser grid barrier / trap
-// features instance-editable dimensions, beam counts, color, damage, and instant editor toggle (on/off)
+// =============================================================================
+// Student: Roshan - 101473963
+// Course: GAME3023 - Game Engines 3
+// File: GridLaser.h
+// Description: Security Grid Laser Barrier / Hazard System.
+// Creates a glowing sci-fi laser field (like in spy/heist movies) with customizable
+// horizontal and vertical beams.
+// =============================================================================
 
 #pragma once
 
@@ -25,6 +30,7 @@ class GAME3023_F26_ROSHAN_API AGridLaser : public AActor
 	GENERATED_BODY()
 	
 public:	
+	// Constructor: sets up components and default materials
 	AGridLaser();
 
 protected:
@@ -32,42 +38,45 @@ protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 #if WITH_EDITOR
+	// Live editor preview: immediately updates beams when you tweak properties in Details panel!
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
 public:	
 	virtual void Tick(float DeltaTime) override;
 
-	// ==========================================
-	// Core State & Toggles
-	// ==========================================
+	// =========================================================================
+	// 🎮 CORE TOGGLES (Change these per actor in the level!)
+	// =========================================================================
 
-	// Whether the laser grid is active. Instance editable so it can be set ON or OFF per placed actor in the level!
+	// ✏️ CHANGE THIS: Toggle this specific laser barrier ON or OFF!
+	// You can check/uncheck this right in the Unreal Editor Details panel to turn it on/off!
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser", meta = (DisplayName = "Is Laser On"))
 	bool bIsLaserOn = true;
 
-	// If true, the laser grid physically blocks the player like a solid energy barrier when active.
-	// If false, it acts as a hazardous pass-through laser trap that burns the player.
+	// ✏️ CHANGE THIS: 
+	// - If TRUE: acts as an impassable solid forcefield (physically blocks player from walking through)
+	// - If FALSE: acts as a hazardous walk-through laser trap that burns the player for damage!
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser", meta = (DisplayName = "Block Player Movement"))
 	bool bBlockPlayer = false;
 
-	// ==========================================
-	// Grid Dimensions & Beam Layout
-	// ==========================================
+	// =========================================================================
+	// 📐 GRID DIMENSIONS & BEAM COUNTS (Shape of the doorway / barrier)
+	// =========================================================================
 
-	// Width of the laser grid corridor / opening (along local Y axis)
+	// ✏️ CHANGE THIS: Total width of the doorway/opening along local Y axis (in cm)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Dimensions", meta = (ClampMin = "50.0", UIMin = "50.0"))
 	float GridWidth = 400.0f;
 
-	// Total height of the laser grid (along local Z axis)
+	// ✏️ CHANGE THIS: Total height of the doorway/opening along local Z axis (in cm)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Dimensions", meta = (ClampMin = "50.0", UIMin = "50.0"))
 	float GridHeight = 300.0f;
 
-	// Number of horizontal laser beams spanning the width
+	// ✏️ CHANGE THIS: How many horizontal laser beams to draw (across the doorway)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Beams", meta = (ClampMin = "0", UIMin = "0"))
 	int32 NumHorizontalBeams = 5;
 
-	// Number of vertical laser beams spanning the height
+	// ✏️ CHANGE THIS: How many vertical laser beams to draw (from top to bottom)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Beams", meta = (ClampMin = "0", UIMin = "0"))
 	int32 NumVerticalBeams = 4;
 
@@ -79,75 +88,60 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Beams")
 	bool bEnableVerticalBeams = true;
 
-	// Cross-sectional thickness / diameter of each laser beam (in cm)
+	// ✏️ CHANGE THIS: Thickness / diameter of each glowing laser cylinder/beam (in cm)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Beams", meta = (ClampMin = "1.0", UIMin = "1.0"))
 	float BeamThickness = 8.0f;
 
-	// ==========================================
-	// Laser Visuals & Materials
-	// ==========================================
+	// =========================================================================
+	// 🎨 VISUALS & MATERIALS (Colors and Glow)
+	// =========================================================================
 
-	// Emissive glow color of the laser beams
+	// ✏️ CHANGE THIS: Emissive glow color of the laser beams (default is bright red)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Visuals")
 	FLinearColor LaserColor = FLinearColor(1.0f, 0.05f, 0.05f, 1.0f);
 
-	// Multiplier for laser emissive brightness
+	// ✏️ CHANGE THIS: Glow intensity multiplier (higher values = more bloom in Unreal Engine post-process)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Visuals", meta = (ClampMin = "0.0", UIMin = "0.0"))
 	float LaserEmissiveIntensity = 25.0f;
 
-	// Laser beam material asset
+	// Base laser material asset (uses M_laserbeam)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Visuals")
 	TObjectPtr<UMaterialInterface> LaserMaterialAsset;
 
-	// Frame / border material asset
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Visuals")
-	TObjectPtr<UMaterialInterface> FrameMaterialAsset;
+	// =========================================================================
+	// 💥 DAMAGE & HAZARD SETTINGS
+	// =========================================================================
 
-	// ==========================================
-	// Frame / Emitter Posts
-	// ==========================================
-
-	// Whether to show the surrounding emitter frame posts (disable if mounting between custom level walls)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Frame")
-	bool bShowEmitterPillars = true;
-
-	// Thickness of the emitter frame posts
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Frame", meta = (ClampMin = "5.0", UIMin = "5.0"))
-	float PillarThickness = 20.0f;
-
-	// ==========================================
-	// Damage & Hazards
-	// ==========================================
-
-	// Damage dealt to the player's health when passing through or contacting active lasers (default 10 points)
+	// ✏️ CHANGE THIS: Damage dealt to the player's health when touching active lasers
+	// (Default is 10.0 HP per hit)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Damage", meta = (ClampMin = "0.0", UIMin = "0.0"))
 	float DamageAmount = 10.0f;
 
-	// Interval between damage ticks (in seconds) if the player remains inside the active laser grid
+	// ✏️ CHANGE THIS: Time interval between continuous damage ticks if player stays inside the lasers
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Damage", meta = (ClampMin = "0.1", UIMin = "0.1"))
 	float DamageTickInterval = 0.5f;
 
-	// ==========================================
-	// Blueprint & Runtime Controls
-	// ==========================================
+	// =========================================================================
+	// 🧠 BLUEPRINT & RUNTIME FUNCTIONS
+	// =========================================================================
 
-	// Turns the laser grid on or off at runtime
+	// Call this from Blueprint (e.g. from a button or trigger) to turn lasers on/off
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|GridLaser")
 	void SetLaserState(bool bNewActive);
 
-	// Toggles the laser grid state
+	// Toggles the laser state (turns on if off, turns off if on)
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|GridLaser")
 	void ToggleLaser();
 
-	// Checks if the laser is currently turned on
+	// Returns true if the laser is currently turned on
 	UFUNCTION(BlueprintPure, Category = "LiveWire|GridLaser")
 	bool IsLaserOn() const { return bIsLaserOn; }
 
-	// Event broadcast whenever the laser grid state changes
+	// Event broadcast when the laser turns on or off
 	UPROPERTY(BlueprintAssignable, Category = "LiveWire|GridLaser")
 	FOnGridLaserStateChanged OnLaserStateChanged;
 
-	// Rebuilds the geometry, instances, and frame dimensions
+	// Rebuilds the mesh geometry, instances, and frame pillars based on current settings
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|GridLaser")
 	void RebuildLaserGrid();
 
@@ -160,7 +154,7 @@ public:
 	void UpdateLaserVisuals();
 
 protected:
-	// Scene root
+	// Root scene component
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USceneComponent> SceneRoot;
 
@@ -172,35 +166,22 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UBoxComponent> HazardBox;
 
-	// Emitter frame meshes
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> LeftPillarMesh;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> RightPillarMesh;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> TopPillarMesh;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> BottomPillarMesh;
-
 private:
 	// Dynamic material instance for glowing laser beams
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> LaserDynamicMat;
 
-	// Currently overlapping player actor
+	// Pointer to player character currently inside the laser hazard box
 	UPROPERTY(Transient)
 	TObjectPtr<AGAME3023_F26_RoshanCharacter> OverlappingPlayer;
 
-	// Timer tracking damage ticks while player stands in the laser grid
+	// Timer for periodic damage ticks while standing inside the laser
 	float OverlapDamageTimer = 0.0f;
 
-	// Applies laser damage to an actor
+	// Helper function that applies damage to player or kills Battery Thief permanently
 	void DealLaserDamage(AActor* TargetActor);
 
-	// Hazard box overlap callbacks
+	// Overlap event callbacks
 	UFUNCTION()
 	void OnHazardBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 

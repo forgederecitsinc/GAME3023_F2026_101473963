@@ -1,8 +1,15 @@
-// roshan - 101473963 - game3023 game engines 3
-// enemy drone implementation - empty static mesh, hovers at Z >= 1000,
-// downward laser spotlight, systematic NavMesh area coverage,
-// 5-second escape countdown when catching the player (escaped by hiding under something),
-// and diving down to latch onto the player and kill them if they don't hide in 5 seconds
+// =============================================================================
+// Student: Roshan - 101473963
+// Course: GAME3023 - Game Engines 3
+// File: EnemyDrone.cpp
+// Description: Implementation of the Flying Enemy Drone.
+// - Hovers at high altitude (Z >= 1000cm) above all obstacles and walls.
+// - Casts a downward spotlight beam detecting the player.
+// - Covers the entire arena with a grid of patrol destinations.
+// - Drops laser bombs while player is in light.
+// - Runs a 5-second escape countdown (avoided by hiding under umbrellas/catwalks).
+// - Dives to latch and kill if timer expires, and resets when player respawns.
+// =============================================================================
 
 #include "EnemyDrone.h"
 #include "DroneLaserParticle.h"
@@ -381,16 +388,7 @@ void AEnemyDrone::BuildNavMeshCoveragePoints()
 	{
 		if (IsValid(WaypointActor))
 		{
-			FVector Loc = WaypointActor->GetActorLocation();
-			if (NavSys)
-			{
-				FNavLocation NavLoc;
-				if (NavSys->ProjectPointToNavigation(Loc, NavLoc, FVector(400.0f, 400.0f, 1500.0f)))
-				{
-					Loc = NavLoc.Location;
-				}
-			}
-			PatrolGroundPoints.Add(Loc);
+			PatrolGroundPoints.Add(WaypointActor->GetActorLocation());
 		}
 	}
 
@@ -399,57 +397,55 @@ void AEnemyDrone::BuildNavMeshCoveragePoints()
 		return;
 	}
 
-	// 2. Otherwise, systematically sample the NavMesh across a boustrophedon (lawnmower) grid
-	// so the drone visits and covers every reachable area of the NavMesh
-	if (NavSys)
+	// 2. Aerial drone coverage: systematically generate aerial patrol waypoints across the entire arena
+	// Drones fly through open air at Z >= 1000 and can fly anywhere over walls, obstacles, platforms, and voids!
+	const float Step = FMath::Max(150.0f, CoverageGridSpacing);
+	const int32 HalfSteps = FMath::Clamp(FMath::CeilToInt(PatrolRadius / Step), 1, 25);
+	const float MinDistSq = FMath::Square(Step * 0.45f);
+	const FVector ProjectionExtent(Step * 0.55f, Step * 0.55f, 1500.0f);
+
+	bool bReverseRow = false;
+	for (int32 XIdx = -HalfSteps; XIdx <= HalfSteps; ++XIdx)
 	{
-		const float Step = FMath::Max(150.0f, CoverageGridSpacing);
-		const int32 HalfSteps = FMath::Clamp(FMath::CeilToInt(PatrolRadius / Step), 1, 25);
-		const float MinDistSq = FMath::Square(Step * 0.45f);
-		const FVector ProjectionExtent(Step * 0.55f, Step * 0.55f, 1500.0f);
-
-		bool bReverseRow = false;
-		for (int32 XIdx = -HalfSteps; XIdx <= HalfSteps; ++XIdx)
+		for (int32 YStep = -HalfSteps; YStep <= HalfSteps; ++YStep)
 		{
-			for (int32 YStep = -HalfSteps; YStep <= HalfSteps; ++YStep)
+			const int32 YIdx = bReverseRow ? -YStep : YStep;
+			const FVector SampleOffset(XIdx * Step, YIdx * Step, 0.0f);
+
+			if (SampleOffset.SizeSquared2D() > FMath::Square(PatrolRadius))
 			{
-				const int32 YIdx = bReverseRow ? -YStep : YStep;
-				const FVector SampleOffset(XIdx * Step, YIdx * Step, 0.0f);
+				continue;
+			}
 
-				if (SampleOffset.SizeSquared2D() > FMath::Square(PatrolRadius))
-				{
-					continue;
-				}
+			const FVector CandidateWorld = PatrolOrigin + SampleOffset;
+			FVector PointToAdd = CandidateWorld;
 
-				const FVector CandidateWorld = PatrolOrigin + SampleOffset;
+			// Sample NavMesh height if present below for ground altitude reference, but do not restrict drone flight if absent
+			if (NavSys)
+			{
 				FNavLocation ProjectedNav;
 				if (NavSys->ProjectPointToNavigation(CandidateWorld, ProjectedNav, ProjectionExtent))
 				{
-					// Avoid adding duplicate points when adjacent grid cells snap to the same NavMesh edge
-					bool bTooClose = false;
-					for (const FVector& Existing : PatrolGroundPoints)
-					{
-						if (FVector::DistSquared2D(Existing, ProjectedNav.Location) < MinDistSq &&
-							FMath::Abs(Existing.Z - ProjectedNav.Location.Z) < 150.0f)
-						{
-							bTooClose = true;
-							break;
-						}
-					}
-
-					if (!bTooClose)
-					{
-						// Verify the point is reachable along the NavMesh from PatrolOrigin
-						UNavigationPath* TestPath = NavSys->FindPathToLocationSynchronously(World, PatrolOrigin, ProjectedNav.Location, this);
-						if (TestPath && TestPath->IsValid() && !TestPath->IsPartial() && TestPath->PathPoints.Num() > 0)
-						{
-							PatrolGroundPoints.Add(ProjectedNav.Location);
-						}
-					}
+					PointToAdd = ProjectedNav.Location;
 				}
 			}
-			bReverseRow = !bReverseRow;
+
+			bool bTooClose = false;
+			for (const FVector& Existing : PatrolGroundPoints)
+			{
+				if (FVector::DistSquared2D(Existing, PointToAdd) < MinDistSq)
+				{
+					bTooClose = true;
+					break;
+				}
+			}
+
+			if (!bTooClose)
+			{
+				PatrolGroundPoints.Add(PointToAdd);
+			}
 		}
+		bReverseRow = !bReverseRow;
 	}
 }
 
@@ -464,8 +460,7 @@ void AEnemyDrone::AdvanceToNextPatrolDestination()
 		return;
 	}
 
-	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
-	const FVector CurrentGroundPos(GetActorLocation().X, GetActorLocation().Y, CurrentGroundZ);
+	const FVector CurrentLocation = GetActorLocation();
 
 	// Re-populate coverage points if needed
 	if (PatrolGroundPoints.Num() == 0)
@@ -473,7 +468,7 @@ void AEnemyDrone::AdvanceToNextPatrolDestination()
 		BuildNavMeshCoveragePoints();
 	}
 
-	// Try to find a valid NavMesh path to the next point in our coverage cycle
+	// The drone flies directly through the air in 3D above all ground obstacles
 	if (PatrolGroundPoints.Num() > 0)
 	{
 		const int32 NumPoints = PatrolGroundPoints.Num();
@@ -482,48 +477,27 @@ void AEnemyDrone::AdvanceToNextPatrolDestination()
 			CurrentPatrolIndex = (CurrentPatrolIndex + 1) % NumPoints;
 			const FVector TargetGroundPos = PatrolGroundPoints[CurrentPatrolIndex];
 
-			if (FVector::DistSquared2D(CurrentGroundPos, TargetGroundPos) < FMath::Square(60.0f))
+			if (FVector::DistSquared2D(CurrentLocation, TargetGroundPos) < FMath::Square(80.0f))
 			{
 				continue;
 			}
 
-			if (NavSys)
-			{
-				UNavigationPath* NavPath = NavSys->FindPathToLocationSynchronously(World, CurrentGroundPos, TargetGroundPos, this);
-				if (NavPath && NavPath->IsValid() && NavPath->PathPoints.Num() > 0)
-				{
-					CurrentPathPoints = NavPath->PathPoints;
-					CurrentPathCornerIndex = (CurrentPathPoints.Num() > 1) ? 1 : 0;
-					return;
-				}
-			}
-
-			// Direct fallback if NavMesh path query wasn't available
 			CurrentPathPoints.Add(TargetGroundPos);
 			CurrentPathCornerIndex = 0;
 			return;
 		}
 	}
 
-	// Fallback: pick a random reachable point on the NavMesh if grid sampling yielded nothing
-	if (NavSys)
-	{
-		FNavLocation RandomNavPoint;
-		if (NavSys->GetRandomReachablePointInRadius(CurrentGroundPos, PatrolRadius, RandomNavPoint))
-		{
-			UNavigationPath* NavPath = NavSys->FindPathToLocationSynchronously(World, CurrentGroundPos, RandomNavPoint.Location, this);
-			if (NavPath && NavPath->IsValid() && NavPath->PathPoints.Num() > 0)
-			{
-				CurrentPathPoints = NavPath->PathPoints;
-				CurrentPathCornerIndex = (CurrentPathPoints.Num() > 1) ? 1 : 0;
-			}
-			else
-			{
-				CurrentPathPoints.Add(RandomNavPoint.Location);
-				CurrentPathCornerIndex = 0;
-			}
-		}
-	}
+	// Fallback: pick a random location within PatrolRadius across the arena
+	const float AngleRad = FMath::FRandRange(0.0f, 2.0f * PI);
+	const float Dist = FMath::FRandRange(500.0f, PatrolRadius);
+	const FVector FallbackPoint(
+		PatrolOrigin.X + FMath::Cos(AngleRad) * Dist,
+		PatrolOrigin.Y + FMath::Sin(AngleRad) * Dist,
+		CurrentGroundZ
+	);
+	CurrentPathPoints.Add(FallbackPoint);
+	CurrentPathCornerIndex = 0;
 }
 
 void AEnemyDrone::Tick(float DeltaTime)

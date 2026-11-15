@@ -1,6 +1,16 @@
-// roshan - 101473963 - game3023 game engines 3
-// character cpp implementation
-// includes 2.5d imax top-down camera setup, wasd movement, and battery inventory management
+// =============================================================================
+// Student: Roshan - 101473963
+// Course: GAME3023 - Game Engines 3
+// File: GAME3023_F26_RoshanCharacter.cpp
+// Description: Implementation of the Main Player Character.
+// Handles:
+// 1. Cinematic 2.5D top-down camera framing.
+// 2. WASD movement & PS5 gamepad aiming/controls.
+// 3. Picking up, carrying, and dropping battery capsules.
+// 4. 5-second hold interaction to attach batteries into laser cylinders.
+// 5. Dynamic see-through cutout mask for roofs and catwalks.
+// 6. Player health HUD, taking damage, and respawning.
+// =============================================================================
 
 #include "GAME3023_F26_RoshanCharacter.h"
 #include "Engine/LocalPlayer.h"

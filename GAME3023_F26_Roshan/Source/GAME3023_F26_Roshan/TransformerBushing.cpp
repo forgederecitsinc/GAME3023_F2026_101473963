@@ -1,6 +1,10 @@
-// roshan - 101473963 - game3023 game engines 3
-// transformer bushing cpp - lights up like a neon light when the matching target is hit
-// supports custom user-chosen neon colors and authentic neon tube bloom
+// =============================================================================
+// Student: Roshan - 101473963
+// Course: GAME3023 - Game Engines 3
+// File: TransformerBushing.cpp
+// Description: Implementation of the Transformer Bushing neon indicator.
+// Listens for laser hit events on matching ALaserTarget and ignites with neon bloom.
+// =============================================================================
 
 #include "TransformerBushing.h"
 #include "LaserTarget.h"
@@ -22,17 +26,10 @@ ATransformerBushing::ATransformerBushing()
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	RootComponent = SceneRoot;
 
-	// 2. Static mesh component
+	// 2. Static mesh component (mesh asset left unassigned so student assigns their custom mesh in BP_TransformerBushing)
 	BushingMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMeshComponent"));
 	BushingMesh->SetupAttachment(RootComponent);
 	BushingMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
-
-	// Default shape mesh asset (cylinder)
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderFinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-	if (CylinderFinder.Succeeded())
-	{
-		BushingMesh->SetStaticMesh(CylinderFinder.Object);
-	}
 
 	// Default unlit flat material
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> FlatMatFinder(TEXT("/Game/LevelPrototyping/Materials/M_FlatCol.M_FlatCol"));
@@ -40,7 +37,6 @@ ATransformerBushing::ATransformerBushing()
 	{
 		UnlitMaterial = FlatMatFinder.Object;
 		BaseMaterial = FlatMatFinder.Object;
-		BushingMesh->SetMaterial(0, UnlitMaterial);
 	}
 
 	// Glowing emissive neon material
@@ -346,9 +342,6 @@ void ATransformerBushing::UpdateAppearance()
 {
 	const bool bShouldGlow = bIsLitUp || (bPreviewLitInEditor && GetWorld() && !GetWorld()->IsGameWorld());
 	const FLinearColor LitColor = GetActiveLitColor();
-	const FLinearColor CurrentColor = bShouldGlow ? LitColor : NeonUnlitColor;
-	const float CurrentEmissiveMult = bShouldGlow ? LitEmissiveMultiplier : UnlitEmissiveMultiplier;
-	const FLinearColor EmissiveCol = LitColor * CurrentEmissiveMult;
 
 	// 1. Update point light for ambient neon glow
 	if (BushingLight)
@@ -361,68 +354,7 @@ void ATransformerBushing::UpdateAppearance()
 		BushingLight->SetSoftSourceRadius(50.0f);
 	}
 
-	// 2. Choose target material template
-	UMaterialInterface* TargetMatTemplate = bShouldGlow ? (NeonMaterial ? NeonMaterial.Get() : UnlitMaterial.Get())
-	                                                   : (UnlitMaterial ? UnlitMaterial.Get() : NeonMaterial.Get());
-
-	auto ApplyNeonToMesh = [this, TargetMatTemplate, &CurrentColor, &EmissiveCol, CurrentEmissiveMult, bShouldGlow](UStaticMeshComponent* MeshComp)
-	{
-		if (!MeshComp) return;
-
-		const int32 NumMats = FMath::Max(1, MeshComp->GetNumMaterials());
-		for (int32 Slot = 0; Slot < NumMats; ++Slot)
-		{
-			if (bSwapMaterialsForNeon && TargetMatTemplate)
-			{
-				UMaterialInterface* ExistingMat = MeshComp->GetMaterial(Slot);
-				if (!ExistingMat)
-				{
-					MeshComp->SetMaterial(Slot, TargetMatTemplate);
-				}
-				else if (UMaterialInstanceDynamic* ExistDyn = Cast<UMaterialInstanceDynamic>(ExistingMat))
-				{
-					if (ExistDyn->Parent != TargetMatTemplate)
-					{
-						MeshComp->SetMaterial(Slot, TargetMatTemplate);
-					}
-				}
-				else if (ExistingMat != TargetMatTemplate)
-				{
-					MeshComp->SetMaterial(Slot, TargetMatTemplate);
-				}
-			}
-
-			UMaterialInstanceDynamic* Dyn = Cast<UMaterialInstanceDynamic>(MeshComp->GetMaterial(Slot));
-			if (!Dyn)
-			{
-				Dyn = MeshComp->CreateAndSetMaterialInstanceDynamic(Slot);
-			}
-
-			if (Dyn)
-			{
-				Dyn->SetVectorParameterValue(TEXT("Base Color"), CurrentColor);
-				Dyn->SetVectorParameterValue(TEXT("BaseColor"), CurrentColor);
-				Dyn->SetVectorParameterValue(TEXT("Color"), CurrentColor);
-				Dyn->SetVectorParameterValue(TEXT("Tint"), CurrentColor);
-
-				Dyn->SetVectorParameterValue(TEXT("Emissive Color"), EmissiveCol);
-				Dyn->SetVectorParameterValue(TEXT("EmissiveColor"), EmissiveCol);
-				Dyn->SetVectorParameterValue(TEXT("Emissive"), EmissiveCol);
-				Dyn->SetScalarParameterValue(TEXT("EmissiveIntensity"), CurrentEmissiveMult);
-			}
-		}
-	};
-
-	// Apply to primary BushingMesh
-	ApplyNeonToMesh(BushingMesh);
-
-	// Apply to any other StaticMeshComponents attached (e.g. user-added blueprint parts!)
-	TInlineComponentArray<UStaticMeshComponent*> AllMeshComponents(this);
-	for (UStaticMeshComponent* ExtraMesh : AllMeshComponents)
-	{
-		if (ExtraMesh && ExtraMesh != BushingMesh)
-		{
-			ApplyNeonToMesh(ExtraMesh);
-		}
-	}
+	// We do NOT color or override static meshes in C++!
+	// Any materials assigned by the student in the Blueprint (BP_TransformerBushing) or on the mesh components
+	// are preserved exactly as they are without being overwritten or tinted by C++.
 }

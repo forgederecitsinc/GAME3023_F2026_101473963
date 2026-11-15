@@ -1,5 +1,11 @@
-// roshan - 101473963 - game3023 game engines 3
-// interact prompt widget - minimal floating hud prompt with circular hold progress bar and square button logo in the center
+// =============================================================================
+// Student: Roshan - 101473963
+// Course: GAME3023 - Game Engines 3
+// File: InteractPromptWidget.cpp
+// Description: Implementation of the Interaction Prompt Widget.
+// Renders a PlayStation [Square] badge with a circular progress fill ring
+// and keyboard [E] hint. Smoothly fades in when in range of interactables!
+// =============================================================================
 
 #include "InteractPromptWidget.h"
 #include "Widgets/DeclarativeSyntaxSupport.h"

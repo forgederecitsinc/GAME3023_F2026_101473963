@@ -1,7 +1,9 @@
-// roshan - 101473963 - game3023 game engines 3
-// battery capsule cpp - redesigned as an industrial power cell battery
-// matches the arena blockout style with dark foundation plinth, cream pedestal, colored cylinder core, and dark top terminal cap
-// when collected by player or socketed into red power cylinder, scales and snaps cleanly
+// Student: Roshan - 101473963
+// Course: GAME3023 - Game Engines 3
+// File: BatteryCapsule.cpp
+// Description: Implementation of the Battery Capsule actor.
+// Handles player pickup, backpack attachment, socketing into laser cylinders,
+// dropping onto the floor, and idle bob/spin animation.
 
 #include "BatteryCapsule.h"
 #include "Components/CapsuleComponent.h"
@@ -18,6 +20,9 @@ ABatteryCapsule::ABatteryCapsule()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
+	// Enable idle floating & spinning animation by default
+	bEnableIdleAnimation = true;
+
 	// root collision capsule enclosing the entire battery assembly
 	CapsuleComponent = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CapsuleComponent"));
 	RootComponent = CapsuleComponent;
@@ -25,54 +30,7 @@ ABatteryCapsule::ABatteryCapsule()
 	CapsuleComponent->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 	CapsuleComponent->SetGenerateOverlapEvents(true);
 
-	// load basic blockout shapes
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMeshFinder(TEXT("/Engine/BasicShapes/Cube.Cube"));
-	UStaticMesh* CubeMesh = CubeMeshFinder.Succeeded() ? CubeMeshFinder.Object : nullptr;
-
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMeshFinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-	UStaticMesh* CylinderMesh = CylinderMeshFinder.Succeeded() ? CylinderMeshFinder.Object : nullptr;
-
-	// load level prototyping base flat material
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> FlatMatFinder(TEXT("/Game/LevelPrototyping/Materials/M_FlatCol.M_FlatCol"));
-	UMaterialInterface* FlatMat = FlatMatFinder.Succeeded() ? FlatMatFinder.Object : nullptr;
-
-	// 1. base plinth foundation - sharp dark charcoal square slab at the bottom (140x140x20 cm)
-	BasePlinthMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BasePlinthMesh"));
-	BasePlinthMesh->SetupAttachment(RootComponent);
-	BasePlinthMesh->SetRelativeLocation(FVector(0.0f, 0.0f, -80.0f));
-	BasePlinthMesh->SetRelativeScale3D(FVector(1.40f, 1.40f, 0.20f));
-	BasePlinthMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
-	if (CubeMesh) BasePlinthMesh->SetStaticMesh(CubeMesh);
-	if (FlatMat) BasePlinthMesh->SetMaterial(0, FlatMat);
-
-	// 2. base pedestal plate - sharp light cream square slab (115x115x30 cm)
-	BasePedestalMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BasePedestalMesh"));
-	BasePedestalMesh->SetupAttachment(RootComponent);
-	BasePedestalMesh->SetRelativeLocation(FVector(0.0f, 0.0f, -55.0f));
-	BasePedestalMesh->SetRelativeScale3D(FVector(1.15f, 1.15f, 0.30f));
-	BasePedestalMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
-	if (CubeMesh) BasePedestalMesh->SetStaticMesh(CubeMesh);
-	if (FlatMat) BasePedestalMesh->SetMaterial(0, FlatMat);
-
-	// 3. central battery cylinder cell core (80 cm dia, 140 cm height)
-	BatteryMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BatteryMesh"));
-	BatteryMesh->SetupAttachment(RootComponent);
-	BatteryMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 0.0f));
-	BatteryMesh->SetRelativeScale3D(FVector(0.80f, 0.80f, 1.40f));
-	BatteryMesh->SetCollisionProfileName(TEXT("NoCollision"));
-	if (CylinderMesh) BatteryMesh->SetStaticMesh(CylinderMesh);
-	if (FlatMat) BatteryMesh->SetMaterial(0, FlatMat);
-
-	// 4. top terminal cap - sharp dark charcoal square cap on top of cylinder (95x95x24 cm)
-	TopCapMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TopCapMesh"));
-	TopCapMesh->SetupAttachment(RootComponent);
-	TopCapMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 82.0f));
-	TopCapMesh->SetRelativeScale3D(FVector(0.95f, 0.95f, 0.24f));
-	TopCapMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
-	if (CubeMesh) TopCapMesh->SetStaticMesh(CubeMesh);
-	if (FlatMat) TopCapMesh->SetMaterial(0, FlatMat);
-
-	// 5. interaction trigger zone for collecting battery with E key
+	// interaction trigger zone for collecting battery with E key
 	InteractionZone = CreateDefaultSubobject<USphereComponent>(TEXT("InteractionZone"));
 	InteractionZone->SetupAttachment(RootComponent);
 	InteractionZone->SetSphereRadius(180.0f);
@@ -83,7 +41,6 @@ void ABatteryCapsule::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 
-	BuildBatteryComponents();
 	ApplyColorFromID();
 }
 
@@ -92,7 +49,6 @@ void ABatteryCapsule::PostEditChangeProperty(FPropertyChangedEvent& PropertyChan
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 
-	BuildBatteryComponents();
 	ApplyColorFromID();
 }
 #endif
@@ -107,95 +63,7 @@ void ABatteryCapsule::BeginPlay()
 	InteractionZone->OnComponentBeginOverlap.AddDynamic(this, &ABatteryCapsule::OnInteractionBeginOverlap);
 	InteractionZone->OnComponentEndOverlap.AddDynamic(this, &ABatteryCapsule::OnInteractionEndOverlap);
 
-	BuildBatteryComponents();
 	ApplyColorFromID();
-}
-
-void ABatteryCapsule::BuildBatteryComponents()
-{
-	// load primitives dynamically for existing level or blueprint instances
-	UStaticMesh* CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
-	UStaticMesh* CylinderMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-	UMaterialInterface* FlatMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/LevelPrototyping/Materials/M_FlatCol.M_FlatCol"));
-
-	// ensure base plinth mesh exists
-	if (!BasePlinthMesh)
-	{
-		BasePlinthMesh = NewObject<UStaticMeshComponent>(this, TEXT("BasePlinthMesh"));
-		if (BasePlinthMesh)
-		{
-			BasePlinthMesh->RegisterComponent();
-			BasePlinthMesh->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
-		}
-	}
-	if (BasePlinthMesh)
-	{
-		BasePlinthMesh->SetVisibility(bShowBaseStructure && !bIsCarried && !bIsSocketed);
-		BasePlinthMesh->SetCollisionEnabled((bShowBaseStructure && !bIsCarried && !bIsSocketed) ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
-		BasePlinthMesh->SetRelativeLocation(FVector(0.0f, 0.0f, -80.0f));
-		BasePlinthMesh->SetRelativeScale3D(FVector(1.40f, 1.40f, 0.20f));
-		BasePlinthMesh->SetRelativeRotation(FRotator::ZeroRotator);
-		BasePlinthMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
-		if (CubeMesh && !BasePlinthMesh->GetStaticMesh()) BasePlinthMesh->SetStaticMesh(CubeMesh);
-		if (PlinthMaterial) BasePlinthMesh->SetMaterial(0, PlinthMaterial);
-		else if (FlatMat && !BasePlinthMesh->GetMaterial(0)) BasePlinthMesh->SetMaterial(0, FlatMat);
-	}
-
-	// ensure base pedestal mesh exists
-	if (!BasePedestalMesh)
-	{
-		BasePedestalMesh = NewObject<UStaticMeshComponent>(this, TEXT("BasePedestalMesh"));
-		if (BasePedestalMesh)
-		{
-			BasePedestalMesh->RegisterComponent();
-			BasePedestalMesh->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
-		}
-	}
-	if (BasePedestalMesh)
-	{
-		BasePedestalMesh->SetVisibility(bShowBaseStructure && !bIsCarried && !bIsSocketed);
-		BasePedestalMesh->SetCollisionEnabled((bShowBaseStructure && !bIsCarried && !bIsSocketed) ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
-		BasePedestalMesh->SetRelativeLocation(FVector(0.0f, 0.0f, -55.0f));
-		BasePedestalMesh->SetRelativeScale3D(FVector(1.15f, 1.15f, 0.30f));
-		BasePedestalMesh->SetRelativeRotation(FRotator::ZeroRotator);
-		BasePedestalMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
-		if (CubeMesh && !BasePedestalMesh->GetStaticMesh()) BasePedestalMesh->SetStaticMesh(CubeMesh);
-		if (PedestalMaterial) BasePedestalMesh->SetMaterial(0, PedestalMaterial);
-		else if (FlatMat && !BasePedestalMesh->GetMaterial(0)) BasePedestalMesh->SetMaterial(0, FlatMat);
-	}
-
-	// configure battery cylinder core
-	if (BatteryMesh)
-	{
-		BatteryMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 0.0f));
-		BatteryMesh->SetRelativeScale3D(FVector(0.80f, 0.80f, 1.40f));
-		BatteryMesh->SetRelativeRotation(FRotator::ZeroRotator);
-		BatteryMesh->SetCollisionProfileName(TEXT("NoCollision"));
-		if (CylinderMesh && !BatteryMesh->GetStaticMesh()) BatteryMesh->SetStaticMesh(CylinderMesh);
-		if (FlatMat && !BatteryMesh->GetMaterial(0)) BatteryMesh->SetMaterial(0, FlatMat);
-	}
-
-	// ensure top terminal cap mesh exists
-	if (!TopCapMesh)
-	{
-		TopCapMesh = NewObject<UStaticMeshComponent>(this, TEXT("TopCapMesh"));
-		if (TopCapMesh)
-		{
-			TopCapMesh->RegisterComponent();
-			TopCapMesh->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
-		}
-	}
-	if (TopCapMesh)
-	{
-		TopCapMesh->SetVisibility(bShowTopCap);
-		TopCapMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 82.0f));
-		TopCapMesh->SetRelativeScale3D(FVector(0.95f, 0.95f, 0.24f));
-		TopCapMesh->SetRelativeRotation(FRotator::ZeroRotator);
-		TopCapMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
-		if (CubeMesh && !TopCapMesh->GetStaticMesh()) TopCapMesh->SetStaticMesh(CubeMesh);
-		if (TopCapMaterial) TopCapMesh->SetMaterial(0, TopCapMaterial);
-		else if (FlatMat && !TopCapMesh->GetMaterial(0)) TopCapMesh->SetMaterial(0, FlatMat);
-	}
 }
 
 FLinearColor ABatteryCapsule::GetColorForID(int32 InID) const
@@ -221,53 +89,9 @@ FLinearColor ABatteryCapsule::GetColorForID(int32 InID) const
 
 void ABatteryCapsule::ApplyColorFromID()
 {
-	const FLinearColor ChosenColor = GetColorForID(BatteryID);
-	UMaterialInterface* FlatMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/LevelPrototyping/Materials/M_FlatCol.M_FlatCol"));
-
-	auto SetMeshColor = [FlatMat](UStaticMeshComponent* MeshComp, const FLinearColor& BaseCol, const FLinearColor& EmissiveCol, UMaterialInterface* CustomMat) -> UMaterialInstanceDynamic*
-	{
-		if (!MeshComp) return nullptr;
-		if (CustomMat)
-		{
-			MeshComp->SetMaterial(0, CustomMat);
-			return nullptr;
-		}
-
-		UMaterialInstanceDynamic* Dyn = Cast<UMaterialInstanceDynamic>(MeshComp->GetMaterial(0));
-		if (!Dyn)
-		{
-			if (FlatMat)
-			{
-				Dyn = UMaterialInstanceDynamic::Create(FlatMat, MeshComp);
-				MeshComp->SetMaterial(0, Dyn);
-			}
-			else
-			{
-				Dyn = MeshComp->CreateAndSetMaterialInstanceDynamic(0);
-			}
-		}
-
-		if (Dyn)
-		{
-			Dyn->SetVectorParameterValue(TEXT("BaseColor"), BaseCol);
-			Dyn->SetVectorParameterValue(TEXT("Color"), BaseCol);
-			Dyn->SetVectorParameterValue(TEXT("EmissiveColor"), EmissiveCol);
-			Dyn->SetVectorParameterValue(TEXT("Emissive"), EmissiveCol);
-		}
-		return Dyn;
-	};
-
-	// 1. Central battery core (glowing cyan energy)
-	DynamicMaterial = SetMeshColor(BatteryMesh, ChosenColor, ChosenColor * 3.0f, nullptr);
-
-	// 2. Base plinth foundation (#383F4C)
-	SetMeshColor(BasePlinthMesh, PlinthColor, FLinearColor::Black, PlinthMaterial);
-
-	// 3. Base pedestal slab (#1A1D24)
-	SetMeshColor(BasePedestalMesh, PedestalColor, FLinearColor::Black, PedestalMaterial);
-
-	// 4. Top terminal cap (#222730)
-	SetMeshColor(TopCapMesh, TopCapColor, FLinearColor::Black, TopCapMaterial);
+	// We do NOT color or override static meshes in C++!
+	// Any materials assigned by the student in the Blueprint (BP_BatteryCapsule) or on the mesh components
+	// are preserved exactly as they are without being overwritten or tinted by C++.
 }
 
 void ABatteryCapsule::Tick(float DeltaTime)
@@ -332,19 +156,11 @@ void ABatteryCapsule::OnCollected(AGAME3023_F26_RoshanCharacter* Player)
 
 	bIsCarried = true;
 
+	// Disable collision on the entire actor (including any Blueprint-added mesh components)
+	// so attached meshes cannot collide with or push the player's capsule.
+	SetActorEnableCollision(false);
 	CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	InteractionZone->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	if (BasePlinthMesh) BasePlinthMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	if (BasePedestalMesh) BasePedestalMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	if (TopCapMesh) TopCapMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	// hide floor dock and pedestal when carried on backpack so player carries the sleek battery cell
-	if (bHideBaseWhenCarried)
-	{
-		if (BasePlinthMesh) BasePlinthMesh->SetVisibility(false);
-		if (BasePedestalMesh) BasePedestalMesh->SetVisibility(false);
-	}
 
 	USkeletalMeshComponent* CharacterMesh = Player->GetMesh();
 	const FName SpineSocket(TEXT("spine_03"));
@@ -388,19 +204,9 @@ void ABatteryCapsule::OnSocketed(AActor* SocketActor, USceneComponent* AttachTar
 	// scale full assembly proportionally for socket docking
 	SetActorRelativeScale3D(FVector(0.45f, 0.45f, 0.45f));
 
-	// hide floor dock and pedestal when inserted into turret cradle
-	if (bHideBaseWhenCarried)
-	{
-		if (BasePlinthMesh) BasePlinthMesh->SetVisibility(false);
-		if (BasePedestalMesh) BasePedestalMesh->SetVisibility(false);
-	}
-
+	SetActorEnableCollision(false);
 	CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	InteractionZone->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	if (BasePlinthMesh) BasePlinthMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	if (BasePedestalMesh) BasePedestalMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	if (TopCapMesh) TopCapMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
 void ABatteryCapsule::OnDropped(const FVector& DropLocation)
@@ -415,22 +221,7 @@ void ABatteryCapsule::OnDropped(const FVector& DropLocation)
 	BaseLocation = DropLocation;
 	RunningTime = 0.0f;
 
-	if (BasePlinthMesh)
-	{
-		BasePlinthMesh->SetVisibility(bShowBaseStructure);
-		BasePlinthMesh->SetCollisionEnabled(bShowBaseStructure ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
-	}
-	if (BasePedestalMesh)
-	{
-		BasePedestalMesh->SetVisibility(bShowBaseStructure);
-		BasePedestalMesh->SetCollisionEnabled(bShowBaseStructure ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
-	}
-	if (TopCapMesh)
-	{
-		TopCapMesh->SetVisibility(bShowTopCap);
-		TopCapMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	}
-
+	SetActorEnableCollision(true);
 	CapsuleComponent->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 	CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	InteractionZone->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
@@ -448,22 +239,7 @@ void ABatteryCapsule::RespawnToOrigin()
 	BaseLocation = SpawnOrigin;
 	RunningTime = 0.0f;
 
-	if (BasePlinthMesh)
-	{
-		BasePlinthMesh->SetVisibility(bShowBaseStructure);
-		BasePlinthMesh->SetCollisionEnabled(bShowBaseStructure ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
-	}
-	if (BasePedestalMesh)
-	{
-		BasePedestalMesh->SetVisibility(bShowBaseStructure);
-		BasePedestalMesh->SetCollisionEnabled(bShowBaseStructure ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
-	}
-	if (TopCapMesh)
-	{
-		TopCapMesh->SetVisibility(bShowTopCap);
-		TopCapMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	}
-
+	SetActorEnableCollision(true);
 	CapsuleComponent->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 	CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	InteractionZone->SetCollisionEnabled(ECollisionEnabled::QueryOnly);

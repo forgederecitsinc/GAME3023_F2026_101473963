@@ -1,6 +1,16 @@
-// roshan - 101473963 - game3023 game engines 3
-// live wire player character header
-// fixed 2.5d imax top-down camera, wasd movement, and 1-slot battery inventory
+// =============================================================================
+// Student: Roshan - 101473963
+// Course: GAME3023 - Game Engines 3
+// File: GAME3023_F26_RoshanCharacter.h
+// Description: LiveWire Substation Main Player Character.
+// Features:
+// - Fixed 2.5D IMAX top-down cinematic camera (Hades-style, never rotates with mouse)
+// - Smooth WASD keyboard movement + full PS5 DualSense controller support
+// - 1-slot inventory carrying a single Battery Capsule at a time
+// - 5-second hold interaction (Hold [Square] / [E]) to attach battery to cylinder
+// - Diablo/Hades-style circular see-through occlusion cutout when under roofs/catwalks
+// - Combat health system (100 HP), damage handling, and respawn logic
+// =============================================================================
 
 #pragma once
 

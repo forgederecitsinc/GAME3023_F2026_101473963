@@ -1,9 +1,12 @@
-// roshan - 101473963 - game3023 game engines 3
-// ground battery saboteur / battery thief enemy implementation
-// spawns at (X=-878.0, Y=-3679.0, Z=10.0) at speed 300, patrols the ground NavMesh, ignores loose or mismatched
-// batteries, detects ONLY batteries that work with a laser (bIsPowered && bHasBattery), navigates to
-// the nearest active laser battery, runs a 10-second removal timer to detach the battery, scans the NavMesh
-// for the closest placed BP_BatteryDropSpot actor in the level, carries the battery there on its back, drops it, and returns to patrol
+// =============================================================================
+// Student: Roshan - 101473963
+// Course: GAME3023 - Game Engines 3
+// File: EnemyBatteryThief.cpp
+// Description: Implementation of the Ground Battery Saboteur / Thief enemy.
+// Handles ground NavMesh navigation, targeting powered laser cylinders,
+// 10-second detachment countdown, backpack socketing, walking to drop spots,
+// anti-stuck watchdog, and touch-to-follow player behavior.
+// =============================================================================
 
 #include "EnemyBatteryThief.h"
 #include "GAME3023_F26_RoshanGameMode.h"
@@ -43,17 +46,8 @@ AEnemyBatteryThief::AEnemyBatteryThief()
 	ThiefMesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 	ThiefMesh->SetCanEverAffectNavigation(false);
 
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeFinder(TEXT("/Engine/BasicShapes/Cube.Cube"));
-	if (CubeFinder.Succeeded())
-	{
-		ThiefMesh->SetStaticMesh(CubeFinder.Object);
-	}
-
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> FlatMatFinder(TEXT("/Game/LevelPrototyping/Materials/M_FlatCol.M_FlatCol"));
-	if (FlatMatFinder.Succeeded())
-	{
-		ThiefMesh->SetMaterial(0, FlatMatFinder.Object);
-	}
+	// Note: We do NOT create or force static mesh assets in C++ so the student can attach
+	// their own custom spider / crawler mesh and materials directly in BP_EnemyBatteryThief!
 
 	// Automatically bind BP_BatteryDropSpot as the default drop spot actor class
 	static ConstructorHelpers::FClassFinder<AActor> DropSpotClassFinder(TEXT("/Game/_Blueprints/LevelAssets/BP_BatteryDropSpot"));
@@ -155,24 +149,11 @@ void AEnemyBatteryThief::MarkAsSpawnedUnit(const FVector& InHomeOrigin)
 	bActAsSpawner = false;
 	bSnapToSpawnLocationOnStart = false;
 
-	// Lock ground floor Z to the ground NavMesh at the spawn origin (Z ~ 10)
-	GroundFloorZ = InHomeOrigin.Z;
-	if (UWorld* World = GetWorld())
-	{
-		if (UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World))
-		{
-			FNavLocation ProjectedSpawn;
-			if (NavSys->ProjectPointToNavigation(InHomeOrigin, ProjectedSpawn, FVector(300.0f, 300.0f, 80.0f)))
-			{
-				GroundFloorZ = ProjectedSpawn.Location.Z;
-			}
-		}
-	}
-
-	CurrentGroundZ = GroundFloorZ;
+	InitialSpawnZ = SampleGroundNavMeshZ(InHomeOrigin);
+	CurrentGroundZ = InitialSpawnZ;
 	bHasValidGroundZ = true;
-	PatrolOrigin = FVector(InHomeOrigin.X, InHomeOrigin.Y, GroundFloorZ);
-	SetActorLocation(FVector(GetActorLocation().X, GetActorLocation().Y, GroundFloorZ + GroundHeightOffset));
+	PatrolOrigin = FVector(InHomeOrigin.X, InHomeOrigin.Y, InitialSpawnZ);
+	SetActorLocation(FVector(InHomeOrigin.X, InHomeOrigin.Y, InitialSpawnZ + GroundHeightOffset));
 
 	LastStuckCheckPosition = GetActorLocation();
 	StuckWatchdogTimer = 0.0f;
@@ -205,38 +186,24 @@ void AEnemyBatteryThief::BeginPlay()
 	}
 
 	const FVector StartPos = GetActorLocation();
-	const FVector GroundReferencePos(StartPos.X, StartPos.Y, SpawnLocation.Z);
-
-	GroundFloorZ = SpawnLocation.Z;
-	if (UWorld* World = GetWorld())
-	{
-		if (UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World))
-		{
-			FNavLocation ProjectedFloor;
-			if (NavSys->ProjectPointToNavigation(GroundReferencePos, ProjectedFloor, FVector(300.0f, 300.0f, 80.0f)))
-			{
-				GroundFloorZ = ProjectedFloor.Location.Z;
-			}
-		}
-	}
-
-	CurrentGroundZ = GroundFloorZ;
+	InitialSpawnZ = SampleGroundNavMeshZ(StartPos);
+	CurrentGroundZ = InitialSpawnZ;
 	bHasValidGroundZ = true;
 
 	if (!bIsSpawnedChildUnit)
 	{
-		// Use the actor's placed/spawned location on the ground floor as the NavMesh patrol origin
-		PatrolOrigin = FVector(StartPos.X, StartPos.Y, GroundFloorZ);
+		// Use the actor's placed/spawned location on the NavMesh as the patrol origin
+		PatrolOrigin = FVector(StartPos.X, StartPos.Y, InitialSpawnZ);
 	}
 
-	// Snap cleanly onto the ground NavMesh surface — never above ground level
-	SetActorLocation(FVector(StartPos.X, StartPos.Y, GroundFloorZ + GroundHeightOffset));
+	// Snap cleanly onto the NavMesh surface
+	SetActorLocation(FVector(StartPos.X, StartPos.Y, InitialSpawnZ + GroundHeightOffset));
 
 	LastStuckCheckPosition = GetActorLocation();
 	StuckWatchdogTimer = 0.0f;
 	WallContactTimer = 0.0f;
 
-	// Start patrolling the ground NavMesh right away
+	// Start patrolling the NavMesh right away
 	CurrentState = EBatteryThiefState::Patrolling;
 	PickNextNavMeshPatrolDestination();
 
@@ -444,9 +411,21 @@ AEnemyBatteryThief* AEnemyBatteryThief::SpawnThiefAtTargetLocation()
 	return NewThief;
 }
 
-bool AEnemyBatteryThief::IsPointOnGroundFloor(const FVector& Point) const
+bool AEnemyBatteryThief::IsPointOnWalkableSurface(const FVector& Point) const
 {
-	return FMath::Abs(Point.Z - GroundFloorZ) <= MaxGroundStepHeight;
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return true;
+	}
+
+	if (UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World))
+	{
+		FNavLocation ProjectedNav;
+		return NavSys->ProjectPointToNavigation(Point, ProjectedNav, FVector(150.0f, 150.0f, 350.0f));
+	}
+
+	return true;
 }
 
 bool AEnemyBatteryThief::IsGroundNavPathValid(const UNavigationPath* NavPath) const
@@ -456,10 +435,24 @@ bool AEnemyBatteryThief::IsGroundNavPathValid(const UNavigationPath* NavPath) co
 		return false;
 	}
 
-	// Every path corner must stay strictly on the ground floor surface (never climbing onto walls, boxes, or pedestals)
-	for (const FVector& Pt : NavPath->PathPoints)
+	// Verify the path follows pedestrian walkable surfaces (stairs, ramps, walkways, other sides) and does NOT scale vertical walls
+	for (int32 i = 0; i < NavPath->PathPoints.Num() - 1; ++i)
 	{
-		if (!IsPointOnGroundFloor(Pt))
+		const FVector& A = NavPath->PathPoints[i];
+		const FVector& B = NavPath->PathPoints[i + 1];
+
+		const float Dist2D = FVector::Dist2D(A, B);
+		const float DeltaZ = FMath::Abs(B.Z - A.Z);
+
+		// An abrupt vertical jump > 80 cm with almost no horizontal movement is scaling a sheer vertical wall, not stairs!
+		if (Dist2D < 10.0f && DeltaZ > 80.0f)
+		{
+			return false;
+		}
+
+		// Stair slope: stairs can be steep (e.g. up to 60-65 degrees, tan(65) ~ 2.14).
+		// Only reject if it's steeper than ~68 degrees (slope > 2.5) AND significant height delta > 60 cm
+		if (Dist2D > 1.0f && DeltaZ > 60.0f && (DeltaZ / Dist2D) > 2.5f)
 		{
 			return false;
 		}
@@ -472,29 +465,39 @@ FVector AEnemyBatteryThief::GetCylinderTriggerGroundCenter(const ARedPowerCylind
 {
 	if (!IsValid(Cylinder))
 	{
-		return FVector(0.0f, 0.0f, GroundFloorZ);
+		return GetActorLocation();
 	}
 
-	// If the cylinder has an InteractionZone or any trigger box/sphere component (even if placed above ground level),
-	// project its horizontal (X, Y) center straight down to the ground floor level (GroundFloorZ)
-	if (IsValid(Cylinder->InteractionZone))
-	{
-		const FVector ZoneLoc = Cylinder->InteractionZone->GetComponentLocation();
-		return FVector(ZoneLoc.X, ZoneLoc.Y, GroundFloorZ);
-	}
+	UWorld* World = GetWorld();
+	const FVector CylinderBase = Cylinder->GetActorLocation();
 
-	TInlineComponentArray<UShapeComponent*> ShapeComponents(Cylinder);
-	for (const UShapeComponent* ShapeComp : ShapeComponents)
+	// 1. Project cylinder base directly to NavMesh with generous vertical extent (finds floor under cylinder upstairs or downstairs)
+	if (World)
 	{
-		if (IsValid(ShapeComp))
+		if (UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World))
 		{
-			const FVector ShapeLoc = ShapeComp->GetComponentLocation();
-			return FVector(ShapeLoc.X, ShapeLoc.Y, GroundFloorZ);
+			FNavLocation ProjectedNav;
+			if (NavSys->ProjectPointToNavigation(CylinderBase, ProjectedNav, FVector(200.0f, 200.0f, 400.0f)))
+			{
+				return ProjectedNav.Location;
+			}
+		}
+
+		// 2. Line trace down from above the cylinder base to find the exact platform/floor surface
+		FHitResult Hit;
+		const FVector TraceStart = CylinderBase + FVector(0.0f, 0.0f, 100.0f);
+		const FVector TraceEnd   = CylinderBase - FVector(0.0f, 0.0f, 400.0f);
+		FCollisionQueryParams TraceParams(SCENE_QUERY_STAT(CylinderFloorTrace), false, Cylinder);
+		if (World->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_WorldStatic, TraceParams))
+		{
+			if (Hit.Normal.Z >= 0.5f)
+			{
+				return Hit.ImpactPoint;
+			}
 		}
 	}
 
-	const FVector CylLoc = Cylinder->GetActorLocation();
-	return FVector(CylLoc.X, CylLoc.Y, GroundFloorZ);
+	return CylinderBase;
 }
 
 bool AEnemyBatteryThief::ComputeGroundStealApproachPoint(const ARedPowerCylinder* Cylinder, FVector& OutGroundPoint, float& OutNavPathLength) const
@@ -514,25 +517,24 @@ bool AEnemyBatteryThief::ComputeGroundStealApproachPoint(const ARedPowerCylinder
 		return false;
 	}
 
-	const FVector MyGroundPos(GetActorLocation().X, GetActorLocation().Y, GroundFloorZ);
-	FVector PathStartPos = MyGroundPos;
+	const FVector CurrentLocation = GetActorLocation();
+	FVector PathStartPos = CurrentLocation;
 	FNavLocation ProjectedStart;
-	if (NavSys->ProjectPointToNavigation(MyGroundPos, ProjectedStart, FVector(300.0f, 300.0f, MaxGroundStepHeight)) &&
-		IsPointOnGroundFloor(ProjectedStart.Location))
+	if (NavSys->ProjectPointToNavigation(CurrentLocation, ProjectedStart, FVector(200.0f, 200.0f, 350.0f)))
 	{
 		PathStartPos = ProjectedStart.Location;
 	}
 
-	// Project the cylinder's trigger box center down onto the ground floor (Z = GroundFloorZ)
+	// Find the walkable platform/floor center where the cylinder stands
 	const FVector TriggerGroundCenter = GetCylinderTriggerGroundCenter(Cylinder);
-	const FVector ToThief2D = (MyGroundPos - TriggerGroundCenter).GetSafeNormal2D();
+	const FVector ToThief2D = (PathStartPos - TriggerGroundCenter).GetSafeNormal2D();
 	const float BaseAngleRad = ToThief2D.IsNearlyZero() ? 0.0f : FMath::Atan2(ToThief2D.Y, ToThief2D.X);
 
-	// Build candidate ground points directly beneath the trigger box and in rings around the pedestal base on the ground floor
-	TArray<FVector, TInlineAllocator<36>> CandidateGroundPoints;
+	// Build candidate points on the walkable surface around the cylinder
+	TArray<FVector, TInlineAllocator<48>> CandidateGroundPoints;
 	CandidateGroundPoints.Add(TriggerGroundCenter);
 
-	const float RingRadii[] = { 90.0f, 150.0f, 210.0f, 270.0f };
+	const float RingRadii[] = { 80.0f, 140.0f, 200.0f, 260.0f, 320.0f };
 	const float AngleOffsetsDeg[] = { 0.0f, 45.0f, -45.0f, 90.0f, -90.0f, 135.0f, -135.0f, 180.0f };
 
 	for (float Radius : RingRadii)
@@ -543,40 +545,41 @@ bool AEnemyBatteryThief::ComputeGroundStealApproachPoint(const ARedPowerCylinder
 			CandidateGroundPoints.Add(FVector(
 				TriggerGroundCenter.X + FMath::Cos(AngleRad) * Radius,
 				TriggerGroundCenter.Y + FMath::Sin(AngleRad) * Radius,
-				GroundFloorZ
+				TriggerGroundCenter.Z
 			));
 		}
 	}
 
-	const float MaxAllowedReach2D = FMath::Max(RemovalInteractionDistance + 110.0f, 340.0f);
+	const float MaxAllowedReach2D = FMath::Max(RemovalInteractionDistance + 120.0f, 350.0f);
 	bool bFoundValidGroundRoute = false;
 
 	for (const FVector& Candidate : CandidateGroundPoints)
 	{
 		FNavLocation ProjectedTarget;
-		if (!NavSys->ProjectPointToNavigation(Candidate, ProjectedTarget, FVector(110.0f, 110.0f, MaxGroundStepHeight)))
+		if (!NavSys->ProjectPointToNavigation(Candidate, ProjectedTarget, FVector(150.0f, 150.0f, 350.0f)))
 		{
 			continue;
 		}
 
-		// Must be strictly on the ground level
-		if (!IsPointOnGroundFloor(ProjectedTarget.Location))
+		// Must be on a walkable surface
+		if (!IsPointOnWalkableSurface(ProjectedTarget.Location))
 		{
 			continue;
 		}
 
-		// Must be close enough horizontally to the cylinder's trigger box on the ground to steal the battery
-		if (FVector::Dist2D(ProjectedTarget.Location, TriggerGroundCenter) > MaxAllowedReach2D)
+		// Must be close enough horizontally and vertically to the cylinder on its platform
+		if (FVector::Dist2D(ProjectedTarget.Location, TriggerGroundCenter) > MaxAllowedReach2D ||
+			FMath::Abs(ProjectedTarget.Location.Z - TriggerGroundCenter.Z) > 150.0f)
 		{
 			continue;
 		}
 
-		// If the thief is already standing at this ground approach point
-		const float Dist2DFromStart = FVector::Dist2D(PathStartPos, ProjectedTarget.Location);
-		if (Dist2DFromStart <= FMath::Max(AcceptanceRadius, 45.0f))
+		// If the thief is already standing at this approach point
+		const float Dist3DFromStart = FVector::Dist(PathStartPos, ProjectedTarget.Location);
+		if (Dist3DFromStart <= FMath::Max(AcceptanceRadius, 50.0f))
 		{
-			OutGroundPoint = FVector(ProjectedTarget.Location.X, ProjectedTarget.Location.Y, GroundFloorZ);
-			OutNavPathLength = Dist2DFromStart;
+			OutGroundPoint = ProjectedTarget.Location;
+			OutNavPathLength = Dist3DFromStart;
 			return true;
 		}
 
@@ -593,7 +596,7 @@ bool AEnemyBatteryThief::ComputeGroundStealApproachPoint(const ARedPowerCylinder
 			if (PathLen < OutNavPathLength)
 			{
 				OutNavPathLength = PathLen;
-				OutGroundPoint = FVector(ProjectedTarget.Location.X, ProjectedTarget.Location.Y, GroundFloorZ);
+				OutGroundPoint = ProjectedTarget.Location;
 				bFoundValidGroundRoute = true;
 			}
 		}
@@ -774,14 +777,13 @@ AActor* AEnemyBatteryThief::FindClosestBatteryDropSpot() const
 	}
 
 	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
-	const FVector MyGroundPos(GetActorLocation().X, GetActorLocation().Y, GroundFloorZ);
+	const FVector CurrentLocation = GetActorLocation();
 
-	FVector PathStartPos = MyGroundPos;
+	FVector PathStartPos = CurrentLocation;
 	if (NavSys)
 	{
 		FNavLocation ProjectedStart;
-		if (NavSys->ProjectPointToNavigation(MyGroundPos, ProjectedStart, FVector(300.0f, 300.0f, MaxGroundStepHeight)) &&
-			IsPointOnGroundFloor(ProjectedStart.Location))
+		if (NavSys->ProjectPointToNavigation(CurrentLocation, ProjectedStart, FVector(200.0f, 200.0f, 250.0f)))
 		{
 			PathStartPos = ProjectedStart.Location;
 		}
@@ -790,7 +792,7 @@ AActor* AEnemyBatteryThief::FindClosestBatteryDropSpot() const
 	AActor* ClosestDropSpot = nullptr;
 	float ShortestNavCost = TNumericLimits<float>::Max();
 
-	// Evaluate every BP_BatteryDropSpot on the ground NavMesh and pick the one with the shortest ground path length
+	// Evaluate every BP_BatteryDropSpot on the NavMesh and pick the closest reachable one (including up stairs or across the map)
 	for (AActor* Spot : CandidateDropSpots)
 	{
 		if (!IsValid(Spot))
@@ -799,14 +801,12 @@ AActor* AEnemyBatteryThief::FindClosestBatteryDropSpot() const
 		}
 
 		const FVector SpotLoc = Spot->GetActorLocation();
-		const FVector SpotGroundPos(SpotLoc.X, SpotLoc.Y, GroundFloorZ);
-		float CandidateDistanceScore = FVector::Dist2D(MyGroundPos, SpotGroundPos);
+		float CandidateDistanceScore = FVector::Dist(CurrentLocation, SpotLoc);
 
 		if (NavSys)
 		{
 			FNavLocation ProjectedNav;
-			if (NavSys->ProjectPointToNavigation(SpotGroundPos, ProjectedNav, FVector(350.0f, 350.0f, MaxGroundStepHeight)) &&
-				IsPointOnGroundFloor(ProjectedNav.Location))
+			if (NavSys->ProjectPointToNavigation(SpotLoc, ProjectedNav, FVector(350.0f, 350.0f, 350.0f)))
 			{
 				UNavigationPath* NavPath = NavSys->FindPathToLocationSynchronously(
 					World,
@@ -837,29 +837,41 @@ AActor* AEnemyBatteryThief::FindClosestBatteryDropSpot() const
 
 float AEnemyBatteryThief::SampleGroundNavMeshZ(const FVector& WorldPos) const
 {
-	// The spider Battery Thief is strictly locked to the ground surface and cannot climb or fly above GroundFloorZ
-	if (bHasValidGroundZ)
-	{
-		return GroundFloorZ;
-	}
-
 	UWorld* World = GetWorld();
 	if (!World)
 	{
-		return SpawnLocation.Z;
+		return WorldPos.Z;
 	}
 
-	const FVector GroundQueryPos(WorldPos.X, WorldPos.Y, SpawnLocation.Z);
+	// 1. Check NavMesh projection around WorldPos (searching vertically +/- 350 units)
 	if (UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World))
 	{
 		FNavLocation ProjectedNav;
-		if (NavSys->ProjectPointToNavigation(GroundQueryPos, ProjectedNav, FVector(250.0f, 250.0f, 80.0f)))
+		if (NavSys->ProjectPointToNavigation(WorldPos, ProjectedNav, FVector(100.0f, 100.0f, 350.0f)))
 		{
 			return ProjectedNav.Location.Z;
 		}
 	}
 
-	return SpawnLocation.Z;
+	// 2. Downward line trace against walkable static geometry (floors, stairs, ramps)
+	FHitResult Hit;
+	const FVector TraceStart = WorldPos + FVector(0.0f, 0.0f, 80.0f);
+	const FVector TraceEnd   = WorldPos - FVector(0.0f, 0.0f, 350.0f);
+	FCollisionQueryParams TraceParams(SCENE_QUERY_STAT(BatteryThiefGroundSample), false, this);
+	if (IsValid(StolenBattery))
+	{
+		TraceParams.AddIgnoredActor(StolenBattery);
+	}
+	if (World->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_WorldStatic, TraceParams))
+	{
+		// Only accept walkable surfaces (slope <= 60 degrees, normal.Z >= 0.5f) — rejects vertical walls!
+		if (Hit.Normal.Z >= 0.5f)
+		{
+			return Hit.ImpactPoint.Z;
+		}
+	}
+
+	return WorldPos.Z;
 }
 
 bool AEnemyBatteryThief::BuildPathToWorldLocation(const FVector& DestinationWorldPos)
@@ -879,20 +891,16 @@ bool AEnemyBatteryThief::BuildPathToWorldLocation(const FVector& DestinationWorl
 		return false;
 	}
 
-	const FVector CurrentGroundPos(GetActorLocation().X, GetActorLocation().Y, GroundFloorZ);
-	FVector PathStartPos = CurrentGroundPos;
+	const FVector CurrentLocation = GetActorLocation();
+	FVector PathStartPos = CurrentLocation;
 	FNavLocation ProjectedStart;
-	if (NavSys->ProjectPointToNavigation(CurrentGroundPos, ProjectedStart, FVector(300.0f, 300.0f, MaxGroundStepHeight)) &&
-		IsPointOnGroundFloor(ProjectedStart.Location))
+	if (NavSys->ProjectPointToNavigation(CurrentLocation, ProjectedStart, FVector(200.0f, 200.0f, 350.0f)))
 	{
 		PathStartPos = ProjectedStart.Location;
 	}
 
-	// Project the target destination onto the ground-level NavMesh (Z = GroundFloorZ)
-	const FVector GroundDestination(DestinationWorldPos.X, DestinationWorldPos.Y, GroundFloorZ);
 	FNavLocation ProjectedTarget;
-	if (!NavSys->ProjectPointToNavigation(GroundDestination, ProjectedTarget, FVector(350.0f, 350.0f, MaxGroundStepHeight)) ||
-		!IsPointOnGroundFloor(ProjectedTarget.Location))
+	if (!NavSys->ProjectPointToNavigation(DestinationWorldPos, ProjectedTarget, FVector(250.0f, 250.0f, 400.0f)))
 	{
 		return false;
 	}
@@ -900,11 +908,7 @@ bool AEnemyBatteryThief::BuildPathToWorldLocation(const FVector& DestinationWorl
 	UNavigationPath* NavPath = NavSys->FindPathToLocationSynchronously(World, PathStartPos, ProjectedTarget.Location, this);
 	if (IsGroundNavPathValid(NavPath))
 	{
-		CurrentPathPoints.Reserve(NavPath->PathPoints.Num());
-		for (const FVector& Pt : NavPath->PathPoints)
-		{
-			CurrentPathPoints.Add(FVector(Pt.X, Pt.Y, GroundFloorZ));
-		}
+		CurrentPathPoints = NavPath->PathPoints;
 		CurrentPathCornerIndex = (CurrentPathPoints.Num() > 1) ? 1 : 0;
 		return true;
 	}
@@ -929,22 +933,15 @@ void AEnemyBatteryThief::PickNextNavMeshPatrolDestination()
 		return;
 	}
 
-	const FVector CurrentGroundPos(GetActorLocation().X, GetActorLocation().Y, GroundFloorZ);
-	FVector PathStartPos = CurrentGroundPos;
+	const FVector CurrentLocation = GetActorLocation();
+	FVector PathStartPos = CurrentLocation;
 	FNavLocation ProjectedStart;
-	if (NavSys->ProjectPointToNavigation(CurrentGroundPos, ProjectedStart, FVector(300.0f, 300.0f, MaxGroundStepHeight)) &&
-		IsPointOnGroundFloor(ProjectedStart.Location))
+	if (NavSys->ProjectPointToNavigation(CurrentLocation, ProjectedStart, FVector(200.0f, 200.0f, 350.0f)))
 	{
 		PathStartPos = ProjectedStart.Location;
-		// If current position is slightly embedded into a wall boundary, gently pull it onto the valid NavMesh corridor
-		const float OffsetDist = FVector::Dist2D(CurrentGroundPos, ProjectedStart.Location);
-		if (OffsetDist > 3.0f && OffsetDist < 75.0f)
-		{
-			SetActorLocation(FVector(ProjectedStart.Location.X, ProjectedStart.Location.Y, GroundFloorZ + GroundHeightOffset));
-		}
 	}
 
-	// 1. If custom patrol waypoints are assigned on the instance, cycle through them using ground-only paths
+	// 1. If custom patrol waypoints are assigned on the instance, cycle through them
 	if (CustomPatrolWaypoints.Num() > 0)
 	{
 		const int32 NumWaypoints = CustomPatrolWaypoints.Num();
@@ -964,29 +961,64 @@ void AEnemyBatteryThief::PickNextNavMeshPatrolDestination()
 		}
 	}
 
-	// 2. Pick a reachable ground-floor point on the NavMesh within PatrolRadius (rejecting any wall tops or elevated islands)
-	FVector SearchOrigin = PathStartPos;
-	const FVector GroundPatrolOrigin(PatrolOrigin.X, PatrolOrigin.Y, GroundFloorZ);
-	FNavLocation ProjectedOrigin;
-	if (NavSys->ProjectPointToNavigation(GroundPatrolOrigin, ProjectedOrigin, FVector(350.0f, 350.0f, MaxGroundStepHeight)) &&
-		IsPointOnGroundFloor(ProjectedOrigin.Location))
+	// 2. Roam all over the NavMesh (stairs, upstairs walkways, other sides of the arena, ground floor)
+	TArray<FVector, TInlineAllocator<16>> AnchorPoints;
+	AnchorPoints.Add(PathStartPos);
+
+	// Collect cylinders (which are distributed upstairs and across different sides of the arena)
+	TArray<AActor*> ArenaCylinders;
+	UGameplayStatics::GetAllActorsOfClass(World, ARedPowerCylinder::StaticClass(), ArenaCylinders);
+	for (AActor* Act : ArenaCylinders)
 	{
-		SearchOrigin = ProjectedOrigin.Location;
+		if (IsValid(Act))
+		{
+			AnchorPoints.Add(Act->GetActorLocation());
+		}
 	}
 
-	for (int32 Attempt = 0; Attempt < 24; ++Attempt)
+	// Collect drop spots (placed on both sides of the arena)
+	if (BatteryDropSpotClass)
+	{
+		TArray<AActor*> DropSpots;
+		UGameplayStatics::GetAllActorsOfClass(World, BatteryDropSpotClass, DropSpots);
+		for (AActor* Act : DropSpots)
+		{
+			if (IsValid(Act))
+			{
+				AnchorPoints.Add(Act->GetActorLocation());
+			}
+		}
+	}
+
+	for (int32 Attempt = 0; Attempt < 30; ++Attempt)
 	{
 		FNavLocation RandomNavPoint;
-		const FVector QueryCenter = (Attempt < 16) ? SearchOrigin : PathStartPos;
-		if (NavSys->GetRandomReachablePointInRadius(QueryCenter, PatrolRadius, RandomNavPoint))
-		{
-			// Reject any point on top of walls, boxes, or pedestals
-			if (!IsPointOnGroundFloor(RandomNavPoint.Location))
-			{
-				continue;
-			}
+		bool bFoundPoint = false;
 
-			if (FVector::DistSquared2D(PathStartPos, RandomNavPoint.Location) < FMath::Square(180.0f))
+		// Alternate strategies:
+		// Strategy 0: Sample near an arena anchor (cylinders / drop spots upstairs and on other sides)
+		// Strategy 1: Wide roam from current position (encourages climbing stairs and exploring walkways)
+		// Strategy 2: Random reachable point across the entire NavMesh
+		const int32 Strategy = Attempt % 3;
+		if (Strategy == 0 && AnchorPoints.Num() > 0)
+		{
+			const int32 RandomIdx = FMath::RandRange(0, AnchorPoints.Num() - 1);
+			const FVector& Anchor = AnchorPoints[RandomIdx];
+			bFoundPoint = NavSys->GetRandomReachablePointInRadius(Anchor, 2000.0f, RandomNavPoint);
+		}
+		else if (Strategy == 1)
+		{
+			const float WanderRadius = FMath::Max(PatrolRadius, 6000.0f);
+			bFoundPoint = NavSys->GetRandomReachablePointInRadius(PathStartPos, WanderRadius, RandomNavPoint);
+		}
+		else
+		{
+			bFoundPoint = NavSys->GetRandomPoint(RandomNavPoint);
+		}
+
+		if (bFoundPoint)
+		{
+			if (FVector::DistSquared2D(PathStartPos, RandomNavPoint.Location) < FMath::Square(220.0f))
 			{
 				continue;
 			}
@@ -994,11 +1026,7 @@ void AEnemyBatteryThief::PickNextNavMeshPatrolDestination()
 			UNavigationPath* NavPath = NavSys->FindPathToLocationSynchronously(World, PathStartPos, RandomNavPoint.Location, this);
 			if (IsGroundNavPathValid(NavPath))
 			{
-				CurrentPathPoints.Reserve(NavPath->PathPoints.Num());
-				for (const FVector& Pt : NavPath->PathPoints)
-				{
-					CurrentPathPoints.Add(FVector(Pt.X, Pt.Y, GroundFloorZ));
-				}
+				CurrentPathPoints = NavPath->PathPoints;
 				CurrentPathCornerIndex = (CurrentPathPoints.Num() > 1) ? 1 : 0;
 				return;
 			}
@@ -1012,10 +1040,6 @@ void AEnemyBatteryThief::FollowCurrentNavPath(float DeltaTime, float SpeedToUse)
 	{
 		return;
 	}
-
-	// Lock ground Z strictly to GroundFloorZ so the spider thief never climbs or flies above ground level
-	CurrentGroundZ = GroundFloorZ;
-	const float LockedGroundZ = GroundFloorZ + GroundHeightOffset;
 
 	const FVector CurrentLocation = GetActorLocation();
 
@@ -1112,7 +1136,9 @@ void AEnemyBatteryThief::FollowCurrentNavPath(float DeltaTime, float SpeedToUse)
 	if (Dist2D <= FMath::Max(StepDist, CornerAcceptance))
 	{
 		++CurrentPathCornerIndex;
-		SetActorLocation(FVector(CurrentLocation.X, CurrentLocation.Y, LockedGroundZ));
+		const float SampledZ = SampleGroundNavMeshZ(CurrentLocation);
+		CurrentGroundZ = SampledZ;
+		SetActorLocation(FVector(CurrentLocation.X, CurrentLocation.Y, SampledZ + GroundHeightOffset));
 		return;
 	}
 
@@ -1123,15 +1149,22 @@ void AEnemyBatteryThief::FollowCurrentNavPath(float DeltaTime, float SpeedToUse)
 	FVector DesiredNewXY(
 		CurrentLocation.X + MoveDir2D.X * StepDist,
 		CurrentLocation.Y + MoveDir2D.Y * StepDist,
-		LockedGroundZ
+		CurrentLocation.Z
 	);
+
+	// Sample the walkable surface / stair Z at the new horizontal position
+	const float SampledSurfaceZ = SampleGroundNavMeshZ(FVector(DesiredNewXY.X, DesiredNewXY.Y, TargetCorner.Z));
+	CurrentGroundZ = FMath::FInterpTo(CurrentGroundZ, SampledSurfaceZ, DeltaTime, 20.0f);
+	const float TargetZ = CurrentGroundZ + GroundHeightOffset;
+	DesiredNewXY.Z = TargetZ;
 
 	// ==========================================
 	// 3. Ground Obstacle Sweep & Anti-Stick Sliding
 	// ==========================================
 	if (UWorld* World = GetWorld())
 	{
-		const float SweepHeightZ = GroundFloorZ + FMath::Max(22.0f, GroundCollisionRadius + 4.0f);
+		// Sweep at waist height above the current ground surface
+		const float SweepHeightZ = TargetZ + FMath::Max(24.0f, GroundCollisionRadius + 4.0f);
 		const FVector SweepStart(CurrentLocation.X, CurrentLocation.Y, SweepHeightZ);
 		const FVector SweepEnd(DesiredNewXY.X, DesiredNewXY.Y, SweepHeightZ);
 
@@ -1147,7 +1180,8 @@ void AEnemyBatteryThief::FollowCurrentNavPath(float DeltaTime, float SpeedToUse)
 		{
 			AActor* HitActor = WallHit.GetActor();
 			const bool bIgnoreHit = HitActor && (HitActor->IsA(AEnemyBatteryThief::StaticClass()) || HitActor->IsA(ABatteryCapsule::StaticClass()));
-			if (!bIgnoreHit && WallHit.bBlockingHit)
+			// Only treat as wall collision if it's a steep/vertical surface (Normal.Z < 0.6f) — walkable stairs and slopes are not walls!
+			if (!bIgnoreHit && WallHit.bBlockingHit && WallHit.Normal.Z < 0.6f)
 			{
 				WallContactTimer += DeltaTime;
 
@@ -1162,14 +1196,14 @@ void AEnemyBatteryThief::FollowCurrentNavPath(float DeltaTime, float SpeedToUse)
 				const FVector SafeStopXY(
 					SweepStart.X + (SweepEnd.X - SweepStart.X) * FMath::Max(0.0f, WallHit.Time - 0.02f),
 					SweepStart.Y + (SweepEnd.Y - SweepStart.Y) * FMath::Max(0.0f, WallHit.Time - 0.02f),
-					LockedGroundZ
+					TargetZ
 				);
 
 				const FVector WallNormal2D = FVector(WallHit.Normal.X, WallHit.Normal.Y, 0.0f).GetSafeNormal();
 				const FVector SlideDir2D = FVector::VectorPlaneProject(MoveDir2D, WallNormal2D).GetSafeNormal();
 				const float RemainingDist = StepDist * (1.0f - WallHit.Time);
 
-				FVector FinalGroundPos = SafeStopXY;
+				FVector FinalPos = SafeStopXY;
 				bool bSlideSucceeded = false;
 				if (!SlideDir2D.IsNearlyZero() && RemainingDist > 0.5f)
 				{
@@ -1178,17 +1212,18 @@ void AEnemyBatteryThief::FollowCurrentNavPath(float DeltaTime, float SpeedToUse)
 					FHitResult SlideHit;
 					if (!World->SweepSingleByChannel(SlideHit, SlideStart, SlideEnd, FQuat::Identity, ECC_WorldStatic, SphereShape, SweepParams))
 					{
-						FinalGroundPos.X = SlideEnd.X;
-						FinalGroundPos.Y = SlideEnd.Y;
+						FinalPos.X = SlideEnd.X;
+						FinalPos.Y = SlideEnd.Y;
 						bSlideSucceeded = true;
 					}
 				}
 
 				// Push 5 cm away from the wall along the normal to prevent being embedded
-				FinalGroundPos.X += WallNormal2D.X * 5.0f;
-				FinalGroundPos.Y += WallNormal2D.Y * 5.0f;
+				FinalPos.X += WallNormal2D.X * 5.0f;
+				FinalPos.Y += WallNormal2D.Y * 5.0f;
+				FinalPos.Z = TargetZ;
 
-				SetActorLocation(FVector(FinalGroundPos.X, FinalGroundPos.Y, LockedGroundZ));
+				SetActorLocation(FinalPos);
 
 				// If sliding failed or if wall contact persists:
 				if (!bSlideSucceeded || WallContactTimer > 0.2f)
@@ -1213,7 +1248,7 @@ void AEnemyBatteryThief::FollowCurrentNavPath(float DeltaTime, float SpeedToUse)
 	}
 
 	WallContactTimer = 0.0f;
-	SetActorLocation(FVector(DesiredNewXY.X, DesiredNewXY.Y, LockedGroundZ));
+	SetActorLocation(DesiredNewXY);
 }
 
 void AEnemyBatteryThief::ReturnToPatrol()
@@ -1300,8 +1335,9 @@ void AEnemyBatteryThief::DepositStolenBatteryAtDropOff()
 		const int32 DroppedID = StolenBattery->BatteryID;
 		const FVector RawDropLocation = IsValid(TargetDropSpotActor)
 			? TargetDropSpotActor->GetActorLocation()
-			: FVector(GetActorLocation().X, GetActorLocation().Y, GroundFloorZ);
-		const FVector FinalDropLocation(RawDropLocation.X, RawDropLocation.Y, GroundFloorZ);
+			: GetActorLocation();
+		const float DropZ = SampleGroundNavMeshZ(RawDropLocation);
+		const FVector FinalDropLocation(RawDropLocation.X, RawDropLocation.Y, DropZ);
 
 		// Place the battery cleanly on the ground at the closest BP_BatteryDropSpot actor so the player can collect it again
 		StolenBattery->OnDropped(FinalDropLocation);
@@ -1337,12 +1373,13 @@ void AEnemyBatteryThief::Tick(float DeltaTime)
 		return;
 	}
 
-	// Always keep the spider thief locked onto the ground surface
-	CurrentGroundZ = GroundFloorZ;
-	const FVector LockedLoc = GetActorLocation();
-	if (!FMath::IsNearlyEqual(LockedLoc.Z, GroundFloorZ + GroundHeightOffset, 0.5f))
+	// When stationary (e.g. during battery removal or wait timer), maintain smooth surface alignment
+	if (CurrentState == EBatteryThiefState::Removing || WaitTimer > 0.0f)
 	{
-		SetActorLocation(FVector(LockedLoc.X, LockedLoc.Y, GroundFloorZ + GroundHeightOffset));
+		const FVector CurrentLoc = GetActorLocation();
+		const float SurfaceZ = SampleGroundNavMeshZ(CurrentLoc);
+		CurrentGroundZ = SurfaceZ;
+		SetActorLocation(FVector(CurrentLoc.X, CurrentLoc.Y, SurfaceZ + GroundHeightOffset));
 	}
 
 	// Check if the player physically touches this Battery Thief (backup to PlayerTouchTrigger overlap)
@@ -1498,11 +1535,12 @@ void AEnemyBatteryThief::Tick(float DeltaTime)
 		const FVector MyLoc = GetActorLocation();
 		const FVector TriggerGroundCenter = GetCylinderTriggerGroundCenter(TargetLaserCylinder);
 		const float Dist2DToTriggerGround = FVector::Dist2D(MyLoc, TriggerGroundCenter);
-		const float Dist2DToApproachPoint = FVector::Dist2D(MyLoc, CurrentLaserGroundApproachPoint);
+		const float DistZToTriggerGround = FMath::Abs(MyLoc.Z - TriggerGroundCenter.Z);
+		const float Dist3DToApproachPoint = FVector::Dist(MyLoc, CurrentLaserGroundApproachPoint);
 
-		// Check if we have reached the ground-level steal point beneath/beside the RedPowerCylinder's trigger box
-		if (Dist2DToTriggerGround <= RemovalInteractionDistance ||
-			Dist2DToApproachPoint <= FMath::Max(AcceptanceRadius * 1.5f, 55.0f))
+		// Check if we have reached the steal point beside the cylinder on its platform (having navigated stairs/walkway)
+		if ((Dist2DToTriggerGround <= RemovalInteractionDistance && DistZToTriggerGround <= 160.0f) ||
+			Dist3DToApproachPoint <= FMath::Max(AcceptanceRadius * 1.5f, 65.0f))
 		{
 			CurrentState = EBatteryThiefState::Removing;
 			RemovalTimerRemaining = BatteryRemovalDuration;
@@ -1566,6 +1604,11 @@ void AEnemyBatteryThief::Tick(float DeltaTime)
 			SetActorRotation(FMath::RInterpTo(GetActorRotation(), FaceLaserRot, DeltaTime, TurnSpeed));
 		}
 
+		// Ensure the thief remains firmly planted on the ground/platform surface
+		const float SurfaceZ = SampleGroundNavMeshZ(GetActorLocation());
+		CurrentGroundZ = SurfaceZ;
+		SetActorLocation(FVector(GetActorLocation().X, GetActorLocation().Y, SurfaceZ + GroundHeightOffset));
+
 		// Pulse the warning scanner light during the 10-second removal countdown
 		if (ScannerLight)
 		{
@@ -1616,22 +1659,22 @@ void AEnemyBatteryThief::Tick(float DeltaTime)
 		}
 
 		const FVector PlayerLoc = TargetPlayerPawn->GetActorLocation();
-		const FVector TargetGroundPos(PlayerLoc.X, PlayerLoc.Y, GroundFloorZ);
-		const float Dist2DToPlayer = FVector::Dist2D(GetActorLocation(), TargetGroundPos);
+		const float Dist2DToPlayer = FVector::Dist2D(GetActorLocation(), PlayerLoc);
+		const float Dist3DToPlayer = FVector::Dist(GetActorLocation(), PlayerLoc);
 
-		// Re-path towards the player on the ground NavMesh periodically
+		// Re-path towards the player on the NavMesh periodically (navigating stairs and upper decks)
 		PathRepathTimer -= DeltaTime;
 		if (PathRepathTimer <= 0.0f || !CurrentPathPoints.IsValidIndex(CurrentPathCornerIndex))
 		{
 			PathRepathTimer = 0.35f;
-			BuildPathToWorldLocation(TargetGroundPos);
+			BuildPathToWorldLocation(PlayerLoc);
 		}
 
-		// Move along the ground NavMesh at PatrolSpeed + FollowPlayerSpeedBonus (defaults to 300 + 70 = 370 cm/s)
+		// Move along the NavMesh at PatrolSpeed + FollowPlayerSpeedBonus (defaults to 300 + 70 = 370 cm/s)
 		const float FollowSpeed = PatrolSpeed + FollowPlayerSpeedBonus;
 
 		// If within close reach of the player, face player smoothly
-		if (Dist2DToPlayer <= 60.0f)
+		if (Dist3DToPlayer <= 70.0f)
 		{
 			const FVector ToPlayer2D(PlayerLoc.X - GetActorLocation().X, PlayerLoc.Y - GetActorLocation().Y, 0.0f);
 			if (!ToPlayer2D.IsNearlyZero())

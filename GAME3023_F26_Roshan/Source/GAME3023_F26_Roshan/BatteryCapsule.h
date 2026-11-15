@@ -1,6 +1,11 @@
-// roshan - 101473963 - game3023 game engines 3
-// battery capsule header - redesigned as an industrial power cell battery
-// matches the arena blockout style with dark foundation plinth, cream pedestal, colored cylinder core, and dark top terminal cap
+// =============================================================================
+// Student: Roshan - 101473963
+// Course: GAME3023 - Game Engines 3
+// File: BatteryCapsule.h
+// Description: Industrial Power Cell Battery Capsule.
+// Picked up by the player (1-slot inventory) or stolen by Battery Thieves.
+// Must be inserted into the matching RedPowerCylinder laser turret to power it on!
+// =============================================================================
 
 #pragma once
 
@@ -45,18 +50,6 @@ public:
 	UPROPERTY()
 	FLinearColor CustomColor = FLinearColor(0.0000f, 0.8714f, 1.0000f);
 
-	// Base mesh foundation colors (fixed industrial palette matching arena blockout)
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "LiveWire|Appearance", meta = (DisplayName = "Base Plinth Color"))
-	FLinearColor PlinthColor = FLinearColor(0.0395f, 0.0497f, 0.0723f); // #383F4C
-
-	// Base pedestal slab color (matte deep slate / charcoal #1A1D24)
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "LiveWire|Appearance", meta = (DisplayName = "Base Pedestal Color"))
-	FLinearColor PedestalColor = FLinearColor(0.0103f, 0.0123f, 0.0176f); // #1A1D24
-
-	// Top terminal cap color (anodized dark alloy #222730)
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "LiveWire|Appearance", meta = (DisplayName = "Top Cap Color"))
-	FLinearColor TopCapColor = FLinearColor(0.0160f, 0.0203f, 0.0296f); // #222730
-
 	// runtime dynamic material instance for battery cylinder glow
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> DynamicMaterial;
@@ -73,51 +66,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UCapsuleComponent> CapsuleComponent;
 
-	// base bottom plinth - sharp dark square foundation slab (matches arena battery dock pad)
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> BasePlinthMesh;
-
-	// base pedestal plate - sharp middle tier slab (matches arena battery pedestal)
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> BasePedestalMesh;
-
-	// central battery cylinder cell mesh
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> BatteryMesh;
-
-	// top terminal cap - sharp dark square block on top of the cylinder
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> TopCapMesh;
-
 	// interaction trigger zone for picking up battery
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USphereComponent> InteractionZone;
-
-	// whether to show the bottom base dock pad and pedestal
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Appearance", meta = (DisplayName = "Show Base Dock & Pedestal"))
-	bool bShowBaseStructure = true;
-
-	// whether to show the top square terminal cap
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Appearance", meta = (DisplayName = "Show Top Terminal Cap"))
-	bool bShowTopCap = true;
-
-	// whether to hide the base dock and pedestal when carried on backpack or socketed into turret
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Appearance", meta = (DisplayName = "Hide Base When Picked Up / Socketed"))
-	bool bHideBaseWhenCarried = true;
-
-	// optional material overrides
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Base Plinth Material"))
-	TObjectPtr<UMaterialInterface> PlinthMaterial;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Base Pedestal Material"))
-	TObjectPtr<UMaterialInterface> PedestalMaterial;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Materials", meta = (DisplayName = "Top Cap Material"))
-	TObjectPtr<UMaterialInterface> TopCapMaterial;
-
-	// constructs and configures battery subcomponents with exact proportions
-	UFUNCTION(BlueprintCallable, Category = "Battery|Visual")
-	void BuildBatteryComponents();
 
 	// idle bobbing and spin settings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery|Visual")
