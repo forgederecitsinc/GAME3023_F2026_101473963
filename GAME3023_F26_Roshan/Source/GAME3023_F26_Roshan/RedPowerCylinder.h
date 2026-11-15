@@ -14,9 +14,10 @@
 #include "GameFramework/Actor.h"
 #include "RedPowerCylinder.generated.h"
 
-class UStaticMeshComponent;
 class USphereComponent;
 class USceneComponent;
+class UStaticMeshComponent;
+class UPointLightComponent;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class ABatteryCapsule;
@@ -41,6 +42,7 @@ protected:
 
 public:	
 	virtual void Tick(float DeltaTime) override;
+	virtual bool ShouldTickIfViewportsOnly() const override;
 
 	// 4-digit ID for this cell (default 1001)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Cell ID (4-Digit)"))
@@ -95,6 +97,18 @@ public:
 	// visual laser beam mesh
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> LaserBeamMesh;
+
+	// Blink interval in seconds for the powerDome green light when a battery is attached
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Visuals", meta = (DisplayName = "Power Dome Blink Interval", ClampMin = "0.05", UIMin = "0.05"))
+	float PowerDomeBlinkInterval = 0.5f;
+
+	// Emissive multiplier for powerDome material when the green light is on
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Visuals", meta = (DisplayName = "Power Dome Glow Intensity", ClampMin = "1.0", UIMin = "1.0"))
+	float PowerDomeGlowIntensity = 15.0f;
+
+	// Point light intensity at powerDome when the green light is on
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Visuals", meta = (DisplayName = "Power Dome Light Intensity", ClampMin = "0.0", UIMin = "0.0"))
+	float PowerDomeLightIntensity = 3000.0f;
 
 	// laser length - instance editable per cylinder in the details panel
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Laser", meta = (DisplayName = "Laser Max Length", ClampMin = "50.0", UIMin = "50.0"))
@@ -178,6 +192,8 @@ protected:
 
 	void UpdateVisualState();
 	void BuildGunComponents();
+	void InitPowerDome();
+	void ApplyPowerDomeLightState(bool bLightOn);
 
 private:
 	// one-shot print state latches for laser target detection
@@ -190,6 +206,19 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<ATransformerBushing> LastHitBushing;
+
+	// Cached Blueprint-added powerDome mesh and its dynamic materials / point light
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMeshComponent> PowerDomeMesh;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> PowerDomeDynamicMaterials;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPointLightComponent> PowerDomeLight;
+
+	float PowerDomeBlinkTimer = 0.0f;
+	bool bPowerDomeLightOn = false;
 
 	// timer for periodic laser burn damage when player steps into the beam
 	float PlayerLaserDamageTimer = 0.4f;

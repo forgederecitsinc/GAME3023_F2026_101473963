@@ -8,11 +8,13 @@
 // =============================================================================
 
 #include "RedPowerCylinder.h"
-#include "Components/StaticMeshComponent.h"
 #include "Components/SphereComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Components/PointLightComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/Engine.h"
+#include "DrawDebugHelpers.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "BatteryCapsule.h"
@@ -44,9 +46,14 @@ ARedPowerCylinder::ARedPowerCylinder()
 	// visual laser beam mesh
 	LaserBeamMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LaserBeamMesh"));
 	LaserBeamMesh->SetupAttachment(LaserEmitter);
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> LaserCubeAsset(TEXT("/Engine/BasicShapes/Cube.Cube"));
+	if (LaserCubeAsset.Succeeded())
+	{
+		LaserBeamMesh->SetStaticMesh(LaserCubeAsset.Object);
+	}
 	LaserBeamMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	LaserBeamMesh->SetCastShadow(false);
-	LaserBeamMesh->SetVisibility(false); // off until battery is attached
+	LaserBeamMesh->SetVisibility(false); // off until matching battery is attached
 
 	// interaction trigger zone for player E / controller square
 	InteractionZone = CreateDefaultSubobject<USphereComponent>(TEXT("InteractionZone"));
@@ -118,8 +125,90 @@ void ARedPowerCylinder::BeginPlay()
 	InteractionZone->OnComponentEndOverlap.AddDynamic(this, &ARedPowerCylinder::OnInteractionEndOverlap);
 
 	BuildGunComponents();
+	InitPowerDome();
 	ApplyColorFromID();
 	UpdateLaserBeam();
+}
+
+void ARedPowerCylinder::InitPowerDome()
+{
+	if (!PowerDomeMesh)
+	{
+		TArray<UStaticMeshComponent*> StaticMeshes;
+		GetComponents<UStaticMeshComponent>(StaticMeshes);
+		for (UStaticMeshComponent* MeshComp : StaticMeshes)
+		{
+			if (MeshComp && MeshComp->GetName().Equals(TEXT("powerDome"), ESearchCase::IgnoreCase))
+			{
+				PowerDomeMesh = MeshComp;
+				break;
+			}
+		}
+	}
+
+	if (!PowerDomeMesh)
+	{
+		return;
+	}
+
+	PowerDomeDynamicMaterials.Empty();
+	const int32 NumMats = PowerDomeMesh->GetNumMaterials();
+	for (int32 i = 0; i < NumMats; ++i)
+	{
+		if (UMaterialInstanceDynamic* DynMat = PowerDomeMesh->CreateAndSetMaterialInstanceDynamic(i))
+		{
+			PowerDomeDynamicMaterials.Add(DynMat);
+		}
+	}
+
+	if (!PowerDomeLight && PowerDomeLightIntensity > 0.0f && GetWorld() && GetWorld()->IsGameWorld())
+	{
+		PowerDomeLight = NewObject<UPointLightComponent>(this, TEXT("PowerDomeBlinkLight"));
+		if (PowerDomeLight)
+		{
+			PowerDomeLight->SetupAttachment(PowerDomeMesh);
+			PowerDomeLight->SetRelativeLocation(FVector::ZeroVector);
+			PowerDomeLight->SetLightColor(FColor(20, 255, 50));
+			PowerDomeLight->SetIntensity(PowerDomeLightIntensity);
+			PowerDomeLight->SetAttenuationRadius(250.0f);
+			PowerDomeLight->SetCastShadows(false);
+			PowerDomeLight->SetVisibility(false);
+			PowerDomeLight->RegisterComponent();
+		}
+	}
+
+	bPowerDomeLightOn = bHasBattery;
+	ApplyPowerDomeLightState(bPowerDomeLightOn);
+}
+
+void ARedPowerCylinder::ApplyPowerDomeLightState(bool bLightOn)
+{
+	const FLinearColor GreenBase(0.05f, 1.0f, 0.15f, 1.0f);
+	const FLinearColor EmissiveVal = bLightOn ? (GreenBase * PowerDomeGlowIntensity) : FLinearColor::Black;
+	const FLinearColor ColorVal = bLightOn ? GreenBase : FLinearColor(0.02f, 0.05f, 0.02f, 1.0f);
+	const float ScalarVal = bLightOn ? PowerDomeGlowIntensity : 0.0f;
+
+	for (UMaterialInstanceDynamic* DynMat : PowerDomeDynamicMaterials)
+	{
+		if (!DynMat) continue;
+
+		DynMat->SetVectorParameterValue(TEXT("EmissiveColor"), EmissiveVal);
+		DynMat->SetVectorParameterValue(TEXT("Emissive Color"), EmissiveVal);
+		DynMat->SetVectorParameterValue(TEXT("Emissive"), EmissiveVal);
+		DynMat->SetVectorParameterValue(TEXT("Color"), ColorVal);
+		DynMat->SetVectorParameterValue(TEXT("BaseColor"), ColorVal);
+		DynMat->SetVectorParameterValue(TEXT("Base Color"), ColorVal);
+		DynMat->SetVectorParameterValue(TEXT("Tint"), ColorVal);
+		DynMat->SetScalarParameterValue(TEXT("EmissiveIntensity"), ScalarVal);
+		DynMat->SetScalarParameterValue(TEXT("EmissiveStrength"), ScalarVal);
+		DynMat->SetScalarParameterValue(TEXT("Glow"), ScalarVal);
+	}
+
+	if (PowerDomeLight)
+	{
+		PowerDomeLight->SetIntensity(PowerDomeLightIntensity);
+		PowerDomeLight->SetVisibility(bLightOn);
+	}
 }
 
 FLinearColor ARedPowerCylinder::GetColorForID(int32 InID) const
@@ -215,15 +304,18 @@ void ARedPowerCylinder::RotateGun(float AngleDegrees)
 
 void ARedPowerCylinder::UpdateLaserBeam()
 {
-	if (!LaserBeamMesh || !LaserEmitter) return;
+	if (!LaserEmitter) return;
 
-	// laser only turns on once battery is attached and powers on the gun!
+	// laser only turns on once matching battery is attached and powers on the gun!
 	// (or when previewing in editor details panel)
 	const bool bShouldBeActive = (bIsPowered && bHasBattery) || (bPreviewLaserInEditor && GetWorld() && !GetWorld()->IsGameWorld());
 
 	if (!bShouldBeActive)
 	{
-		LaserBeamMesh->SetVisibility(false);
+		if (LaserBeamMesh)
+		{
+			LaserBeamMesh->SetVisibility(false);
+		}
 		bIsTargetDetected = false;
 		DetectedTarget = nullptr;
 		bHasPrintedNoTarget = false;
@@ -241,16 +333,15 @@ void ARedPowerCylinder::UpdateLaserBeam()
 		return;
 	}
 
-	LaserBeamMesh->SetVisibility(true);
-
 	const FVector Start = LaserEmitter->GetComponentLocation();
 	const FVector Forward = LaserEmitter->GetForwardVector();
 	const FVector DesiredEnd = Start + Forward * LaserLength;
 
 	float ActualDistance = LaserLength;
+	bool bHitObstacle = false;
 	AActor* HitActor = nullptr;
 
-	// raycast forward so the laser beam stops against obstacles and detects target
+	// raycast forward so the laser beam detects obstacles and targets
 	if (GetWorld())
 	{
 		FHitResult Hit;
@@ -269,15 +360,32 @@ void ARedPowerCylinder::UpdateLaserBeam()
 			if (bLaserStopsAtObstacles)
 			{
 				ActualDistance = FMath::Max(15.0f, Hit.Distance);
+				bHitObstacle = true;
+			}
+		}
+
+		// Draw debug laser preview in editor viewport when Preview Laser In Editor is checked
+		if (!GetWorld()->IsGameWorld() && bPreviewLaserInEditor)
+		{
+			const FVector EndPoint = Start + Forward * ActualDistance;
+			const FColor BeamColor = GetColorForID(CellID).ToFColor(true);
+			DrawDebugLine(GetWorld(), Start, EndPoint, BeamColor, false, 0.0f, 0, FMath::Max(2.0f, LaserThickness * 0.5f));
+			if (bHitObstacle)
+			{
+				DrawDebugSphere(GetWorld(), EndPoint, FMath::Max(6.0f, LaserThickness * 0.75f), 8, BeamColor, false, 0.0f);
 			}
 		}
 	}
 
 	// position laser beam: cube mesh center is at 0, so offset forward by half distance along X
 	// scale X by distance, scale Y and Z by laser thickness
-	LaserBeamMesh->SetRelativeLocation(FVector(ActualDistance * 0.5f, 0.0f, 0.0f));
-	LaserBeamMesh->SetRelativeRotation(FRotator::ZeroRotator);
-	LaserBeamMesh->SetRelativeScale3D(FVector(ActualDistance / 100.0f, LaserThickness / 100.0f, LaserThickness / 100.0f));
+	if (LaserBeamMesh)
+	{
+		LaserBeamMesh->SetVisibility(true);
+		LaserBeamMesh->SetRelativeLocation(FVector(ActualDistance * 0.5f, 0.0f, 0.0f));
+		LaserBeamMesh->SetRelativeRotation(FRotator::ZeroRotator);
+		LaserBeamMesh->SetRelativeScale3D(FVector(ActualDistance / 100.0f, LaserThickness / 100.0f, LaserThickness / 100.0f));
+	}
 
 	// Target detection by matching Target ID during gameplay
 	if (GetWorld() && GetWorld()->IsGameWorld())
@@ -383,14 +491,34 @@ void ARedPowerCylinder::UpdateLaserBeam()
 	}
 }
 
+bool ARedPowerCylinder::ShouldTickIfViewportsOnly() const
+{
+	return bPreviewLaserInEditor;
+}
+
 void ARedPowerCylinder::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
 	// if battery is attached and powered, continuously update laser so it reacts if dynamic actors cross the beam
-	if (bIsPowered && bHasBattery)
+	// or if previewing in editor viewport, draw the debug preview line each frame
+	const bool bIsGame = GetWorld() && GetWorld()->IsGameWorld();
+	const bool bIsEditorPreview = bPreviewLaserInEditor && GetWorld() && !bIsGame;
+	if ((bIsPowered && bHasBattery) || bIsEditorPreview)
 	{
 		UpdateLaserBeam();
+	}
+
+	// Blink powerDome green light on and off while a battery is attached
+	if (bIsGame && bHasBattery)
+	{
+		PowerDomeBlinkTimer += DeltaTime;
+		if (PowerDomeBlinkTimer >= FMath::Max(0.05f, PowerDomeBlinkInterval))
+		{
+			PowerDomeBlinkTimer = 0.0f;
+			bPowerDomeLightOn = !bPowerDomeLightOn;
+			ApplyPowerDomeLightState(bPowerDomeLightOn);
+		}
 	}
 }
 
@@ -620,6 +748,10 @@ ABatteryCapsule* ARedPowerCylinder::RemoveBattery()
 	UpdateVisualState();
 	UpdateLaserBeam(); // turns off laser!
 
+	PowerDomeBlinkTimer = 0.0f;
+	bPowerDomeLightOn = false;
+	ApplyPowerDomeLightState(false);
+
 	return Extracted;
 }
 
@@ -632,6 +764,11 @@ bool ARedPowerCylinder::InsertBattery(ABatteryCapsule* Battery)
 
 	// attach battery to socket on top of the laser gun
 	Battery->OnSocketed(this, BatterySocket);
+
+	// start blinking powerDome green light on and off immediately
+	PowerDomeBlinkTimer = 0.0f;
+	bPowerDomeLightOn = true;
+	ApplyPowerDomeLightState(true);
 
 	// 4-digit ID match check: battery id must equal cell id to power on!
 	if (Battery->BatteryID == CellID)
