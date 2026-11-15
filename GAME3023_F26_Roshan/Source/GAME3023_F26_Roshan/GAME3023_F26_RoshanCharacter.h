@@ -513,4 +513,13 @@ public:
 
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+
+private:
+	void UpdateDualSenseControls(float DeltaTime);
+	void AcquireOccludingMesh(class UPrimitiveComponent* Comp);
+	void FadeOccludingMeshes(float DeltaTime, const FVector& CameraLoc);
+	bool InteractWithCylinder(class ARedPowerCylinder* Cylinder);
+	AActor* FindBestInteractable();
+	void UpdateCylinderHoldPrompt(class ARedPowerCylinder* Cylinder, float DeltaTime, bool bInputHeld, FString& OutAction, FString& OutTarget);
+	void ApplyHealthChange(float NewHealth);
 };

@@ -11,10 +11,10 @@
 
 #include "GAME3023_F26_RoshanGameMode.h"
 #include "EnemyBatteryThief.h"
+#include "LiveWireUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/World.h"
-#include "Engine/Engine.h"
 #include "TimerManager.h"
 
 // -----------------------------------------------------------------------------
@@ -22,6 +22,12 @@
 // -----------------------------------------------------------------------------
 AGAME3023_F26_RoshanGameMode::AGAME3023_F26_RoshanGameMode()
 {
+	BatteryThiefSpawnLocations = {
+		FVector(-878.0f, -3679.0f, 100.0f),
+		FVector(1700.0f, 2900.0f, 100.0f),
+		FVector(-1700.0f, 2900.0f, 100.0f)
+	};
+
 	// Find the student's custom BP_EnemyBatteryThief blueprint so it spawns with all mesh/material setup intact!
 	static ConstructorHelpers::FClassFinder<AEnemyBatteryThief> BPThiefFinder(TEXT("/Game/_Blueprints/Enemy/BP_EnemyBatteryThief"));
 	if (BPThiefFinder.Succeeded())
@@ -34,65 +40,55 @@ AGAME3023_F26_RoshanGameMode::AGAME3023_F26_RoshanGameMode()
 	}
 }
 
-// -----------------------------------------------------------------------------
-// BEGIN PLAY: Initializes existing thieves and starts the 10-second wave timer
-// -----------------------------------------------------------------------------
 void AGAME3023_F26_RoshanGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// If spawner is disabled in settings, do nothing
-	if (!bEnableBatteryThiefSpawning)
-	{
-		return;
-	}
-
 	UWorld* World = GetWorld();
-	if (!World)
+	if (!bEnableBatteryThiefSpawning || !World)
 	{
 		return;
 	}
 
-	// 1. Check for any Battery Thieves that were already placed into the map by hand
+	const int32 SlotCount = GetSpawnSlotCount();
+	SpawnSlotStates.SetNum(SlotCount);
+	ThiefToSpawnSlotMap.Empty();
+
 	TArray<AActor*> ExistingThieves;
 	UGameplayStatics::GetAllActorsOfClass(World, AEnemyBatteryThief::StaticClass(), ExistingThieves);
 	for (AActor* Act : ExistingThieves)
 	{
 		if (AEnemyBatteryThief* Existing = Cast<AEnemyBatteryThief>(Act))
 		{
-			// Enforce our global game mode movement speed
-			Existing->PatrolSpeed = BatteryThiefMoveSpeed;
-			Existing->CarrySpeed = BatteryThiefMoveSpeed;
-			Existing->RefreshEnemySettings();
-
-			// Hook up death notifications so we know when to queue a 60s replacement
-			Existing->OnBatteryThiefKilled.RemoveDynamic(this, &AGAME3023_F26_RoshanGameMode::OnSpawnedBatteryThiefKilled);
-			Existing->OnBatteryThiefKilled.AddDynamic(this, &AGAME3023_F26_RoshanGameMode::OnSpawnedBatteryThiefKilled);
+			const bool bTrackInSlot = (SlotCount > 0 && !Existing->bIsDead);
+			const int32 NearestSlot = bTrackInSlot ? FindNearestSpawnSlotIndex(Existing->GetActorLocation()) : INDEX_NONE;
+			RegisterThief(Existing, NearestSlot, bTrackInSlot);
 		}
 	}
 
-	// 2. Spawn the very first Battery Thief immediately on match start if none exist
-	if (ExistingThieves.Num() < MaxActiveBatteryThieves)
+	// Deploy the first thief from each slot immediately on match start.
+	for (int32 SlotIdx = 0; SlotIdx < SlotCount; ++SlotIdx)
 	{
-		TrySpawnBatteryThief();
+		if (GetActiveCountForSlot(SlotIdx) < MaxActivePerSpawnLocation &&
+			SpawnSlotStates[SlotIdx].TotalSpawned < MaxTotalSpawnsPerLocation)
+		{
+			TrySpawnBatteryThiefAtSlot(SlotIdx);
+		}
 	}
 
-	// 3. If we already have 5 active, we're done with the initial wave; otherwise set recurring 10s timer
-	if (GetActiveBatteryThiefCount() >= MaxActiveBatteryThieves)
+	if (AreAllSlotsInitialWaveComplete())
 	{
 		bInitialWaveCompleted = true;
+		return;
 	}
-	else
-	{
-		// Spawn one new Battery Thief every 10.0 seconds until 5 are active in the level
-		World->GetTimerManager().SetTimer(
-			InitialSpawnTimerHandle,
-			this,
-			&AGAME3023_F26_RoshanGameMode::HandleInitialWaveSpawnTick,
-			InitialWaveSpawnInterval,
-			true
-		);
-	}
+
+	World->GetTimerManager().SetTimer(
+		InitialSpawnTimerHandle,
+		this,
+		&AGAME3023_F26_RoshanGameMode::HandleInitialWaveSpawnTick,
+		InitialWaveSpawnInterval,
+		true
+	);
 }
 
 // -----------------------------------------------------------------------------
@@ -141,49 +137,154 @@ int32 AGAME3023_F26_RoshanGameMode::GetActiveBatteryThiefCount() const
 }
 
 // -----------------------------------------------------------------------------
-// TRY SPAWN BATTERY THIEF: Spawns a thief at the hatch if below the max cap (5)
+// SPAWN SLOT HELPERS
 // -----------------------------------------------------------------------------
-AEnemyBatteryThief* AGAME3023_F26_RoshanGameMode::TrySpawnBatteryThief()
+int32 AGAME3023_F26_RoshanGameMode::GetSpawnSlotCount() const
+{
+	return BatteryThiefSpawnLocations.Num() > 0 ? BatteryThiefSpawnLocations.Num() : 1;
+}
+
+FVector AGAME3023_F26_RoshanGameMode::GetSpawnLocationForSlot(int32 SlotIndex) const
+{
+	if (BatteryThiefSpawnLocations.IsValidIndex(SlotIndex))
+	{
+		return BatteryThiefSpawnLocations[SlotIndex];
+	}
+	return DefaultBatteryThiefSpawnLocation;
+}
+
+int32 AGAME3023_F26_RoshanGameMode::GetActiveCountForSlot(int32 SlotIndex) const
+{
+	if (!SpawnSlotStates.IsValidIndex(SlotIndex))
+	{
+		return 0;
+	}
+
+	int32 AliveCount = 0;
+	for (const TWeakObjectPtr<AEnemyBatteryThief>& WeakThief : SpawnSlotStates[SlotIndex].ActiveThieves)
+	{
+		const AEnemyBatteryThief* Thief = WeakThief.Get();
+		if (IsValid(Thief) && !Thief->bIsDead)
+		{
+			++AliveCount;
+		}
+	}
+	return AliveCount;
+}
+
+int32 AGAME3023_F26_RoshanGameMode::FindNearestSpawnSlotIndex(const FVector& Location) const
+{
+	const int32 SlotCount = GetSpawnSlotCount();
+	int32 BestIndex = 0;
+	float BestDistSq = TNumericLimits<float>::Max();
+
+	for (int32 i = 0; i < SlotCount; ++i)
+	{
+		const float DistSq = FVector::DistSquared(Location, GetSpawnLocationForSlot(i));
+		if (DistSq < BestDistSq)
+		{
+			BestDistSq = DistSq;
+			BestIndex = i;
+		}
+	}
+	return BestIndex;
+}
+
+bool AGAME3023_F26_RoshanGameMode::AreAllSlotsInitialWaveComplete() const
+{
+	for (int32 SlotIdx = 0; SlotIdx < SpawnSlotStates.Num(); ++SlotIdx)
+	{
+		const FBatteryThiefSpawnSlotState& State = SpawnSlotStates[SlotIdx];
+		const int32 ActiveOrPending = GetActiveCountForSlot(SlotIdx) + State.PendingReplacements;
+		if (ActiveOrPending < MaxActivePerSpawnLocation && State.TotalSpawned < MaxTotalSpawnsPerLocation)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+void AGAME3023_F26_RoshanGameMode::RegisterThief(AEnemyBatteryThief* Thief, int32 SlotIndex, bool bAddToSlotTracking)
+{
+	if (!Thief)
+	{
+		return;
+	}
+
+	Thief->PatrolSpeed = BatteryThiefMoveSpeed;
+	Thief->CarrySpeed = BatteryThiefMoveSpeed;
+	Thief->RefreshEnemySettings();
+
+	Thief->OnBatteryThiefKilled.RemoveDynamic(this, &AGAME3023_F26_RoshanGameMode::OnSpawnedBatteryThiefKilled);
+	Thief->OnBatteryThiefKilled.AddDynamic(this, &AGAME3023_F26_RoshanGameMode::OnSpawnedBatteryThiefKilled);
+
+	if (bAddToSlotTracking && SpawnSlotStates.IsValidIndex(SlotIndex))
+	{
+		SpawnSlotStates[SlotIndex].ActiveThieves.Add(Thief);
+		++SpawnSlotStates[SlotIndex].TotalSpawned;
+		ThiefToSpawnSlotMap.Add(Thief, SlotIndex);
+	}
+}
+
+AEnemyBatteryThief* AGAME3023_F26_RoshanGameMode::TrySpawnBatteryThiefAtSlot(int32 SlotIndex)
 {
 	UWorld* World = GetWorld();
-	if (!World)
+	if (!World || !SpawnSlotStates.IsValidIndex(SlotIndex))
 	{
 		return nullptr;
 	}
 
-	// Do not exceed the maximum allowed enemies in the arena
-	const int32 CurrentAlive = GetActiveBatteryThiefCount();
-	if (CurrentAlive >= MaxActiveBatteryThieves)
+	const FBatteryThiefSpawnSlotState& SlotState = SpawnSlotStates[SlotIndex];
+	if (SlotState.TotalSpawned >= MaxTotalSpawnsPerLocation ||
+		GetActiveCountForSlot(SlotIndex) >= MaxActivePerSpawnLocation)
 	{
 		return nullptr;
 	}
 
 	TSubclassOf<AEnemyBatteryThief> SpawnClass = BatteryThiefClass ? *BatteryThiefClass : AEnemyBatteryThief::StaticClass();
 	FActorSpawnParameters SpawnParams;
-	// Always spawn even if colliding with another actor at the hatch
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	// Spawn the new enemy at the designated hatch location (X=-878, Y=-3679, Z=10)
-	AEnemyBatteryThief* SpawnedThief = World->SpawnActor<AEnemyBatteryThief>(SpawnClass, DefaultBatteryThiefSpawnLocation, FRotator::ZeroRotator, SpawnParams);
-	if (SpawnedThief)
+	const FVector ChosenSpawnLocation = GetSpawnLocationForSlot(SlotIndex);
+	AEnemyBatteryThief* SpawnedThief = World->SpawnActor<AEnemyBatteryThief>(SpawnClass, ChosenSpawnLocation, FRotator::ZeroRotator, SpawnParams);
+	if (!SpawnedThief)
 	{
-		// Configure speed, home origin, and start patrolling the NavMesh
-		SpawnedThief->PatrolSpeed = BatteryThiefMoveSpeed;
-		SpawnedThief->CarrySpeed = BatteryThiefMoveSpeed;
-		SpawnedThief->RefreshEnemySettings();
-		SpawnedThief->MarkAsSpawnedUnit(DefaultBatteryThiefSpawnLocation);
-		SpawnedThief->PickNextNavMeshPatrolDestination();
-
-		// Bind death event callback so we know when to schedule a replacement
-		SpawnedThief->OnBatteryThiefKilled.RemoveDynamic(this, &AGAME3023_F26_RoshanGameMode::OnSpawnedBatteryThiefKilled);
-		SpawnedThief->OnBatteryThiefKilled.AddDynamic(this, &AGAME3023_F26_RoshanGameMode::OnSpawnedBatteryThiefKilled);
+		return nullptr;
 	}
+
+	RegisterThief(SpawnedThief, SlotIndex, true);
+	SpawnedThief->MarkAsSpawnedUnit(ChosenSpawnLocation);
+	SpawnedThief->PickNextNavMeshPatrolDestination();
 
 	return SpawnedThief;
 }
 
 // -----------------------------------------------------------------------------
-// INITIAL WAVE TICK: Fires every 10 seconds to spawn initial enemies
+// TRY SPAWN BATTERY THIEF: Spawns a thief from the next eligible spawn location
+// -----------------------------------------------------------------------------
+AEnemyBatteryThief* AGAME3023_F26_RoshanGameMode::TrySpawnBatteryThief()
+{
+	const int32 SlotCount = SpawnSlotStates.Num();
+	if (SlotCount <= 0)
+	{
+		return nullptr;
+	}
+
+	for (int32 Attempt = 0; Attempt < SlotCount; ++Attempt)
+	{
+		const int32 SlotIndex = (NextSpawnLocationIndex + Attempt) % SlotCount;
+		if (AEnemyBatteryThief* Spawned = TrySpawnBatteryThiefAtSlot(SlotIndex))
+		{
+			NextSpawnLocationIndex = (SlotIndex + 1) % SlotCount;
+			return Spawned;
+		}
+	}
+
+	return nullptr;
+}
+
+// -----------------------------------------------------------------------------
+// INITIAL WAVE TICK: Deploys remaining initial thieves up to 2 per spawn location
 // -----------------------------------------------------------------------------
 void AGAME3023_F26_RoshanGameMode::HandleInitialWaveSpawnTick()
 {
@@ -193,19 +294,17 @@ void AGAME3023_F26_RoshanGameMode::HandleInitialWaveSpawnTick()
 		return;
 	}
 
-	// Check total slots used (alive enemies + any dead ones waiting on their 60s respawn timer)
-	const int32 TotalSlotsUsed = GetActiveBatteryThiefCount() + PendingReplacementCount;
-	if (TotalSlotsUsed >= MaxActiveBatteryThieves)
+	for (int32 SlotIdx = 0; SlotIdx < SpawnSlotStates.Num(); ++SlotIdx)
 	{
-		bInitialWaveCompleted = true;
-		World->GetTimerManager().ClearTimer(InitialSpawnTimerHandle);
-		return;
+		const FBatteryThiefSpawnSlotState& State = SpawnSlotStates[SlotIdx];
+		const int32 ActiveOrPending = GetActiveCountForSlot(SlotIdx) + State.PendingReplacements;
+		if (ActiveOrPending < MaxActivePerSpawnLocation && State.TotalSpawned < MaxTotalSpawnsPerLocation)
+		{
+			TrySpawnBatteryThiefAtSlot(SlotIdx);
+		}
 	}
 
-	TrySpawnBatteryThief();
-
-	// If we just hit the max cap of 5, shut off the initial wave timer
-	if (GetActiveBatteryThiefCount() + PendingReplacementCount >= MaxActiveBatteryThieves)
+	if (AreAllSlotsInitialWaveComplete())
 	{
 		bInitialWaveCompleted = true;
 		World->GetTimerManager().ClearTimer(InitialSpawnTimerHandle);
@@ -223,24 +322,66 @@ void AGAME3023_F26_RoshanGameMode::OnSpawnedBatteryThiefKilled(AEnemyBatteryThie
 		return;
 	}
 
-	++PendingReplacementCount;
-
-	if (GEngine)
+	int32 SlotIndex = 0;
+	if (KilledThief)
 	{
-		GEngine->AddOnScreenDebugMessage(
-			-1,
-			4.0f,
-			FColor::Cyan,
-			FString::Printf(TEXT("[BATTERY THIEF DESTROYED] Replacement will spawn in %.0f seconds."), ReplacementRespawnDelay)
-		);
+		if (const int32* FoundSlot = ThiefToSpawnSlotMap.Find(KilledThief))
+		{
+			SlotIndex = *FoundSlot;
+			ThiefToSpawnSlotMap.Remove(KilledThief);
+		}
+		else
+		{
+			SlotIndex = FindNearestSpawnSlotIndex(KilledThief->GetActorLocation());
+		}
+
+		if (SpawnSlotStates.IsValidIndex(SlotIndex))
+		{
+			SpawnSlotStates[SlotIndex].ActiveThieves.RemoveAll([KilledThief](const TWeakObjectPtr<AEnemyBatteryThief>& Entry)
+			{
+				return !Entry.IsValid() || Entry.Get() == KilledThief;
+			});
+		}
 	}
 
-	// ⏱️ Schedule a new replacement Battery Thief to spawn after ReplacementRespawnDelay (60.0s)
+	if (!SpawnSlotStates.IsValidIndex(SlotIndex))
+	{
+		return;
+	}
+
+	FBatteryThiefSpawnSlotState& SlotState = SpawnSlotStates[SlotIndex];
+
+	// Stop spawning once this location has reached its lifetime limit (10)
+	if (SlotState.TotalSpawned + SlotState.PendingReplacements >= MaxTotalSpawnsPerLocation)
+	{
+		return;
+	}
+
+	++SlotState.PendingReplacements;
+
+	LiveWireUtils::ShowScreenMessage(
+		-1,
+		4.0f,
+		FColor::Cyan,
+		FString::Printf(
+			TEXT("[BATTERY THIEF DESTROYED] Hatch %d replacement (%d/%d) will spawn in %.0f seconds."),
+			SlotIndex + 1,
+			SlotState.TotalSpawned + SlotState.PendingReplacements,
+			MaxTotalSpawnsPerLocation,
+			ReplacementRespawnDelay
+		)
+	);
+
+	// ⏱️ Schedule a replacement Battery Thief for this same spawn location
 	FTimerHandle NewReplacementTimer;
+	FTimerDelegate RespawnDelegate = FTimerDelegate::CreateUObject(
+		this,
+		&AGAME3023_F26_RoshanGameMode::HandleReplacementRespawnForSlot,
+		SlotIndex
+	);
 	World->GetTimerManager().SetTimer(
 		NewReplacementTimer,
-		this,
-		&AGAME3023_F26_RoshanGameMode::HandleReplacementRespawn,
+		RespawnDelegate,
 		ReplacementRespawnDelay,
 		false
 	);
@@ -248,10 +389,15 @@ void AGAME3023_F26_RoshanGameMode::OnSpawnedBatteryThiefKilled(AEnemyBatteryThie
 }
 
 // -----------------------------------------------------------------------------
-// REPLACEMENT RESPAWN: Fires when the 60-second replacement timer finishes
+// REPLACEMENT RESPAWN: Fires when the replacement timer finishes for a hatch
 // -----------------------------------------------------------------------------
-void AGAME3023_F26_RoshanGameMode::HandleReplacementRespawn()
+void AGAME3023_F26_RoshanGameMode::HandleReplacementRespawnForSlot(int32 SlotIndex)
 {
-	PendingReplacementCount = FMath::Max(0, PendingReplacementCount - 1);
-	TrySpawnBatteryThief();
+	if (!SpawnSlotStates.IsValidIndex(SlotIndex))
+	{
+		return;
+	}
+
+	SpawnSlotStates[SlotIndex].PendingReplacements = FMath::Max(0, SpawnSlotStates[SlotIndex].PendingReplacements - 1);
+	TrySpawnBatteryThiefAtSlot(SlotIndex);
 }

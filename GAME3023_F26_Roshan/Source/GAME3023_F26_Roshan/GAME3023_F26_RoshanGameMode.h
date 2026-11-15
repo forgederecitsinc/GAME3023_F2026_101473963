@@ -42,15 +42,28 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Battery Thief Spawning")
 	bool bEnableBatteryThiefSpawning = true;
 
-	// ✏️ CHANGE THIS: World coordinates of the hatch where Battery Thieves crawl out from
-	// Default location is (X=-878, Y=-3679, Z=10) on the ground floor.
+	// ✏️ CHANGE THIS: World coordinates of the hatches where Battery Thieves crawl out from
+	// Defaults to (X=-878, Y=-3679, Z=100), (X=1700, Y=2900, Z=100), and (X=-1700, Y=2900, Z=100).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Battery Thief Spawning")
-	FVector DefaultBatteryThiefSpawnLocation = FVector(-878.0f, -3679.0f, 10.0f);
+	TArray<FVector> BatteryThiefSpawnLocations;
 
-	// ✏️ CHANGE THIS: Maximum number of Battery Thieves allowed active at the same time
-	// Default is 5. Increase if you want a more crowded, intense arena!
+	// Fallback spawn location used if BatteryThiefSpawnLocations is empty
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Battery Thief Spawning")
+	FVector DefaultBatteryThiefSpawnLocation = FVector(-878.0f, -3679.0f, 100.0f);
+
+	// ✏️ CHANGE THIS: Maximum number of Battery Thieves allowed active at the same time per spawn location
+	// Default is 2 (2 stay inside the level per spawn location).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Battery Thief Spawning", meta = (ClampMin = "1", ClampMax = "50"))
-	int32 MaxActiveBatteryThieves = 5;
+	int32 MaxActivePerSpawnLocation = 2;
+
+	// ✏️ CHANGE THIS: Maximum total Battery Thieves each spawn location can ever spawn before stopping
+	// Default is 10 per spawn location.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Battery Thief Spawning", meta = (ClampMin = "1", ClampMax = "100"))
+	int32 MaxTotalSpawnsPerLocation = 10;
+
+	// ✏️ CHANGE THIS: Maximum number of Battery Thieves allowed active at the same time (legacy/global reference)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Battery Thief Spawning", meta = (ClampMin = "1", ClampMax = "50"))
+	int32 MaxActiveBatteryThieves = 6;
 
 	// ✏️ CHANGE THIS: Delay in seconds between spawning initial enemies until reaching 5
 	// Default is 10.0 seconds.
@@ -91,15 +104,36 @@ protected:
 	// Timer callback for initial wave spawning (every 10 seconds)
 	void HandleInitialWaveSpawnTick();
 
-	// Timer callback when 60-second replacement timer expires
-	void HandleReplacementRespawn();
+	// Timer callback when replacement timer expires for a specific spawn location slot
+	void HandleReplacementRespawnForSlot(int32 SlotIndex);
 
 private:
-	// True once the initial 5 enemies have finished spawning
+	struct FBatteryThiefSpawnSlotState
+	{
+		int32 TotalSpawned = 0;
+		int32 PendingReplacements = 0;
+		TArray<TWeakObjectPtr<AEnemyBatteryThief>> ActiveThieves;
+	};
+
+	int32 GetSpawnSlotCount() const;
+	FVector GetSpawnLocationForSlot(int32 SlotIndex) const;
+	int32 GetActiveCountForSlot(int32 SlotIndex) const;
+	int32 FindNearestSpawnSlotIndex(const FVector& Location) const;
+	AEnemyBatteryThief* TrySpawnBatteryThiefAtSlot(int32 SlotIndex);
+	void RegisterThief(AEnemyBatteryThief* Thief, int32 SlotIndex, bool bAddToSlotTracking);
+	bool AreAllSlotsInitialWaveComplete() const;
+
+	// True once the initial wave has finished deploying
 	bool bInitialWaveCompleted = false;
 
-	// Number of killed enemies currently waiting on their 60-second replacement timer
-	int32 PendingReplacementCount = 0;
+	// Per-spawn-location tracking (active count, lifetime spawned count, pending replacements)
+	TArray<FBatteryThiefSpawnSlotState> SpawnSlotStates;
+
+	// Maps each spawned/registered Battery Thief to its spawn location slot index
+	TMap<TWeakObjectPtr<AEnemyBatteryThief>, int32> ThiefToSpawnSlotMap;
+
+	// Round-robin index into BatteryThiefSpawnLocations
+	int32 NextSpawnLocationIndex = 0;
 
 	// Timer handles
 	FTimerHandle InitialSpawnTimerHandle;

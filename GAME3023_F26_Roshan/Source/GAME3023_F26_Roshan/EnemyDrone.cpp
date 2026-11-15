@@ -16,6 +16,7 @@
 #include "GAME3023_F26_RoshanCharacter.h"
 #include "BatteryCapsule.h"
 #include "RedPowerCylinder.h"
+#include "LiveWireUtils.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SpotLightComponent.h"
@@ -24,7 +25,6 @@
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/Pawn.h"
 #include "Engine/World.h"
-#include "Engine/Engine.h"
 
 AEnemyDrone::AEnemyDrone()
 {
@@ -91,7 +91,7 @@ void AEnemyDrone::RefreshDroneSettings()
 		DownwardLaserLight->SetLightColor(LaserLightColor);
 		DownwardLaserLight->SetInnerConeAngle(LaserInnerConeAngle);
 		DownwardLaserLight->SetOuterConeAngle(FMath::Max(LaserInnerConeAngle + 0.5f, LaserOuterConeAngle));
-		DownwardLaserLight->SetAttenuationRadius(FMath::Max3(LaserAttenuationRadius, PatrolHeight * 2.0f, 2200.0f));
+		DownwardLaserLight->SetAttenuationRadius(FMath::Max3(LaserAttenuationRadius, PatrolHeight * 2.0f, MinimumFlightZ + 1000.0f));
 	}
 }
 
@@ -109,17 +109,26 @@ void AEnemyDrone::BeginPlay()
 	RefreshDroneSettings();
 
 	const FVector StartLocation = GetActorLocation();
-	CurrentGroundZ = SampleNavMeshGroundZ(StartLocation);
+	FVector ClampedStartGround = StartLocation;
+	if (ClampLocationToNavMesh(StartLocation, ClampedStartGround, 2500.0f))
+	{
+		CurrentGroundZ = ClampedStartGround.Z;
+		PatrolOrigin = ClampedStartGround;
+	}
+	else
+	{
+		CurrentGroundZ = SampleNavMeshGroundZ(StartLocation);
+		PatrolOrigin = FVector(StartLocation.X, StartLocation.Y, CurrentGroundZ);
+	}
 	InitialGroundZ = CurrentGroundZ;
 	bHasValidGroundZ = true;
 
-	PatrolOrigin = FVector(StartLocation.X, StartLocation.Y, CurrentGroundZ);
-
 	// Snap initial Z to >= 1000 above the NavMesh and record starting transform for respawn reset
 	const float InitialHoverZ = FMath::Max(ComputeHoverAltitudeZ(), StartLocation.Z);
-	InitialSpawnLocation = FVector(StartLocation.X, StartLocation.Y, InitialHoverZ);
+	InitialSpawnLocation = FVector(PatrolOrigin.X, PatrolOrigin.Y, InitialHoverZ);
 	InitialSpawnRotation = GetActorRotation();
 	SetActorLocationAndRotation(InitialSpawnLocation, InitialSpawnRotation, false, nullptr, ETeleportType::TeleportPhysics);
+	UpdateLightRangeForAltitude(InitialSpawnLocation.Z, CurrentGroundZ);
 
 	DroneState = EEnemyDroneState::Patrolling;
 	BuildNavMeshCoveragePoints();
@@ -327,48 +336,60 @@ void AEnemyDrone::LatchAndKillPlayer(APawn* TargetPawn)
 		UGameplayStatics::ApplyDamage(TargetPawn, 9999.0f, GetInstigatorController(), this, UDamageType::StaticClass());
 	}
 
-	if (GEngine)
+	LiveWireUtils::ShowScreenMessage(
+		4201,
+		5.0f,
+		FColor::Red,
+		TEXT("[DRONE LATCHED!] Failed to hide in 5 seconds — Enemy Drone latched onto you and killed you!"),
+		1.4f
+	);
+}
+
+bool AEnemyDrone::ClampLocationToNavMesh(const FVector& WorldPos, FVector& OutNavGroundPos, float HorizontalSearchRadius) const
+{
+	const float QueryZ = bHasValidGroundZ ? CurrentGroundZ : WorldPos.Z;
+	return LiveWireUtils::ProjectToNavMesh(
+		GetWorld(),
+		FVector(WorldPos.X, WorldPos.Y, QueryZ),
+		FVector(HorizontalSearchRadius, HorizontalSearchRadius, 4000.0f),
+		OutNavGroundPos);
+}
+
+void AEnemyDrone::UpdateLightRangeForAltitude(float CurrentZ, float GroundZ)
+{
+	if (!DownwardLaserLight)
 	{
-		GEngine->AddOnScreenDebugMessage(
-			4201,
-			5.0f,
-			FColor::Red,
-			TEXT("[DRONE LATCHED!] Failed to hide in 5 seconds — Enemy Drone latched onto you and killed you!"),
-			true,
-			FVector2D(1.4f, 1.4f)
-		);
+		return;
+	}
+
+	const float HeightAboveGround = FMath::Max(0.0f, CurrentZ - GroundZ);
+	const float RequiredRange = FMath::Max3(
+		LaserAttenuationRadius,
+		FMath::Max(PatrolHeight, MinimumFlightZ) + 1000.0f,
+		HeightAboveGround + 800.0f
+	);
+
+	if (DownwardLaserLight->AttenuationRadius < RequiredRange)
+	{
+		DownwardLaserLight->SetAttenuationRadius(RequiredRange);
 	}
 }
 
 float AEnemyDrone::SampleNavMeshGroundZ(const FVector& WorldPos) const
 {
-	UWorld* World = GetWorld();
-	if (!World)
+	FVector ProjectedGroundPos;
+	if (ClampLocationToNavMesh(WorldPos, ProjectedGroundPos, 300.0f))
 	{
-		return 0.0f;
+		return ProjectedGroundPos.Z;
 	}
 
-	if (UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World))
-	{
-		FNavLocation ProjectedLocation;
-		const FVector QueryExtent(300.0f, 300.0f, 2000.0f);
-		if (NavSys->ProjectPointToNavigation(FVector(WorldPos.X, WorldPos.Y, CurrentGroundZ), ProjectedLocation, QueryExtent))
-		{
-			return ProjectedLocation.Location.Z;
-		}
-	}
+	const float TracedZ = LiveWireUtils::SampleWalkableGroundZ(
+		GetWorld(),
+		FVector(WorldPos.X, WorldPos.Y, FMath::Max(WorldPos.Z, 1200.0f)),
+		this,
+		0.0f);
 
-	// Fallback downward line trace to find floor Z below the drone
-	FHitResult Hit;
-	const FVector TraceStart(WorldPos.X, WorldPos.Y, FMath::Max(WorldPos.Z, 1200.0f));
-	const FVector TraceEnd(WorldPos.X, WorldPos.Y, -2000.0f);
-	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(DroneGroundTrace), false, this);
-	if (World->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_Visibility, QueryParams))
-	{
-		return Hit.ImpactPoint.Z;
-	}
-
-	return bHasValidGroundZ ? CurrentGroundZ : 0.0f;
+	return (TracedZ != 0.0f || !bHasValidGroundZ) ? TracedZ : CurrentGroundZ;
 }
 
 void AEnemyDrone::BuildNavMeshCoveragePoints()
@@ -383,12 +404,24 @@ void AEnemyDrone::BuildNavMeshCoveragePoints()
 
 	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
 
-	// 1. If the user assigned explicit custom patrol actors in the instance, use those first
+	// 1. If the user assigned explicit custom patrol actors in the instance, clamp them onto the NavMesh
 	for (AActor* WaypointActor : CustomPatrolWaypoints)
 	{
 		if (IsValid(WaypointActor))
 		{
-			PatrolGroundPoints.Add(WaypointActor->GetActorLocation());
+			FVector WaypointLoc = WaypointActor->GetActorLocation();
+			if (NavSys)
+			{
+				FNavLocation ProjectedNav;
+				if (NavSys->ProjectPointToNavigation(WaypointLoc, ProjectedNav, FVector(500.0f, 500.0f, 4000.0f)))
+				{
+					PatrolGroundPoints.Add(ProjectedNav.Location);
+				}
+			}
+			else
+			{
+				PatrolGroundPoints.Add(WaypointLoc);
+			}
 		}
 	}
 
@@ -397,12 +430,17 @@ void AEnemyDrone::BuildNavMeshCoveragePoints()
 		return;
 	}
 
-	// 2. Aerial drone coverage: systematically generate aerial patrol waypoints across the entire arena
-	// Drones fly through open air at Z >= 1000 and can fly anywhere over walls, obstacles, platforms, and voids!
+	if (!NavSys)
+	{
+		return;
+	}
+
+	// 2. Aerial drone coverage: sample grid points strictly within the NavMesh bounds
+	// so the drone never flies wider than the playable NavMesh area.
 	const float Step = FMath::Max(150.0f, CoverageGridSpacing);
 	const int32 HalfSteps = FMath::Clamp(FMath::CeilToInt(PatrolRadius / Step), 1, 25);
 	const float MinDistSq = FMath::Square(Step * 0.45f);
-	const FVector ProjectionExtent(Step * 0.55f, Step * 0.55f, 1500.0f);
+	const FVector ProjectionExtent(Step * 0.45f, Step * 0.45f, 3000.0f);
 
 	bool bReverseRow = false;
 	for (int32 XIdx = -HalfSteps; XIdx <= HalfSteps; ++XIdx)
@@ -418,17 +456,14 @@ void AEnemyDrone::BuildNavMeshCoveragePoints()
 			}
 
 			const FVector CandidateWorld = PatrolOrigin + SampleOffset;
-			FVector PointToAdd = CandidateWorld;
-
-			// Sample NavMesh height if present below for ground altitude reference, but do not restrict drone flight if absent
-			if (NavSys)
+			FNavLocation ProjectedNav;
+			if (!NavSys->ProjectPointToNavigation(CandidateWorld, ProjectedNav, ProjectionExtent))
 			{
-				FNavLocation ProjectedNav;
-				if (NavSys->ProjectPointToNavigation(CandidateWorld, ProjectedNav, ProjectionExtent))
-				{
-					PointToAdd = ProjectedNav.Location;
-				}
+				// Skip points outside the NavMesh
+				continue;
 			}
+
+			const FVector PointToAdd = ProjectedNav.Location;
 
 			bool bTooClose = false;
 			for (const FVector& Existing : PatrolGroundPoints)
@@ -447,6 +482,19 @@ void AEnemyDrone::BuildNavMeshCoveragePoints()
 		}
 		bReverseRow = !bReverseRow;
 	}
+
+	// If the grid missed a narrow/irregular NavMesh, sample random navigable points within PatrolRadius
+	if (PatrolGroundPoints.Num() == 0)
+	{
+		for (int32 SampleIdx = 0; SampleIdx < 16; ++SampleIdx)
+		{
+			FNavLocation RandomNav;
+			if (NavSys->GetRandomPointInNavigableRadius(PatrolOrigin, PatrolRadius, RandomNav))
+			{
+				PatrolGroundPoints.Add(RandomNav.Location);
+			}
+		}
+	}
 }
 
 void AEnemyDrone::AdvanceToNextPatrolDestination()
@@ -461,6 +509,10 @@ void AEnemyDrone::AdvanceToNextPatrolDestination()
 	}
 
 	const FVector CurrentLocation = GetActorLocation();
+	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+
+	FVector GroundStart(CurrentLocation.X, CurrentLocation.Y, CurrentGroundZ);
+	ClampLocationToNavMesh(CurrentLocation, GroundStart, 1000.0f);
 
 	// Re-populate coverage points if needed
 	if (PatrolGroundPoints.Num() == 0)
@@ -468,7 +520,7 @@ void AEnemyDrone::AdvanceToNextPatrolDestination()
 		BuildNavMeshCoveragePoints();
 	}
 
-	// The drone flies directly through the air in 3D above all ground obstacles
+	// Follow NavMesh path corridors horizontally while hovering high in the air so the drone never cuts outside the NavMesh
 	if (PatrolGroundPoints.Num() > 0)
 	{
 		const int32 NumPoints = PatrolGroundPoints.Num();
@@ -482,21 +534,49 @@ void AEnemyDrone::AdvanceToNextPatrolDestination()
 				continue;
 			}
 
+			if (NavSys)
+			{
+				if (UNavigationPath* NavPath = NavSys->FindPathToLocationSynchronously(World, GroundStart, TargetGroundPos, this))
+				{
+					if (NavPath->IsValid() && NavPath->PathPoints.Num() > 0)
+					{
+						for (const FVector& PathPt : NavPath->PathPoints)
+						{
+							if (CurrentPathPoints.Num() == 0 && FVector::DistSquared2D(CurrentLocation, PathPt) < FMath::Square(25.0f))
+							{
+								continue;
+							}
+							CurrentPathPoints.Add(PathPt);
+						}
+
+						if (CurrentPathPoints.Num() > 0)
+						{
+							CurrentPathCornerIndex = 0;
+							return;
+						}
+					}
+				}
+			}
+
 			CurrentPathPoints.Add(TargetGroundPos);
 			CurrentPathCornerIndex = 0;
 			return;
 		}
 	}
 
-	// Fallback: pick a random location within PatrolRadius across the arena
-	const float AngleRad = FMath::FRandRange(0.0f, 2.0f * PI);
-	const float Dist = FMath::FRandRange(500.0f, PatrolRadius);
-	const FVector FallbackPoint(
-		PatrolOrigin.X + FMath::Cos(AngleRad) * Dist,
-		PatrolOrigin.Y + FMath::Sin(AngleRad) * Dist,
-		CurrentGroundZ
-	);
-	CurrentPathPoints.Add(FallbackPoint);
+	// Fallback: pick a random navigable point on the NavMesh within PatrolRadius
+	if (NavSys)
+	{
+		FNavLocation RandomNavLoc;
+		if (NavSys->GetRandomPointInNavigableRadius(PatrolOrigin, PatrolRadius, RandomNavLoc))
+		{
+			CurrentPathPoints.Add(RandomNavLoc.Location);
+			CurrentPathCornerIndex = 0;
+			return;
+		}
+	}
+
+	CurrentPathPoints.Add(GroundStart);
 	CurrentPathCornerIndex = 0;
 }
 
@@ -506,14 +586,11 @@ void AEnemyDrone::Tick(float DeltaTime)
 
 	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0);
 	const AGAME3023_F26_RoshanCharacter* PlayerChar = Cast<AGAME3023_F26_RoshanCharacter>(PlayerPawn);
+	const bool bIsPlayerDead = (PlayerChar && PlayerChar->IsDead());
 
-	// While latched onto the killed player, wait until the player respawns; once alive again, detach and reset to start
 	if (DroneState == EEnemyDroneState::LatchedKilled)
 	{
-		if (!IsValid(PlayerPawn) || (PlayerChar && !PlayerChar->IsDead()))
-		{
-			ResetToStartAndResumePatrol();
-		}
+		TickLatched(PlayerPawn, bIsPlayerDead);
 		return;
 	}
 
@@ -522,152 +599,132 @@ void AEnemyDrone::Tick(float DeltaTime)
 		ParticleDropCooldown -= DeltaTime;
 	}
 
+	switch (DroneState)
+	{
+	case EEnemyDroneState::DivingToLatch:
+		TickDiving(DeltaTime, PlayerPawn, bIsPlayerDead);
+		break;
+	case EEnemyDroneState::TrackingPlayer:
+		TickTracking(DeltaTime, PlayerPawn, bIsPlayerDead);
+		break;
+	case EEnemyDroneState::Patrolling:
+	default:
+		TickPatrolling(DeltaTime, PlayerPawn);
+		break;
+	}
+}
+
+void AEnemyDrone::TickLatched(APawn* PlayerPawn, bool bIsPlayerDead)
+{
+	if (!IsValid(PlayerPawn) || !bIsPlayerDead)
+	{
+		ResetToStartAndResumePatrol();
+	}
+}
+
+void AEnemyDrone::TickDiving(float DeltaTime, APawn* PlayerPawn, bool bIsPlayerDead)
+{
+	if (!IsValid(PlayerPawn) || bIsPlayerDead)
+	{
+		ResetToStartAndResumePatrol();
+		return;
+	}
+
 	const FVector CurrentLocation = GetActorLocation();
+	const FVector LatchTargetPos = PlayerPawn->GetActorLocation() + FVector(0.0f, 0.0f, 65.0f);
+	const FVector ToLatch = LatchTargetPos - CurrentLocation;
+	const float DistToLatch = ToLatch.Size();
+	const float DiveStep = DiveLatchSpeed * DeltaTime;
 
-	// ==========================================
-	// STATE 3: Diving Down To Latch Onto Player & Kill Them (5s timer expired)
-	// ==========================================
-	if (DroneState == EEnemyDroneState::DivingToLatch)
+	if (DistToLatch <= FMath::Max(DiveStep, 65.0f))
 	{
-		if (!IsValid(PlayerPawn) || (PlayerChar && PlayerChar->IsDead()))
-		{
-			ResetToStartAndResumePatrol();
-			return;
-		}
-
-		// Target the player's upper body / head to latch on
-		const FVector LatchTargetPos = PlayerPawn->GetActorLocation() + FVector(0.0f, 0.0f, 65.0f);
-		const FVector ToLatch = LatchTargetPos - CurrentLocation;
-		const float DistToLatch = ToLatch.Size();
-		const float DiveStep = DiveLatchSpeed * DeltaTime;
-
-		if (DistToLatch <= FMath::Max(DiveStep, 65.0f))
-		{
-			LatchAndKillPlayer(PlayerPawn);
-			return;
-		}
-
-		const FVector DiveDir = ToLatch / DistToLatch;
-		SetActorLocation(CurrentLocation + DiveDir * DiveStep);
-
-		const FRotator DiveRot(0.0f, DiveDir.Rotation().Yaw, 0.0f);
-		SetActorRotation(FMath::RInterpTo(GetActorRotation(), DiveRot, DeltaTime, TurnSpeed * 2.0f));
+		LatchAndKillPlayer(PlayerPawn);
 		return;
 	}
 
-	// ==========================================
-	// STATE 2: Player Caught — 5-Second Escape Countdown (Hide Under Something!)
-	// ==========================================
-	if (DroneState == EEnemyDroneState::TrackingPlayer)
+	const FVector DiveDir = ToLatch / DistToLatch;
+	SetActorLocation(CurrentLocation + DiveDir * DiveStep);
+	FaceDirection2D(DiveDir, DeltaTime, 2.0f);
+}
+
+void AEnemyDrone::TickTracking(float DeltaTime, APawn* PlayerPawn, bool bIsPlayerDead)
+{
+	if (bIsPlayerDead)
 	{
-		const bool bPlayerDead = PlayerChar && PlayerChar->IsDead();
-		if (bPlayerDead)
-		{
-			ResetToStartAndResumePatrol();
-			return;
-		}
-
-		// Check if the player escaped by hiding under a roof, catwalk, or overhead structure
-		if (!IsValid(PlayerPawn) || IsPawnHidingUnderCover(PlayerPawn))
-		{
-			DroneState = EEnemyDroneState::Patrolling;
-			bIsFollowingPlayer = false;
-			EscapeTimerRemaining = 0.0f;
-			RefreshDroneSettings();
-
-			if (GEngine)
-			{
-				GEngine->AddOnScreenDebugMessage(
-					4201,
-					3.0f,
-					FColor::Green,
-					TEXT("[ESCAPED DRONE!] You hid under cover and escaped the Enemy Drone!"),
-					true,
-					FVector2D(1.3f, 1.3f)
-				);
-			}
-
-			if (PatrolGroundPoints.IsValidIndex(CurrentPatrolIndex))
-			{
-				CurrentPatrolIndex = FMath::Max(-1, CurrentPatrolIndex - 1);
-			}
-			AdvanceToNextPatrolDestination();
-			return;
-		}
-
-		// Count down the 5-second escape window
-		EscapeTimerRemaining -= DeltaTime;
-
-		// Pulse the downward laser light rapidly to warn the player during the 5-second countdown
-		if (DownwardLaserLight && GetWorld())
-		{
-			const float Pulse = 0.5f + 0.5f * FMath::Sin(GetWorld()->GetTimeSeconds() * 16.0f);
-			DownwardLaserLight->SetIntensity(LaserLightIntensity * (0.5f + 1.2f * Pulse));
-		}
-
-		// Drop laser particles while tracking
-		if (ParticleDropCooldown <= 0.0f)
-		{
-			DropLaserParticle(PlayerPawn);
-			ParticleDropCooldown = FMath::Max(0.05f, LaserParticleInterval);
-		}
-
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(
-				4201,
-				0.15f,
-				FColor::Red,
-				FString::Printf(TEXT("[DRONE LOCKED ON!] Hide under cover in %.1fs or the Drone will dive and latch onto you!"),
-					FMath::Max(0.0f, EscapeTimerRemaining)),
-				true,
-				FVector2D(1.3f, 1.3f)
-			);
-		}
-
-		// If the 5 seconds run out and the player hasn't hidden under cover, dive down to latch and kill!
-		if (EscapeTimerRemaining <= 0.0f)
-		{
-			DroneState = EEnemyDroneState::DivingToLatch;
-			if (DownwardLaserLight)
-			{
-				DownwardLaserLight->SetIntensity(LaserLightIntensity * 2.0f);
-			}
-			return;
-		}
-
-		// Keep following directly above the player at Z >= 1000 during the 5-second escape window
-		const FVector PlayerLoc = PlayerPawn->GetActorLocation();
-		const FVector ToPlayer2D(PlayerLoc.X - CurrentLocation.X, PlayerLoc.Y - CurrentLocation.Y, 0.0f);
-		const float DistToPlayer2D = ToPlayer2D.Size();
-		const float StepDist = MovementSpeed * DeltaTime;
-
-		FVector NewLocation = CurrentLocation;
-		if (DistToPlayer2D > 5.0f)
-		{
-			const FVector MoveDir2D = ToPlayer2D / DistToPlayer2D;
-			const float MoveAmount = FMath::Min(StepDist, DistToPlayer2D);
-			NewLocation.X += MoveDir2D.X * MoveAmount;
-			NewLocation.Y += MoveDir2D.Y * MoveAmount;
-
-			const FRotator DesiredRotation(0.0f, MoveDir2D.Rotation().Yaw, 0.0f);
-			SetActorRotation(FMath::RInterpTo(GetActorRotation(), DesiredRotation, DeltaTime, TurnSpeed));
-		}
-
-		const float SampledZ = SampleNavMeshGroundZ(FVector(NewLocation.X, NewLocation.Y, PlayerLoc.Z));
-		CurrentGroundZ = FMath::FInterpTo(CurrentGroundZ, SampledZ, DeltaTime, 10.0f);
-
-		// Stay at Z >= 1000 while tracking
-		const float TargetHoverZ = ComputeHoverAltitudeZ();
-		NewLocation.Z = FMath::Max(1000.0f, FMath::FInterpTo(CurrentLocation.Z, TargetHoverZ, DeltaTime, 12.0f));
-
-		SetActorLocation(NewLocation);
+		ResetToStartAndResumePatrol();
 		return;
 	}
 
-	// ==========================================
-	// STATE 1: Patrolling at Z >= 1000
-	// ==========================================
+	if (!IsValid(PlayerPawn) || IsPawnHidingUnderCover(PlayerPawn))
+	{
+		DroneState = EEnemyDroneState::Patrolling;
+		bIsFollowingPlayer = false;
+		EscapeTimerRemaining = 0.0f;
+		RefreshDroneSettings();
+
+		LiveWireUtils::ShowScreenMessage(
+			4201, 3.0f, FColor::Green,
+			TEXT("[ESCAPED DRONE!] You hid under cover and escaped the Enemy Drone!"), 1.3f);
+
+		if (PatrolGroundPoints.IsValidIndex(CurrentPatrolIndex))
+		{
+			CurrentPatrolIndex = FMath::Max(-1, CurrentPatrolIndex - 1);
+		}
+		AdvanceToNextPatrolDestination();
+		return;
+	}
+
+	EscapeTimerRemaining -= DeltaTime;
+
+	if (DownwardLaserLight && GetWorld())
+	{
+		const float Pulse = 0.5f + 0.5f * FMath::Sin(GetWorld()->GetTimeSeconds() * 16.0f);
+		DownwardLaserLight->SetIntensity(LaserLightIntensity * (0.5f + 1.2f * Pulse));
+	}
+
+	if (ParticleDropCooldown <= 0.0f)
+	{
+		DropLaserParticle(PlayerPawn);
+		ParticleDropCooldown = FMath::Max(0.05f, LaserParticleInterval);
+	}
+
+	LiveWireUtils::ShowScreenMessage(
+		4201, 0.15f, FColor::Red,
+		FString::Printf(
+			TEXT("[DRONE LOCKED ON!] Hide under cover in %.1fs or the Drone will dive and latch onto you!"),
+			FMath::Max(0.0f, EscapeTimerRemaining)),
+		1.3f);
+
+	if (EscapeTimerRemaining <= 0.0f)
+	{
+		DroneState = EEnemyDroneState::DivingToLatch;
+		if (DownwardLaserLight)
+		{
+			DownwardLaserLight->SetIntensity(LaserLightIntensity * 2.0f);
+		}
+		return;
+	}
+
+	const FVector CurrentLocation = GetActorLocation();
+	const FVector PlayerLoc = PlayerPawn->GetActorLocation();
+	const FVector ToPlayer2D(PlayerLoc.X - CurrentLocation.X, PlayerLoc.Y - CurrentLocation.Y, 0.0f);
+	const float DistToPlayer2D = ToPlayer2D.Size();
+
+	FVector TargetXY = CurrentLocation;
+	if (DistToPlayer2D > 5.0f)
+	{
+		const FVector MoveDir2D = ToPlayer2D / DistToPlayer2D;
+		const float MoveAmount = FMath::Min(MovementSpeed * DeltaTime, DistToPlayer2D);
+		TargetXY.X += MoveDir2D.X * MoveAmount;
+		TargetXY.Y += MoveDir2D.Y * MoveAmount;
+		FaceDirection2D(MoveDir2D, DeltaTime);
+	}
+
+	UpdateHoverPosition(TargetXY, PlayerLoc.Z, DeltaTime);
+}
+
+void AEnemyDrone::TickPatrolling(float DeltaTime, APawn* PlayerPawn)
+{
 	if (IsPawnUnderLight(PlayerPawn))
 	{
 		DroneState = EEnemyDroneState::TrackingPlayer;
@@ -675,17 +732,10 @@ void AEnemyDrone::Tick(float DeltaTime)
 		EscapeTimerRemaining = EscapeTimeLimit;
 		WaitTimer = 0.0f;
 
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(
-				4201,
-				2.5f,
-				FColor::Red,
-				FString::Printf(TEXT("[CAUGHT BY DRONE!] Hide under something within %.0f seconds!"), EscapeTimeLimit),
-				true,
-				FVector2D(1.35f, 1.35f)
-			);
-		}
+		LiveWireUtils::ShowScreenMessage(
+			4201, 2.5f, FColor::Red,
+			FString::Printf(TEXT("[CAUGHT BY DRONE!] Hide under something within %.0f seconds!"), EscapeTimeLimit),
+			1.35f);
 		return;
 	}
 
@@ -704,19 +754,17 @@ void AEnemyDrone::Tick(float DeltaTime)
 		}
 	}
 
+	const FVector CurrentLocation = GetActorLocation();
 	const FVector TargetCornerGround = CurrentPathPoints[CurrentPathCornerIndex];
-
-	// Horizontal movement toward current NavMesh path corner
 	const FVector ToTarget2D(TargetCornerGround.X - CurrentLocation.X, TargetCornerGround.Y - CurrentLocation.Y, 0.0f);
 	const float Dist2D = ToTarget2D.Size();
 	const float StepDist = MovementSpeed * DeltaTime;
 
-	FVector NewLocation = CurrentLocation;
-
+	FVector TargetXY = CurrentLocation;
 	if (Dist2D <= FMath::Max(StepDist, 15.0f))
 	{
-		NewLocation.X = TargetCornerGround.X;
-		NewLocation.Y = TargetCornerGround.Y;
+		TargetXY.X = TargetCornerGround.X;
+		TargetXY.Y = TargetCornerGround.Y;
 		CurrentGroundZ = TargetCornerGround.Z;
 
 		++CurrentPathCornerIndex;
@@ -725,25 +773,50 @@ void AEnemyDrone::Tick(float DeltaTime)
 			WaitTimer = WaypointWaitTime;
 			AdvanceToNextPatrolDestination();
 		}
+
+		// Snap directly over the corner and update altitude.
+		const float TargetHoverZ = ComputeHoverAltitudeZ();
+		TargetXY.Z = FMath::Max(FMath::Max(1000.0f, MinimumFlightZ), FMath::FInterpTo(CurrentLocation.Z, TargetHoverZ, DeltaTime, 12.0f));
+		UpdateLightRangeForAltitude(TargetXY.Z, CurrentGroundZ);
+		SetActorLocation(TargetXY);
+		return;
+	}
+
+	const FVector MoveDir2D = ToTarget2D / Dist2D;
+	TargetXY.X += MoveDir2D.X * StepDist;
+	TargetXY.Y += MoveDir2D.Y * StepDist;
+
+	FaceDirection2D(MoveDir2D, DeltaTime);
+	UpdateHoverPosition(TargetXY, TargetCornerGround.Z, DeltaTime);
+}
+
+void AEnemyDrone::UpdateHoverPosition(const FVector& TargetXY, float FallbackZ, float DeltaTime)
+{
+	FVector NewLocation = TargetXY;
+	FVector ClampedGroundPos;
+	float SampledZ = FallbackZ;
+
+	if (ClampLocationToNavMesh(NewLocation, ClampedGroundPos, 500.0f))
+	{
+		NewLocation.X = ClampedGroundPos.X;
+		NewLocation.Y = ClampedGroundPos.Y;
+		SampledZ = ClampedGroundPos.Z;
 	}
 	else
 	{
-		const FVector MoveDir2D = ToTarget2D / Dist2D;
-		NewLocation.X += MoveDir2D.X * StepDist;
-		NewLocation.Y += MoveDir2D.Y * StepDist;
-
-		// Smoothly rotate drone on Yaw to face movement direction while keeping downward light vertical
-		const FRotator DesiredRotation(0.0f, MoveDir2D.Rotation().Yaw, 0.0f);
-		SetActorRotation(FMath::RInterpTo(GetActorRotation(), DesiredRotation, DeltaTime, TurnSpeed));
-
-		// Sample the NavMesh ground height at our new XY
-		const float SampledZ = SampleNavMeshGroundZ(FVector(NewLocation.X, NewLocation.Y, TargetCornerGround.Z));
-		CurrentGroundZ = FMath::FInterpTo(CurrentGroundZ, SampledZ, DeltaTime, 10.0f);
+		SampledZ = SampleNavMeshGroundZ(FVector(NewLocation.X, NewLocation.Y, FallbackZ));
 	}
 
-	// Always stay at Z = 1000 or higher while patrolling
-	const float TargetHoverZ = ComputeHoverAltitudeZ();
-	NewLocation.Z = FMath::Max(1000.0f, FMath::FInterpTo(CurrentLocation.Z, TargetHoverZ, DeltaTime, 12.0f));
+	CurrentGroundZ = FMath::FInterpTo(CurrentGroundZ, SampledZ, DeltaTime, 10.0f);
 
+	const float TargetHoverZ = ComputeHoverAltitudeZ();
+	NewLocation.Z = FMath::Max(FMath::Max(1000.0f, MinimumFlightZ), FMath::FInterpTo(GetActorLocation().Z, TargetHoverZ, DeltaTime, 12.0f));
+	UpdateLightRangeForAltitude(NewLocation.Z, CurrentGroundZ);
 	SetActorLocation(NewLocation);
+}
+
+void AEnemyDrone::FaceDirection2D(const FVector& Dir2D, float DeltaTime, float SpeedMultiplier)
+{
+	const FRotator DesiredRotation(0.0f, Dir2D.Rotation().Yaw, 0.0f);
+	SetActorRotation(FMath::RInterpTo(GetActorRotation(), DesiredRotation, DeltaTime, TurnSpeed * SpeedMultiplier));
 }

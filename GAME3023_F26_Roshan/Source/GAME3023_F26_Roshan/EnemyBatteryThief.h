@@ -423,4 +423,14 @@ private:
 	// Overlap callback when player touches the Battery Thief
 	UFUNCTION()
 	void OnPlayerTouchBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	bool HandleStuckWatchdog(float DeltaTime, float SpeedToUse, const FVector& CurrentLocation);
+	void MoveWithWallSlide(const FVector& CurrentLocation, const FVector& MoveDir2D, float StepDist, float TargetZ, bool bHasNextCorner, float DeltaTime);
+	void PinToGroundSurface();
+	void CheckPlayerProximityTouch();
+	void TickPatrolling(float DeltaTime);
+	void TickApproaching(float DeltaTime);
+	void TickRemoving(float DeltaTime);
+	void TickCarrying(float DeltaTime);
+	void TickFollowingPlayer(float DeltaTime);
 };

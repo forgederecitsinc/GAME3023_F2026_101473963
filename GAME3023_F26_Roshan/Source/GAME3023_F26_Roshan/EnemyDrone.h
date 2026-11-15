@@ -80,7 +80,7 @@ public:
 
 	// Height above the NavMesh floor at which the drone hovers (clamped so world Z is always >= MinimumFlightZ = 1000)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Drone|Movement & Patrol", meta = (DisplayName = "Patrol Height Above NavMesh", ClampMin = "1000.0"))
-	float PatrolHeight = 1000.0f;
+	float PatrolHeight = 1500.0f;
 
 	// Movement speed of the drone while patrolling and tracking (in cm/s)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Drone|Movement & Patrol", meta = (DisplayName = "Movement Speed", ClampMin = "10.0"))
@@ -130,9 +130,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Drone|Laser Light", meta = (DisplayName = "Laser Outer Cone Angle", ClampMin = "0.5", ClampMax = "80.0"))
 	float LaserOuterConeAngle = 18.0f;
 
-	// Maximum range/attenuation radius of the downward laser light (scaled to reach the floor from Z >= 1000)
+	// Maximum range/attenuation radius of the downward laser light (scaled to reach the floor from tall hover heights)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Drone|Laser Light", meta = (DisplayName = "Laser Light Attenuation Radius", ClampMin = "100.0"))
-	float LaserAttenuationRadius = 2500.0f;
+	float LaserAttenuationRadius = 3500.0f;
 
 	// ==========================================
 	// Instance Editable Laser Bomb / Particle Attack Settings
@@ -246,4 +246,17 @@ private:
 
 	// Samples the NavMesh or floor beneath a world XY position to get the ground Z
 	float SampleNavMeshGroundZ(const FVector& WorldPos) const;
+
+	// Clamps a world position horizontally onto the NavMesh and outputs the projected ground point
+	bool ClampLocationToNavMesh(const FVector& WorldPos, FVector& OutNavGroundPos, float HorizontalSearchRadius = 500.0f) const;
+
+	// Ensures the downward spotlight attenuation radius reaches the ground/player from the drone's current altitude
+	void UpdateLightRangeForAltitude(float CurrentZ, float GroundZ);
+
+	void TickLatched(APawn* PlayerPawn, bool bIsPlayerDead);
+	void TickDiving(float DeltaTime, APawn* PlayerPawn, bool bIsPlayerDead);
+	void TickTracking(float DeltaTime, APawn* PlayerPawn, bool bIsPlayerDead);
+	void TickPatrolling(float DeltaTime, APawn* PlayerPawn);
+	void UpdateHoverPosition(const FVector& TargetXY, float FallbackZ, float DeltaTime);
+	void FaceDirection2D(const FVector& Dir2D, float DeltaTime, float SpeedMultiplier = 1.0f);
 };

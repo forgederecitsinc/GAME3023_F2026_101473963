@@ -101,6 +101,8 @@ protected:
 	TOptional<float> GetPromptRenderOpacity() const { return CurrentAlpha; }
 
 private:
+	void UpdatePromptLabels();
+
 	TWeakObjectPtr<AActor> TargetActor;
 
 	bool bIsPromptVisible = false;
