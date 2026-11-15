@@ -1,12 +1,3 @@
-// =============================================================================
-// Student: Roshan - 101473963
-// Course: GAME3023 - Game Engines 3
-// File: InteractPromptWidget.h
-// Description: Interaction Prompt HUD Widget.
-// Displays an on-screen prompt when the player approaches an interactable actor
-// (Battery Capsule or Red Power Cylinder).
-// =============================================================================
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -101,13 +92,14 @@ protected:
 	TOptional<float> GetPromptRenderOpacity() const { return CurrentAlpha; }
 
 private:
+	void UpdatePromptLabels();
+
 	TWeakObjectPtr<AActor> TargetActor;
 
 	bool bIsPromptVisible = false;
 	float CurrentAlpha = 0.0f;
 	float TargetAlpha = 0.0f;
 
-	// Cached slate root box, circular button badge, and text blocks
 	TSharedPtr<SBox> PromptContainerBox;
 	TSharedPtr<SCircularHoldBadge> CircularHoldBadge;
 	TSharedPtr<STextBlock> ActionTextBlock;

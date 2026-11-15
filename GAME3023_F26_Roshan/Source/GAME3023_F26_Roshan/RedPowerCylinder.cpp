@@ -1,49 +1,35 @@
-// =============================================================================
-// Student: Roshan - 101473963
-// Course: GAME3023 - Game Engines 3
-// File: RedPowerCylinder.cpp
-// Description: Implementation of the Laser Gun Turret (Red Power Cylinder).
-// Handles battery cradle socketing, laser raycasting, target detection,
-// and line-of-sight elevation checks so players can't interact through walls.
-// =============================================================================
-
 #include "RedPowerCylinder.h"
-#include "Components/SphereComponent.h"
-#include "Components/StaticMeshComponent.h"
-#include "Components/PointLightComponent.h"
-#include "UObject/ConstructorHelpers.h"
-#include "Engine/StaticMesh.h"
-#include "Engine/Engine.h"
-#include "DrawDebugHelpers.h"
-#include "Materials/MaterialInterface.h"
-#include "Materials/MaterialInstanceDynamic.h"
 #include "BatteryCapsule.h"
 #include "LaserTarget.h"
 #include "TransformerBushing.h"
 #include "GAME3023_F26_RoshanCharacter.h"
 #include "GAME3023_F26_Roshan.h"
+#include "LiveWireUtils.h"
+#include "Components/SphereComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Components/PointLightComponent.h"
+#include "UObject/ConstructorHelpers.h"
+#include "Engine/StaticMesh.h"
+#include "DrawDebugHelpers.h"
+#include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Kismet/KismetSystemLibrary.h"
 
 ARedPowerCylinder::ARedPowerCylinder()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	// root scene component
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	RootComponent = SceneRoot;
 
-	// socket where the battery snaps in when inserted
 	BatterySocket = CreateDefaultSubobject<USceneComponent>(TEXT("BatterySocket"));
 	BatterySocket->SetupAttachment(RootComponent);
 	BatterySocket->SetRelativeLocation(FVector(-20.0f, 0.0f, 360.0f));
 
-	// laser emitter socket
 	LaserEmitter = CreateDefaultSubobject<USceneComponent>(TEXT("LaserEmitter"));
 	LaserEmitter->SetupAttachment(RootComponent);
 	LaserEmitter->SetRelativeLocation(FVector(322.0f, 0.0f, 286.0f));
-	LaserEmitter->SetRelativeRotation(FRotator::ZeroRotator);
 
-	// visual laser beam mesh
 	LaserBeamMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LaserBeamMesh"));
 	LaserBeamMesh->SetupAttachment(LaserEmitter);
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> LaserCubeAsset(TEXT("/Engine/BasicShapes/Cube.Cube"));
@@ -53,9 +39,8 @@ ARedPowerCylinder::ARedPowerCylinder()
 	}
 	LaserBeamMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	LaserBeamMesh->SetCastShadow(false);
-	LaserBeamMesh->SetVisibility(false); // off until matching battery is attached
+	LaserBeamMesh->SetVisibility(false);
 
-	// interaction trigger zone for player E / controller square
 	InteractionZone = CreateDefaultSubobject<USphereComponent>(TEXT("InteractionZone"));
 	InteractionZone->SetupAttachment(RootComponent);
 	InteractionZone->SetRelativeLocation(FVector(0.0f, 0.0f, 220.0f));
@@ -67,30 +52,24 @@ void ARedPowerCylinder::BuildGunComponents()
 {
 	const FRotator AimRot(0.0f, GunYaw, 0.0f);
 
-	// configure battery socket
 	if (BatterySocket)
 	{
-		const FVector SocketLoc = AimRot.RotateVector(FVector(-20.0f, 0.0f, 75.0f)) + FVector(0.0f, 0.0f, 286.0f);
-		BatterySocket->SetRelativeLocation(SocketLoc);
+		BatterySocket->SetRelativeLocation(AimRot.RotateVector(FVector(-20.0f, 0.0f, 75.0f)) + FVector(0.0f, 0.0f, 286.0f));
 		BatterySocket->SetRelativeRotation(AimRot);
 	}
 
-	// configure laser emitter
 	if (LaserEmitter)
 	{
-		const FVector EmitterLoc = AimRot.RotateVector(FVector(322.0f, 0.0f, 0.0f)) + FVector(0.0f, 0.0f, 286.0f);
-		LaserEmitter->SetRelativeLocation(EmitterLoc);
+		LaserEmitter->SetRelativeLocation(AimRot.RotateVector(FVector(322.0f, 0.0f, 0.0f)) + FVector(0.0f, 0.0f, 286.0f));
 		LaserEmitter->SetRelativeRotation(AimRot);
 	}
 
-	// configure laser beam mesh
 	if (LaserBeamMesh)
 	{
 		LaserBeamMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		LaserBeamMesh->SetCastShadow(false);
 	}
 
-	// configure interaction trigger zone
 	if (InteractionZone)
 	{
 		InteractionZone->SetRelativeLocation(FVector(0.0f, 0.0f, 220.0f));
@@ -101,7 +80,6 @@ void ARedPowerCylinder::BuildGunComponents()
 void ARedPowerCylinder::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
-
 	BuildGunComponents();
 	ApplyColorFromID();
 	UpdateLaserBeam();
@@ -111,7 +89,6 @@ void ARedPowerCylinder::OnConstruction(const FTransform& Transform)
 void ARedPowerCylinder::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
-
 	ApplyColorFromID();
 	UpdateLaserBeam();
 }
@@ -120,7 +97,7 @@ void ARedPowerCylinder::PostEditChangeProperty(FPropertyChangedEvent& PropertyCh
 void ARedPowerCylinder::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
 	InteractionZone->OnComponentBeginOverlap.AddDynamic(this, &ARedPowerCylinder::OnInteractionBeginOverlap);
 	InteractionZone->OnComponentEndOverlap.AddDynamic(this, &ARedPowerCylinder::OnInteractionEndOverlap);
 
@@ -151,13 +128,28 @@ void ARedPowerCylinder::InitPowerDome()
 		return;
 	}
 
-	PowerDomeDynamicMaterials.Empty();
-	const int32 NumMats = PowerDomeMesh->GetNumMaterials();
-	for (int32 i = 0; i < NumMats; ++i)
+	PowerDomeOriginalMaterials.Empty();
+	for (int32 i = 0; i < PowerDomeMesh->GetNumMaterials(); ++i)
 	{
-		if (UMaterialInstanceDynamic* DynMat = PowerDomeMesh->CreateAndSetMaterialInstanceDynamic(i))
+		PowerDomeOriginalMaterials.Add(PowerDomeMesh->GetMaterial(i));
+	}
+
+	if (!PowerDomeGreenDynMaterial)
+	{
+		if (UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
 		{
-			PowerDomeDynamicMaterials.Add(DynMat);
+			PowerDomeGreenDynMaterial = UMaterialInstanceDynamic::Create(BaseMat, this);
+			if (PowerDomeGreenDynMaterial)
+			{
+				const FLinearColor GreenBase(0.05f, 1.0f, 0.15f, 1.0f);
+				const FLinearColor GreenEmissive = GreenBase * PowerDomeGlowIntensity;
+				PowerDomeGreenDynMaterial->SetVectorParameterValue(TEXT("Color"), GreenBase);
+				PowerDomeGreenDynMaterial->SetVectorParameterValue(TEXT("BaseColor"), GreenBase);
+				PowerDomeGreenDynMaterial->SetVectorParameterValue(TEXT("Base Color"), GreenBase);
+				PowerDomeGreenDynMaterial->SetVectorParameterValue(TEXT("EmissiveColor"), GreenEmissive);
+				PowerDomeGreenDynMaterial->SetVectorParameterValue(TEXT("Emissive Color"), GreenEmissive);
+				PowerDomeGreenDynMaterial->SetVectorParameterValue(TEXT("Emissive"), GreenEmissive);
+			}
 		}
 	}
 
@@ -177,119 +169,90 @@ void ARedPowerCylinder::InitPowerDome()
 		}
 	}
 
-	bPowerDomeLightOn = bHasBattery;
+	bPowerDomeLightOn = (bIsPowered && bHasBattery);
 	ApplyPowerDomeLightState(bPowerDomeLightOn);
 }
 
 void ARedPowerCylinder::ApplyPowerDomeLightState(bool bLightOn)
 {
-	const FLinearColor GreenBase(0.05f, 1.0f, 0.15f, 1.0f);
-	const FLinearColor EmissiveVal = bLightOn ? (GreenBase * PowerDomeGlowIntensity) : FLinearColor::Black;
-	const FLinearColor ColorVal = bLightOn ? GreenBase : FLinearColor(0.02f, 0.05f, 0.02f, 1.0f);
-	const float ScalarVal = bLightOn ? PowerDomeGlowIntensity : 0.0f;
+	const bool bPoweredActive = (bIsPowered && bHasBattery);
+	const bool bShowGreen = bPoweredActive && bLightOn;
 
-	for (UMaterialInstanceDynamic* DynMat : PowerDomeDynamicMaterials)
+	if (PowerDomeMesh)
 	{
-		if (!DynMat) continue;
-
-		DynMat->SetVectorParameterValue(TEXT("EmissiveColor"), EmissiveVal);
-		DynMat->SetVectorParameterValue(TEXT("Emissive Color"), EmissiveVal);
-		DynMat->SetVectorParameterValue(TEXT("Emissive"), EmissiveVal);
-		DynMat->SetVectorParameterValue(TEXT("Color"), ColorVal);
-		DynMat->SetVectorParameterValue(TEXT("BaseColor"), ColorVal);
-		DynMat->SetVectorParameterValue(TEXT("Base Color"), ColorVal);
-		DynMat->SetVectorParameterValue(TEXT("Tint"), ColorVal);
-		DynMat->SetScalarParameterValue(TEXT("EmissiveIntensity"), ScalarVal);
-		DynMat->SetScalarParameterValue(TEXT("EmissiveStrength"), ScalarVal);
-		DynMat->SetScalarParameterValue(TEXT("Glow"), ScalarVal);
+		for (int32 i = 0; i < PowerDomeOriginalMaterials.Num(); ++i)
+		{
+			if (bShowGreen && PowerDomeGreenDynMaterial)
+			{
+				PowerDomeMesh->SetMaterial(i, PowerDomeGreenDynMaterial);
+			}
+			else if (PowerDomeOriginalMaterials[i])
+			{
+				PowerDomeMesh->SetMaterial(i, PowerDomeOriginalMaterials[i]);
+			}
+		}
 	}
 
 	if (PowerDomeLight)
 	{
 		PowerDomeLight->SetIntensity(PowerDomeLightIntensity);
-		PowerDomeLight->SetVisibility(bLightOn);
+		PowerDomeLight->SetLightColor(bShowGreen ? FColor(20, 255, 50) : FColor(255, 130, 15));
+		PowerDomeLight->SetVisibility(bPoweredActive);
 	}
 }
 
 FLinearColor ARedPowerCylinder::GetColorForID(int32 InID) const
 {
-	// vibrant saturated color palette matching the blockout art in the arena
-	switch (InID)
-	{
-		case 1001: return FLinearColor(1.00f, 0.10f, 0.12f); // vibrant cherry red
-		case 1002: return FLinearColor(0.08f, 0.95f, 0.18f); // vibrant electric emerald green
-		case 1003: return FLinearColor(0.08f, 0.45f, 1.00f); // vibrant cobalt electric blue
-		case 1004: return FLinearColor(1.00f, 0.82f, 0.02f); // vibrant hazard caution yellow (matches arena turrets)
-		case 1005: return FLinearColor(1.00f, 0.42f, 0.02f); // vibrant safety neon orange
-		case 1006: return FLinearColor(0.78f, 0.10f, 1.00f); // vibrant neon electric violet
-		case 1007: return FLinearColor(0.02f, 0.92f, 0.98f); // vibrant bright laser cyan
-		case 1008: return FLinearColor(1.00f, 0.10f, 0.65f); // vibrant hot neon magenta
-		default:
-		{
-			// high saturation and high brightness for any custom 4-digit ID
-			const uint8 HueByte = (uint8)(FMath::Abs(InID * 53) % 256);
-			return FLinearColor::MakeFromHSV8(HueByte, 240, 255);
-		}
-	}
+	return LiveWireUtils::GetColorForID(InID);
 }
 
 void ARedPowerCylinder::ApplyColorFromID()
 {
-	// We do NOT color or override static meshes in C++!
-	// Any materials assigned by the student in the Blueprint (BP_RedPowerCylinder) or on the mesh components
-	// are preserved exactly as they are without being overwritten or tinted by C++.
 }
 
 bool ARedPowerCylinder::CheckActorTargetIDMatch(AActor* ActorToCheck, int32& OutFoundID) const
 {
-	if (!ActorToCheck) return false;
+	if (!ActorToCheck)
+	{
+		return false;
+	}
 
-	// 1. Direct LaserTarget check
 	if (ALaserTarget* LaserTarget = Cast<ALaserTarget>(ActorToCheck))
 	{
 		OutFoundID = LaserTarget->TargetID;
-		return (LaserTarget->TargetID == CellID);
+		return OutFoundID == CellID;
 	}
 
-	// 2. Direct TransformerBushing check
 	if (ATransformerBushing* Bushing = Cast<ATransformerBushing>(ActorToCheck))
 	{
 		OutFoundID = Bushing->BushingID;
-		return (Bushing->BushingID == CellID);
+		return OutFoundID == CellID;
 	}
 
-	// 2. Direct other RedPowerCylinder check
 	if (ARedPowerCylinder* OtherCyl = Cast<ARedPowerCylinder>(ActorToCheck))
 	{
 		if (OtherCyl != this)
 		{
 			OutFoundID = OtherCyl->CellID;
-			return (OtherCyl->CellID == CellID);
+			return OutFoundID == CellID;
 		}
 	}
 
-	// 3. Check attached parent actor (in case a child mesh component was hit)
 	if (AActor* ParentActor = ActorToCheck->GetAttachParentActor())
 	{
-		if (ParentActor != ActorToCheck)
+		if (ParentActor != ActorToCheck && CheckActorTargetIDMatch(ParentActor, OutFoundID))
 		{
-			if (CheckActorTargetIDMatch(ParentActor, OutFoundID))
-			{
-				return true;
-			}
+			return true;
 		}
 	}
 
-	// 4. Generic reflection: check for integer property named "TargetID" or "CellID"
-	if (FIntProperty* TargetIdProp = CastField<FIntProperty>(ActorToCheck->GetClass()->FindPropertyByName(TEXT("TargetID"))))
+	for (const TCHAR* PropName : { TEXT("TargetID"), TEXT("CellID") })
 	{
-		OutFoundID = TargetIdProp->GetPropertyValue_InContainer(ActorToCheck);
-		return (OutFoundID == CellID);
-	}
-	if (FIntProperty* CellIdProp = CastField<FIntProperty>(ActorToCheck->GetClass()->FindPropertyByName(TEXT("CellID"))))
-	{
-		OutFoundID = CellIdProp->GetPropertyValue_InContainer(ActorToCheck);
-		return (OutFoundID == CellID);
+		if (FIntProperty* IntProp = CastField<FIntProperty>(ActorToCheck->GetClass()->FindPropertyByName(PropName)))
+		{
+			OutFoundID = IntProp->GetPropertyValue_InContainer(ActorToCheck);
+			return OutFoundID == CellID;
+		}
 	}
 
 	return false;
@@ -302,13 +265,157 @@ void ARedPowerCylinder::RotateGun(float AngleDegrees)
 	UpdateLaserBeam();
 }
 
+void ARedPowerCylinder::ClearDetectedTargets()
+{
+	bIsTargetDetected = false;
+	DetectedTarget = nullptr;
+	bHasPrintedNoTarget = false;
+	bHasPrintedTargetDetected = false;
+
+	if (LastHitLaserTarget)
+	{
+		LastHitLaserTarget->SetLaserHit(false, this);
+		LastHitLaserTarget = nullptr;
+	}
+	if (LastHitBushing)
+	{
+		LastHitBushing->SetLaserHit(false, this);
+		LastHitBushing = nullptr;
+	}
+}
+
+AActor* ARedPowerCylinder::TraceLaserBeam(float& OutDistance, bool& bOutHitObstacle) const
+{
+	OutDistance = LaserLength;
+	bOutHitObstacle = false;
+
+	UWorld* World = GetWorld();
+	if (!World || !LaserEmitter)
+	{
+		return nullptr;
+	}
+
+	const FVector Start = LaserEmitter->GetComponentLocation();
+	const FVector Forward = LaserEmitter->GetForwardVector();
+	const FVector DesiredEnd = Start + Forward * LaserLength;
+
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+	if (InsertedBattery)
+	{
+		Params.AddIgnoredActor(InsertedBattery);
+	}
+
+	FHitResult Hit;
+	AActor* HitActor = nullptr;
+	if (World->LineTraceSingleByChannel(Hit, Start, DesiredEnd, ECC_Visibility, Params))
+	{
+		HitActor = Hit.GetActor();
+		if (bLaserStopsAtObstacles)
+		{
+			OutDistance = FMath::Max(15.0f, Hit.Distance);
+			bOutHitObstacle = true;
+		}
+	}
+
+	if (!World->IsGameWorld() && bPreviewLaserInEditor)
+	{
+		const FVector EndPoint = Start + Forward * OutDistance;
+		const FColor BeamColor = GetColorForID(CellID).ToFColor(true);
+		DrawDebugLine(World, Start, EndPoint, BeamColor, false, 0.0f, 0, FMath::Max(2.0f, LaserThickness * 0.5f));
+		if (bOutHitObstacle)
+		{
+			DrawDebugSphere(World, EndPoint, FMath::Max(6.0f, LaserThickness * 0.75f), 8, BeamColor, false, 0.0f);
+		}
+	}
+
+	return HitActor;
+}
+
+void ARedPowerCylinder::ApplyLaserBurnToPlayer(AActor* HitActor)
+{
+	AGAME3023_F26_RoshanCharacter* HitPlayer = LiveWireUtils::ResolveActorOrParent<AGAME3023_F26_RoshanCharacter>(HitActor);
+	if (!HitPlayer || HitPlayer->IsDead() || !GetWorld())
+	{
+		PlayerLaserDamageTimer = 0.35f;
+		return;
+	}
+
+	PlayerLaserDamageTimer += GetWorld()->GetDeltaSeconds();
+	if (PlayerLaserDamageTimer >= 0.35f)
+	{
+		PlayerLaserDamageTimer = 0.0f;
+		HitPlayer->ApplyDamageToPlayer(10.0f, this);
+	}
+}
+
+void ARedPowerCylinder::UpdateDetectedTargets(AActor* HitActor)
+{
+	int32 FoundTargetID = -1;
+	const bool bHitMatchingTarget = CheckActorTargetIDMatch(HitActor, FoundTargetID);
+	bIsTargetDetected = bHitMatchingTarget;
+	DetectedTarget = bHitMatchingTarget ? HitActor : nullptr;
+
+	ALaserTarget* CurrentHitLaserTarget = LiveWireUtils::ResolveActorOrParent<ALaserTarget>(HitActor);
+	ATransformerBushing* CurrentHitBushing = LiveWireUtils::ResolveActorOrParent<ATransformerBushing>(HitActor);
+
+	if (LastHitLaserTarget && LastHitLaserTarget != CurrentHitLaserTarget)
+	{
+		LastHitLaserTarget->SetLaserHit(false, this);
+		LastHitLaserTarget = nullptr;
+	}
+	if (LastHitBushing && LastHitBushing != CurrentHitBushing)
+	{
+		LastHitBushing->SetLaserHit(false, this);
+		LastHitBushing = nullptr;
+	}
+
+	if (bHitMatchingTarget)
+	{
+		if (CurrentHitLaserTarget)
+		{
+			CurrentHitLaserTarget->SetLaserHit(true, this);
+			LastHitLaserTarget = CurrentHitLaserTarget;
+		}
+		if (CurrentHitBushing)
+		{
+			CurrentHitBushing->SetLaserHit(true, this);
+			LastHitBushing = CurrentHitBushing;
+		}
+
+		bHasPrintedNoTarget = false;
+		if (!bHasPrintedTargetDetected)
+		{
+			bHasPrintedTargetDetected = true;
+			const FString TargetName = HitActor ? HitActor->GetActorNameOrLabel() : TEXT("Target");
+			UKismetSystemLibrary::PrintString(this,
+				FString::Printf(TEXT("[TARGET MATCH: %d] Laser hit matching target object: %s"), CellID, *TargetName),
+				true, true, FLinearColor(0.1f, 1.0f, 0.2f), 3.0f);
+		}
+	}
+	else
+	{
+		bHasPrintedTargetDetected = false;
+		if (!bHasPrintedNoTarget)
+		{
+			bHasPrintedNoTarget = true;
+			UKismetSystemLibrary::PrintString(this,
+				FString::Printf(TEXT("[LASER EMITTING] Laser beam emitted (ID: %d) - No matching target detected"), CellID),
+				true, true, FLinearColor(1.0f, 0.85f, 0.1f), 2.5f);
+		}
+	}
+}
+
 void ARedPowerCylinder::UpdateLaserBeam()
 {
-	if (!LaserEmitter) return;
+	if (!LaserEmitter)
+	{
+		return;
+	}
 
-	// laser only turns on once matching battery is attached and powers on the gun!
-	// (or when previewing in editor details panel)
-	const bool bShouldBeActive = (bIsPowered && bHasBattery) || (bPreviewLaserInEditor && GetWorld() && !GetWorld()->IsGameWorld());
+	const UWorld* World = GetWorld();
+	const bool bIsGame = World && World->IsGameWorld();
+	const bool bShouldBeActive = (bIsPowered && bHasBattery) || (bPreviewLaserInEditor && World && !bIsGame);
 
 	if (!bShouldBeActive)
 	{
@@ -316,69 +423,14 @@ void ARedPowerCylinder::UpdateLaserBeam()
 		{
 			LaserBeamMesh->SetVisibility(false);
 		}
-		bIsTargetDetected = false;
-		DetectedTarget = nullptr;
-		bHasPrintedNoTarget = false;
-		bHasPrintedTargetDetected = false;
-		if (LastHitLaserTarget)
-		{
-			LastHitLaserTarget->SetLaserHit(false, this);
-			LastHitLaserTarget = nullptr;
-		}
-		if (LastHitBushing)
-		{
-			LastHitBushing->SetLaserHit(false, this);
-			LastHitBushing = nullptr;
-		}
+		ClearDetectedTargets();
 		return;
 	}
 
-	const FVector Start = LaserEmitter->GetComponentLocation();
-	const FVector Forward = LaserEmitter->GetForwardVector();
-	const FVector DesiredEnd = Start + Forward * LaserLength;
-
 	float ActualDistance = LaserLength;
 	bool bHitObstacle = false;
-	AActor* HitActor = nullptr;
+	AActor* HitActor = TraceLaserBeam(ActualDistance, bHitObstacle);
 
-	// raycast forward so the laser beam detects obstacles and targets
-	if (GetWorld())
-	{
-		FHitResult Hit;
-		FCollisionQueryParams Params;
-		Params.AddIgnoredActor(this);
-		if (InsertedBattery)
-		{
-			Params.AddIgnoredActor(InsertedBattery);
-		}
-
-		// Line trace against Visibility channel (hits static geometry, props, and dynamic actors)
-		const bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Start, DesiredEnd, ECC_Visibility, Params);
-		if (bHit)
-		{
-			HitActor = Hit.GetActor();
-			if (bLaserStopsAtObstacles)
-			{
-				ActualDistance = FMath::Max(15.0f, Hit.Distance);
-				bHitObstacle = true;
-			}
-		}
-
-		// Draw debug laser preview in editor viewport when Preview Laser In Editor is checked
-		if (!GetWorld()->IsGameWorld() && bPreviewLaserInEditor)
-		{
-			const FVector EndPoint = Start + Forward * ActualDistance;
-			const FColor BeamColor = GetColorForID(CellID).ToFColor(true);
-			DrawDebugLine(GetWorld(), Start, EndPoint, BeamColor, false, 0.0f, 0, FMath::Max(2.0f, LaserThickness * 0.5f));
-			if (bHitObstacle)
-			{
-				DrawDebugSphere(GetWorld(), EndPoint, FMath::Max(6.0f, LaserThickness * 0.75f), 8, BeamColor, false, 0.0f);
-			}
-		}
-	}
-
-	// position laser beam: cube mesh center is at 0, so offset forward by half distance along X
-	// scale X by distance, scale Y and Z by laser thickness
 	if (LaserBeamMesh)
 	{
 		LaserBeamMesh->SetVisibility(true);
@@ -387,107 +439,10 @@ void ARedPowerCylinder::UpdateLaserBeam()
 		LaserBeamMesh->SetRelativeScale3D(FVector(ActualDistance / 100.0f, LaserThickness / 100.0f, LaserThickness / 100.0f));
 	}
 
-	// Target detection by matching Target ID during gameplay
-	if (GetWorld() && GetWorld()->IsGameWorld())
+	if (bIsGame)
 	{
-		// 1. Check if laser beam hits player character and deal laser burn damage
-		AGAME3023_F26_RoshanCharacter* HitPlayer = Cast<AGAME3023_F26_RoshanCharacter>(HitActor);
-		if (!HitPlayer && HitActor)
-		{
-			HitPlayer = Cast<AGAME3023_F26_RoshanCharacter>(HitActor->GetAttachParentActor());
-		}
-
-		if (HitPlayer && !HitPlayer->IsDead())
-		{
-			const float DeltaSec = GetWorld()->GetDeltaSeconds();
-			PlayerLaserDamageTimer += DeltaSec;
-			if (PlayerLaserDamageTimer >= 0.35f)
-			{
-				PlayerLaserDamageTimer = 0.0f;
-				HitPlayer->ApplyDamageToPlayer(10.0f, this);
-			}
-		}
-		else
-		{
-			PlayerLaserDamageTimer = 0.35f;
-		}
-
-		int32 FoundTargetID = -1;
-		const bool bHitMatchingTarget = CheckActorTargetIDMatch(HitActor, FoundTargetID);
-		bIsTargetDetected = bHitMatchingTarget;
-		DetectedTarget = bHitMatchingTarget ? HitActor : nullptr;
-
-		// Manage LaserTarget and TransformerBushing glow transitions
-		ALaserTarget* CurrentHitLaserTarget = Cast<ALaserTarget>(HitActor);
-		ATransformerBushing* CurrentHitBushing = Cast<ATransformerBushing>(HitActor);
-		if (HitActor)
-		{
-			if (!CurrentHitLaserTarget) CurrentHitLaserTarget = Cast<ALaserTarget>(HitActor->GetAttachParentActor());
-			if (!CurrentHitBushing) CurrentHitBushing = Cast<ATransformerBushing>(HitActor->GetAttachParentActor());
-		}
-
-		if (LastHitLaserTarget && LastHitLaserTarget != CurrentHitLaserTarget)
-		{
-			LastHitLaserTarget->SetLaserHit(false, this);
-			LastHitLaserTarget = nullptr;
-		}
-
-		if (LastHitBushing && LastHitBushing != CurrentHitBushing)
-		{
-			LastHitBushing->SetLaserHit(false, this);
-			LastHitBushing = nullptr;
-		}
-
-		if (bHitMatchingTarget)
-		{
-			if (CurrentHitLaserTarget)
-			{
-				CurrentHitLaserTarget->SetLaserHit(true, this);
-				LastHitLaserTarget = CurrentHitLaserTarget;
-			}
-			if (CurrentHitBushing)
-			{
-				CurrentHitBushing->SetLaserHit(true, this);
-				LastHitBushing = CurrentHitBushing;
-			}
-
-			// Reset the "no target" latch so it can print again if we lose target
-			bHasPrintedNoTarget = false;
-
-			// Print once upon detecting the matching target object (displayed for 3 seconds)
-			if (!bHasPrintedTargetDetected)
-			{
-				bHasPrintedTargetDetected = true;
-
-#if WITH_EDITOR
-				const FString TargetName = HitActor ? HitActor->GetActorLabel() : TEXT("Target");
-#else
-				const FString TargetName = HitActor ? HitActor->GetName() : TEXT("Target");
-#endif
-				const FString Msg = FString::Printf(TEXT("[TARGET MATCH: %d] Laser hit matching target object: %s"), CellID, *TargetName);
-
-				UKismetSystemLibrary::PrintString(this, Msg, true, true, FLinearColor(0.1f, 1.0f, 0.2f), 3.0f);
-
-				UE_LOG(LogGAME3023_F26_Roshan, Log, TEXT("[Live Wire] Laser Gun %s (ID: %d): Detected matching target '%s' with ID %d (printed for 3s)."), *GetName(), CellID, *TargetName, FoundTargetID);
-			}
-		}
-		else
-		{
-			// Reset the "target detected" latch so it can print again when matching target is acquired
-			bHasPrintedTargetDetected = false;
-
-			// Print once when emitting laser but not detecting a matching target
-			if (!bHasPrintedNoTarget)
-			{
-				bHasPrintedNoTarget = true;
-
-				const FString Msg = FString::Printf(TEXT("[LASER EMITTING] Laser beam emitted (ID: %d) - No matching target detected"), CellID);
-
-				UKismetSystemLibrary::PrintString(this, Msg, true, true, FLinearColor(1.0f, 0.85f, 0.1f), 2.5f);
-
-				UE_LOG(LogGAME3023_F26_Roshan, Log, TEXT("[Live Wire] Laser Gun %s (ID: %d): Laser emitted - no matching target detected (printed once)."), *GetName(), CellID);
-			}
-		}
+		ApplyLaserBurnToPlayer(HitActor);
+		UpdateDetectedTargets(HitActor);
 	}
 }
 
@@ -500,17 +455,16 @@ void ARedPowerCylinder::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// if battery is attached and powered, continuously update laser so it reacts if dynamic actors cross the beam
-	// or if previewing in editor viewport, draw the debug preview line each frame
-	const bool bIsGame = GetWorld() && GetWorld()->IsGameWorld();
-	const bool bIsEditorPreview = bPreviewLaserInEditor && GetWorld() && !bIsGame;
+	const UWorld* World = GetWorld();
+	const bool bIsGame = World && World->IsGameWorld();
+	const bool bIsEditorPreview = bPreviewLaserInEditor && World && !bIsGame;
+
 	if ((bIsPowered && bHasBattery) || bIsEditorPreview)
 	{
 		UpdateLaserBeam();
 	}
 
-	// Blink powerDome green light on and off while a battery is attached
-	if (bIsGame && bHasBattery)
+	if (bIsGame && bIsPowered && bHasBattery)
 	{
 		PowerDomeBlinkTimer += DeltaTime;
 		if (PowerDomeBlinkTimer >= FMath::Max(0.05f, PowerDomeBlinkInterval))
@@ -532,48 +486,34 @@ bool ARedPowerCylinder::CanPlayerInteract(const AActor* InPlayerActor) const
 	const FVector PlayerLoc = InPlayerActor->GetActorLocation();
 	const FVector CylinderLoc = GetActorLocation();
 
-	// 1. Elevation check:
-	// In Unreal, player capsule center is ~90-100 units above player feet.
-	// Cylinder base origin (Z=0 relative) sits on top of the platform/ledge.
-	// If player is on the platform, PlayerLoc.Z >= CylinderLoc.Z + 50.0f.
-	// If player is on the lower floor/path beneath the platform, PlayerLoc.Z will be below (CylinderLoc.Z + 20.0f).
-	if (PlayerLoc.Z < (CylinderLoc.Z + 20.0f))
+	if (PlayerLoc.Z < (CylinderLoc.Z + 20.0f) || PlayerLoc.Z > (CylinderLoc.Z + 400.0f))
 	{
 		return false;
 	}
 
-	// Player shouldn't be way above the cylinder either
-	if (PlayerLoc.Z > (CylinderLoc.Z + 400.0f))
+	if (FVector::DistSquared2D(PlayerLoc, CylinderLoc) > FMath::Square(280.0f))
 	{
 		return false;
 	}
 
-	// 2. 2D Horizontal distance check: player must be next to the cylinder
-	const float Dist2DSq = FVector::DistSquared2D(PlayerLoc, CylinderLoc);
-	if (Dist2DSq > FMath::Square(280.0f))
-	{
-		return false;
-	}
-
-	// 3. Line of sight check:
-	// Verify that the platform floor or walls do not block the path between the player and cylinder gun
 	UWorld* World = GetWorld();
-	if (World)
+	if (!World)
 	{
-		FHitResult HitResult;
-		FCollisionQueryParams QueryParams;
-		QueryParams.AddIgnoredActor(this);
-		QueryParams.AddIgnoredActor(InPlayerActor);
+		return true;
+	}
 
-		const FVector EyeLoc = PlayerLoc + FVector(0.0f, 0.0f, 40.0f);
-		const FVector CylinderTargetLoc = CylinderLoc + FVector(0.0f, 0.0f, 286.0f);
+	FHitResult HitResult;
+	FCollisionQueryParams QueryParams;
+	QueryParams.AddIgnoredActor(this);
+	QueryParams.AddIgnoredActor(InPlayerActor);
 
-		if (World->LineTraceSingleByChannel(HitResult, EyeLoc, CylinderTargetLoc, ECC_Visibility, QueryParams))
+	const FVector EyeLoc = PlayerLoc + FVector(0.0f, 0.0f, 40.0f);
+	const FVector CylinderTargetLoc = CylinderLoc + FVector(0.0f, 0.0f, 286.0f);
+	if (World->LineTraceSingleByChannel(HitResult, EyeLoc, CylinderTargetLoc, ECC_Visibility, QueryParams))
+	{
+		if (HitResult.bBlockingHit && HitResult.GetActor() && HitResult.GetActor() != this && HitResult.GetActor() != InPlayerActor)
 		{
-			if (HitResult.bBlockingHit && HitResult.GetActor() && HitResult.GetActor() != this && HitResult.GetActor() != InPlayerActor)
-			{
-				return false;
-			}
+			return false;
 		}
 	}
 
@@ -582,48 +522,28 @@ bool ARedPowerCylinder::CanPlayerInteract(const AActor* InPlayerActor) const
 
 void ARedPowerCylinder::OnInteractionBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if (AGAME3023_F26_RoshanCharacter* Player = Cast<AGAME3023_F26_RoshanCharacter>(OtherActor))
+	AGAME3023_F26_RoshanCharacter* Player = Cast<AGAME3023_F26_RoshanCharacter>(OtherActor);
+	if (!Player || !CanPlayerInteract(Player))
 	{
-		if (!CanPlayerInteract(Player))
-		{
-			return;
-		}
+		return;
+	}
 
-		Player->SetCurrentInteractable(this);
+	Player->SetCurrentInteractable(this);
 
-		if (GEngine)
-		{
-			if (bHasBattery)
-			{
-				GEngine->AddOnScreenDebugMessage(
-					2001,
-					2.5f,
-					FColor::Cyan,
-					FString::Printf(TEXT("[Laser Gun] Press [Square] to Remove Battery (ID: %d)"), CellID)
-				);
-			}
-			else
-			{
-				if (Player->HasBattery())
-				{
-					GEngine->AddOnScreenDebugMessage(
-						2001,
-						2.5f,
-						FColor::Green,
-						FString::Printf(TEXT("[Laser Gun] Press [Square] to Attach Battery into Laser Gun (ID: %d)"), CellID)
-					);
-				}
-				else
-				{
-					GEngine->AddOnScreenDebugMessage(
-						2001,
-						2.5f,
-						FColor::Orange,
-						FString::Printf(TEXT("[Laser Gun] Laser Gun (ID: %d): OFFLINE (Requires Matching Battery)"), CellID)
-					);
-				}
-			}
-		}
+	if (bHasBattery)
+	{
+		LiveWireUtils::ShowScreenMessage(2001, 2.5f, FColor::Cyan,
+			FString::Printf(TEXT("[Laser Gun] Press [Square] to Remove Battery (ID: %d)"), CellID));
+	}
+	else if (Player->HasBattery())
+	{
+		LiveWireUtils::ShowScreenMessage(2001, 2.5f, FColor::Green,
+			FString::Printf(TEXT("[Laser Gun] Press [Square] to Attach Battery into Laser Gun (ID: %d)"), CellID));
+	}
+	else
+	{
+		LiveWireUtils::ShowScreenMessage(2001, 2.5f, FColor::Orange,
+			FString::Printf(TEXT("[Laser Gun] Laser Gun (ID: %d): OFFLINE (Requires Matching Battery)"), CellID));
 	}
 }
 
@@ -640,113 +560,57 @@ void ARedPowerCylinder::OnInteractionEndOverlap(UPrimitiveComponent* OverlappedC
 
 bool ARedPowerCylinder::Interact(AGAME3023_F26_RoshanCharacter* Player)
 {
-	if (!Player || !CanPlayerInteract(Player)) return false;
+	if (!Player || !CanPlayerInteract(Player))
+	{
+		return false;
+	}
 
-	// 1. remove battery if already plugged in
 	if (bHasBattery)
 	{
 		if (Player->HasBattery())
 		{
-			if (GEngine)
-			{
-				GEngine->AddOnScreenDebugMessage(
-					-1,
-					3.5f,
-					FColor::Red,
-					TEXT("[INVENTORY FULL] Hands full! Press [R] / [Circle] to drop your current battery first."),
-					true,
-					FVector2D(1.3f, 1.3f)
-				);
-			}
+			LiveWireUtils::ShowScreenMessage(-1, 3.5f, FColor::Red,
+				TEXT("[INVENTORY FULL] Hands full! Press [R] / [Circle] to drop your current battery first."), 1.3f);
 			return false;
 		}
 
-		ABatteryCapsule* Extracted = RemoveBattery();
-		if (Extracted)
+		if (ABatteryCapsule* Extracted = RemoveBattery())
 		{
 			Player->TryPickupBattery(Extracted);
-
-			if (GEngine)
-			{
-				GEngine->AddOnScreenDebugMessage(
-					-1,
-					4.0f,
-					FColor::Yellow,
-					FString::Printf(TEXT("[BATTERY REMOVED] Battery removed! Laser Gun (ID: %d) is now OFFLINE."), CellID),
-					true,
-					FVector2D(1.3f, 1.3f)
-				);
-			}
-
-			UE_LOG(LogGAME3023_F26_Roshan, Log, TEXT("[Live Wire] Laser Gun %s (ID: %d): Battery removed. Laser OFF."), *GetName(), CellID);
+			LiveWireUtils::ShowScreenMessage(-1, 4.0f, FColor::Yellow,
+				FString::Printf(TEXT("[BATTERY REMOVED] Battery removed! Laser Gun (ID: %d) is now OFFLINE."), CellID), 1.3f);
 			return true;
 		}
 		return false;
 	}
 
-	// 2. insert battery into empty laser gun
-	if (Player->HasBattery())
+	if (!Player->HasBattery())
 	{
-		ABatteryCapsule* BatteryToSocket = Player->TakeCarriedBattery();
-		const bool bMatched = InsertBattery(BatteryToSocket);
-
-		if (bMatched)
-		{
-			Player->TriggerControllerRumble(1.0f, 0.35f, true, true);
-		}
-		else
-		{
-			Player->TriggerControllerRumble(0.6f, 0.15f, true, false);
-		}
-
-		return bMatched;
-	}
-	else
-	{
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(
-				-1,
-				3.5f,
-				FColor::Red,
-				FString::Printf(TEXT("[POWER OFFLINE] Laser Gun (ID: %d) needs a matching Battery!"), CellID),
-				true,
-				FVector2D(1.3f, 1.3f)
-			);
-		}
-
-		UE_LOG(LogGAME3023_F26_Roshan, Warning, TEXT("[Live Wire] Laser Gun %s (ID: %d): Interacted without a battery."), *GetName(), CellID);
+		LiveWireUtils::ShowScreenMessage(-1, 3.5f, FColor::Red,
+			FString::Printf(TEXT("[POWER OFFLINE] Laser Gun (ID: %d) needs a matching Battery!"), CellID), 1.3f);
 		return false;
 	}
+
+	const bool bMatched = InsertBattery(Player->TakeCarriedBattery());
+	Player->TriggerControllerRumble(bMatched ? 1.0f : 0.6f, bMatched ? 0.35f : 0.15f, true, bMatched);
+	return bMatched;
 }
 
 ABatteryCapsule* ARedPowerCylinder::RemoveBattery()
 {
-	if (!bHasBattery || !InsertedBattery) return nullptr;
+	if (!bHasBattery || !InsertedBattery)
+	{
+		return nullptr;
+	}
 
 	ABatteryCapsule* Extracted = InsertedBattery;
-
 	InsertedBattery = nullptr;
 	bHasBattery = false;
 	bIsPowered = false;
-	bIsTargetDetected = false;
-	DetectedTarget = nullptr;
-	bHasPrintedNoTarget = false;
-	bHasPrintedTargetDetected = false;
 
-	if (LastHitLaserTarget)
-	{
-		LastHitLaserTarget->SetLaserHit(false, this);
-		LastHitLaserTarget = nullptr;
-	}
-	if (LastHitBushing)
-	{
-		LastHitBushing->SetLaserHit(false, this);
-		LastHitBushing = nullptr;
-	}
-
+	ClearDetectedTargets();
 	UpdateVisualState();
-	UpdateLaserBeam(); // turns off laser!
+	UpdateLaserBeam();
 
 	PowerDomeBlinkTimer = 0.0f;
 	bPowerDomeLightOn = false;
@@ -757,70 +621,43 @@ ABatteryCapsule* ARedPowerCylinder::RemoveBattery()
 
 bool ARedPowerCylinder::InsertBattery(ABatteryCapsule* Battery)
 {
-	if (!Battery) return false;
+	if (!Battery)
+	{
+		return false;
+	}
 
 	InsertedBattery = Battery;
 	bHasBattery = true;
-
-	// attach battery to socket on top of the laser gun
 	Battery->OnSocketed(this, BatterySocket);
 
-	// start blinking powerDome green light on and off immediately
-	PowerDomeBlinkTimer = 0.0f;
-	bPowerDomeLightOn = true;
-	ApplyPowerDomeLightState(true);
+	const bool bMatched = (Battery->BatteryID == CellID);
+	bIsPowered = bMatched;
+	bHasPrintedNoTarget = false;
+	bHasPrintedTargetDetected = false;
+	bIsTargetDetected = false;
 
-	// 4-digit ID match check: battery id must equal cell id to power on!
-	if (Battery->BatteryID == CellID)
+	UpdateVisualState();
+	UpdateLaserBeam();
+
+	if (bMatched)
 	{
-		bIsPowered = true;
-		bHasPrintedNoTarget = false;
-		bHasPrintedTargetDetected = false;
-		bIsTargetDetected = false;
-		UpdateVisualState(); // glows gun receiver and barrel
-		UpdateLaserBeam();   // fires the laser beam out of the nozzle!
+		PowerDomeBlinkTimer = 0.0f;
+		bPowerDomeLightOn = true;
+		ApplyPowerDomeLightState(true);
 
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(
-				-1,
-				4.5f,
-				FColor::Green,
-				FString::Printf(TEXT("[ID MATCH: %d] Battery attached & Laser Gun ONLINE! Laser beam active!"), CellID),
-				true,
-				FVector2D(1.4f, 1.4f)
-			);
-		}
-
-		UE_LOG(LogGAME3023_F26_Roshan, Log, TEXT("[Live Wire] Laser Gun %s: ID MATCH (%d == %d). Laser fired!"), *GetName(), CellID, Battery->BatteryID);
-		return true;
+		LiveWireUtils::ShowScreenMessage(-1, 4.5f, FColor::Green,
+			FString::Printf(TEXT("[ID MATCH: %d] Battery attached & Laser Gun ONLINE! Laser beam active!"), CellID), 1.4f);
 	}
 	else
 	{
-		// wrong ID: attaches, but stays unpowered and laser stays off
-		bIsPowered = false;
-		UpdateVisualState();
-		UpdateLaserBeam();
-
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(
-				-1,
-				5.0f,
-				FColor::Orange,
-				FString::Printf(TEXT("[ID MISMATCH] Battery (ID: %d) attached, but Laser Gun (ID: %d) WON'T POWER ON!"), Battery->BatteryID, CellID),
-				true,
-				FVector2D(1.4f, 1.4f)
-			);
-		}
-
-		UE_LOG(LogGAME3023_F26_Roshan, Warning, TEXT("[Live Wire] Laser Gun %s: ID MISMATCH (Battery ID: %d != Cell ID: %d). Attached but laser OFF!"), *GetName(), Battery->BatteryID, CellID);
-		return false;
+		LiveWireUtils::ShowScreenMessage(-1, 5.0f, FColor::Orange,
+			FString::Printf(TEXT("[ID MISMATCH] Battery (ID: %d) attached, but Laser Gun (ID: %d) WON'T POWER ON!"), Battery->BatteryID, CellID), 1.4f);
 	}
+
+	return bMatched;
 }
 
 void ARedPowerCylinder::UpdateVisualState()
 {
-	// Materials are set in Blueprint, not overwritten in C++
 	ApplyColorFromID();
 }

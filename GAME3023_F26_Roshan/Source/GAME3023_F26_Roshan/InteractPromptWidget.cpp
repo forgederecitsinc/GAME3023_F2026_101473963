@@ -1,12 +1,3 @@
-// =============================================================================
-// Student: Roshan - 101473963
-// Course: GAME3023 - Game Engines 3
-// File: InteractPromptWidget.cpp
-// Description: Implementation of the Interaction Prompt Widget.
-// Renders a PlayStation [Square] badge with a circular progress fill ring
-// and keyboard [E] hint. Smoothly fades in when in range of interactables!
-// =============================================================================
-
 #include "InteractPromptWidget.h"
 #include "Widgets/DeclarativeSyntaxSupport.h"
 #include "Widgets/SCompoundWidget.h"
@@ -80,233 +71,185 @@ public:
 		const FSlateResourceHandle ResourceHandle = WhiteBrush->GetRenderingResource();
 		const FSlateRenderTransform& RenderTransform = AllottedGeometry.GetAccumulatedRenderTransform();
 
-		// 1. Filled circular dark background disc
-		{
-			const int32 NumCircleSegments = 48;
-			TArray<FSlateVertex> Vertices;
-			TArray<SlateIndex> Indices;
-			Vertices.Reserve(NumCircleSegments + 1);
-			Indices.Reserve(NumCircleSegments * 3);
+		DrawBackgroundDisc(OutDrawElements, LayerId, ResourceHandle, RenderTransform, Center, OuterRadius, CombinedOpacity);
+		DrawProgressTrack(OutDrawElements, LayerId + 1, AllottedGeometry, Center, RingRadius, CombinedOpacity);
 
-			const FLinearColor DiscLinearColor = (HoldProgress > 0.001f)
-				? FLinearColor(0.10f, 0.13f, 0.20f, 0.94f * CombinedOpacity)
-				: FLinearColor(0.06f, 0.07f, 0.11f, 0.88f * CombinedOpacity);
-			const FColor DiscColor = DiscLinearColor.ToFColor(true);
-
-			// Center vertex (index 0)
-			Vertices.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(
-				RenderTransform,
-				FVector2f(Center),
-				FVector2f(0.5f, 0.5f),
-				DiscColor
-			));
-
-			for (int32 i = 0; i < NumCircleSegments; ++i)
-			{
-				const float Angle = (static_cast<float>(i) / static_cast<float>(NumCircleSegments)) * UE_TWO_PI;
-				const FVector2D Pos = Center + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * OuterRadius;
-				Vertices.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(
-					RenderTransform,
-					FVector2f(Pos),
-					FVector2f(0.5f, 0.5f),
-					DiscColor
-				));
-			}
-
-			for (int32 i = 0; i < NumCircleSegments; ++i)
-			{
-				const SlateIndex CurrentIdx = static_cast<SlateIndex>(i + 1);
-				const SlateIndex NextIdx = static_cast<SlateIndex>(((i + 1) % NumCircleSegments) + 1);
-				Indices.Add(0);
-				Indices.Add(CurrentIdx);
-				Indices.Add(NextIdx);
-			}
-
-			FSlateDrawElement::MakeCustomVerts(
-				OutDrawElements,
-				LayerId,
-				ResourceHandle,
-				Vertices,
-				Indices,
-				nullptr,
-				0,
-				0
-			);
-		}
-
-		// 2. Circular background track ring (360 degrees)
-		{
-			const int32 NumTrackSegments = 64;
-			TArray<FVector2f> TrackPoints;
-			TrackPoints.Reserve(NumTrackSegments + 1);
-
-			for (int32 i = 0; i <= NumTrackSegments; ++i)
-			{
-				const float Angle = -UE_HALF_PI + (static_cast<float>(i) / static_cast<float>(NumTrackSegments)) * UE_TWO_PI;
-				const FVector2D Pt = Center + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * RingRadius;
-				TrackPoints.Add(FVector2f(Pt));
-			}
-
-			const FLinearColor TrackColor(0.22f, 0.27f, 0.36f, 0.85f * CombinedOpacity);
-			FSlateDrawElement::MakeLines(
-				OutDrawElements,
-				LayerId + 1,
-				AllottedGeometry.ToPaintGeometry(),
-				MoveTemp(TrackPoints),
-				ESlateDrawEffect::None,
-				TrackColor,
-				true,
-				3.5f
-			);
-		}
-
-		// 3. Circular Progress Fill Arc (fills clockwise from top 12 o'clock over 0 to 5 seconds)
 		if (HoldProgress > 0.001f)
 		{
-			const int32 MaxArcSegments = 64;
-			const int32 ActiveSegments = FMath::Max(2, FMath::CeilToInt(HoldProgress * static_cast<float>(MaxArcSegments)));
-			const float TotalSweepAngle = HoldProgress * UE_TWO_PI;
-			const float StartAngle = -UE_HALF_PI; // 12 o'clock top
-
-			// Smooth color transition from electric cyan to bright neon green as it approaches 5 seconds
-			const FLinearColor ArcLinearColor = FMath::Lerp(
-				FLinearColor(0.0f, 0.88f, 1.0f, 1.0f * CombinedOpacity),
-				FLinearColor(0.15f, 1.0f, 0.45f, 1.0f * CombinedOpacity),
-				FMath::Pow(HoldProgress, 1.4f)
-			);
-			const FColor ArcColor = ArcLinearColor.ToFColor(true);
-
-			// 3a. Solid annulus band via MakeCustomVerts for zero-gap thick progress ring
-			const float InnerArcRadius = RingRadius - 2.3f;
-			const float OuterArcRadius = RingRadius + 2.3f;
-			TArray<FSlateVertex> ArcVertices;
-			TArray<SlateIndex> ArcIndices;
-			ArcVertices.Reserve((ActiveSegments + 1) * 2);
-			ArcIndices.Reserve(ActiveSegments * 6);
-
-			for (int32 i = 0; i <= ActiveSegments; ++i)
-			{
-				const float Alpha = static_cast<float>(i) / static_cast<float>(ActiveSegments);
-				const float Angle = StartAngle + Alpha * TotalSweepAngle;
-				const FVector2D Dir(FMath::Cos(Angle), FMath::Sin(Angle));
-
-				const FVector2D InnerPt = Center + Dir * InnerArcRadius;
-				const FVector2D OuterPt = Center + Dir * OuterArcRadius;
-
-				ArcVertices.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(
-					RenderTransform,
-					FVector2f(InnerPt),
-					FVector2f(0.5f, 0.5f),
-					ArcColor
-				));
-				ArcVertices.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(
-					RenderTransform,
-					FVector2f(OuterPt),
-					FVector2f(0.5f, 0.5f),
-					ArcColor
-				));
-			}
-
-			for (int32 i = 0; i < ActiveSegments; ++i)
-			{
-				const SlateIndex BaseIdx = static_cast<SlateIndex>(i * 2);
-				ArcIndices.Add(BaseIdx);
-				ArcIndices.Add(BaseIdx + 1);
-				ArcIndices.Add(BaseIdx + 2);
-
-				ArcIndices.Add(BaseIdx + 1);
-				ArcIndices.Add(BaseIdx + 3);
-				ArcIndices.Add(BaseIdx + 2);
-			}
-
-			FSlateDrawElement::MakeCustomVerts(
-				OutDrawElements,
-				LayerId + 2,
-				ResourceHandle,
-				ArcVertices,
-				ArcIndices,
-				nullptr,
-				0,
-				0
-			);
-
-			// 3b. Anti-aliased line pass along the progress arc for crisp edges
-			TArray<FVector2f> ArcLinePoints;
-			ArcLinePoints.Reserve(ActiveSegments + 1);
-			for (int32 i = 0; i <= ActiveSegments; ++i)
-			{
-				const float Alpha = static_cast<float>(i) / static_cast<float>(ActiveSegments);
-				const float Angle = StartAngle + Alpha * TotalSweepAngle;
-				const FVector2D Pt = Center + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * RingRadius;
-				ArcLinePoints.Add(FVector2f(Pt));
-			}
-
-			FSlateDrawElement::MakeLines(
-				OutDrawElements,
-				LayerId + 3,
-				AllottedGeometry.ToPaintGeometry(),
-				MoveTemp(ArcLinePoints),
-				ESlateDrawEffect::None,
-				ArcLinearColor,
-				true,
-				4.5f
-			);
+			DrawProgressArc(OutDrawElements, LayerId + 2, AllottedGeometry, ResourceHandle, RenderTransform, Center, RingRadius, CombinedOpacity);
 		}
 
-		// 4. PlayStation Square Button Logo in the exact center of the circle
-		{
-			const float SquareHalfSize = (HoldProgress > 0.001f) ? 7.2f : 8.0f;
-			const float SquareSize = SquareHalfSize * 2.0f;
-			const float WallThickness = 2.6f;
-			const FVector2D TopLeft = Center - FVector2D(SquareHalfSize, SquareHalfSize);
-
-			// Classic PlayStation Square Pink/Magenta
-			const FLinearColor SquareColor = (HoldProgress > 0.001f)
-				? FLinearColor(1.0f, 0.50f, 0.80f, 1.0f * CombinedOpacity)
-				: FLinearColor(1.0f, 0.32f, 0.65f, 1.0f * CombinedOpacity);
-
-			// Top bar
-			FSlateDrawElement::MakeBox(
-				OutDrawElements,
-				LayerId + 4,
-				AllottedGeometry.ToPaintGeometry(FVector2D(SquareSize, WallThickness), FSlateLayoutTransform(TopLeft)),
-				WhiteBrush,
-				ESlateDrawEffect::None,
-				SquareColor
-			);
-			// Bottom bar
-			FSlateDrawElement::MakeBox(
-				OutDrawElements,
-				LayerId + 4,
-				AllottedGeometry.ToPaintGeometry(FVector2D(SquareSize, WallThickness), FSlateLayoutTransform(TopLeft + FVector2D(0.0f, SquareSize - WallThickness))),
-				WhiteBrush,
-				ESlateDrawEffect::None,
-				SquareColor
-			);
-			// Left bar
-			FSlateDrawElement::MakeBox(
-				OutDrawElements,
-				LayerId + 4,
-				AllottedGeometry.ToPaintGeometry(FVector2D(WallThickness, SquareSize), FSlateLayoutTransform(TopLeft)),
-				WhiteBrush,
-				ESlateDrawEffect::None,
-				SquareColor
-			);
-			// Right bar
-			FSlateDrawElement::MakeBox(
-				OutDrawElements,
-				LayerId + 4,
-				AllottedGeometry.ToPaintGeometry(FVector2D(WallThickness, SquareSize), FSlateLayoutTransform(TopLeft + FVector2D(SquareSize - WallThickness, 0.0f))),
-				WhiteBrush,
-				ESlateDrawEffect::None,
-				SquareColor
-			);
-		}
+		DrawSquareIcon(OutDrawElements, LayerId + 4, AllottedGeometry, WhiteBrush, Center, CombinedOpacity);
 
 		return LayerId + 5;
 	}
 
 private:
+	void DrawBackgroundDisc(
+		FSlateWindowElementList& OutDrawElements,
+		int32 LayerId,
+		const FSlateResourceHandle& ResourceHandle,
+		const FSlateRenderTransform& RenderTransform,
+		const FVector2D& Center,
+		float OuterRadius,
+		float Opacity) const
+	{
+		const int32 NumSegments = 48;
+		TArray<FSlateVertex> Vertices;
+		TArray<SlateIndex> Indices;
+		Vertices.Reserve(NumSegments + 1);
+		Indices.Reserve(NumSegments * 3);
+
+		const FLinearColor DiscLinearColor = (HoldProgress > 0.001f)
+			? FLinearColor(0.10f, 0.13f, 0.20f, 0.94f * Opacity)
+			: FLinearColor(0.06f, 0.07f, 0.11f, 0.88f * Opacity);
+		const FColor DiscColor = DiscLinearColor.ToFColor(true);
+
+		Vertices.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(
+			RenderTransform, FVector2f(Center), FVector2f(0.5f, 0.5f), DiscColor));
+
+		for (int32 i = 0; i < NumSegments; ++i)
+		{
+			const float Angle = (static_cast<float>(i) / static_cast<float>(NumSegments)) * UE_TWO_PI;
+			const FVector2D Pos = Center + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * OuterRadius;
+			Vertices.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(
+				RenderTransform, FVector2f(Pos), FVector2f(0.5f, 0.5f), DiscColor));
+		}
+
+		for (int32 i = 0; i < NumSegments; ++i)
+		{
+			Indices.Add(0);
+			Indices.Add(static_cast<SlateIndex>(i + 1));
+			Indices.Add(static_cast<SlateIndex>(((i + 1) % NumSegments) + 1));
+		}
+
+		FSlateDrawElement::MakeCustomVerts(
+			OutDrawElements, LayerId, ResourceHandle, Vertices, Indices, nullptr, 0, 0);
+	}
+
+	void DrawProgressTrack(
+		FSlateWindowElementList& OutDrawElements,
+		int32 LayerId,
+		const FGeometry& AllottedGeometry,
+		const FVector2D& Center,
+		float RingRadius,
+		float Opacity) const
+	{
+		const int32 NumSegments = 64;
+		TArray<FVector2f> TrackPoints;
+		TrackPoints.Reserve(NumSegments + 1);
+
+		for (int32 i = 0; i <= NumSegments; ++i)
+		{
+			const float Angle = -UE_HALF_PI + (static_cast<float>(i) / static_cast<float>(NumSegments)) * UE_TWO_PI;
+			const FVector2D Pt = Center + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * RingRadius;
+			TrackPoints.Add(FVector2f(Pt));
+		}
+
+		const FLinearColor TrackColor(0.22f, 0.27f, 0.36f, 0.85f * Opacity);
+		FSlateDrawElement::MakeLines(
+			OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(),
+			MoveTemp(TrackPoints), ESlateDrawEffect::None, TrackColor, true, 3.5f);
+	}
+
+	void DrawProgressArc(
+		FSlateWindowElementList& OutDrawElements,
+		int32 BaseLayerId,
+		const FGeometry& AllottedGeometry,
+		const FSlateResourceHandle& ResourceHandle,
+		const FSlateRenderTransform& RenderTransform,
+		const FVector2D& Center,
+		float RingRadius,
+		float Opacity) const
+	{
+		const int32 MaxSegments = 64;
+		const int32 ActiveSegments = FMath::Max(2, FMath::CeilToInt(HoldProgress * static_cast<float>(MaxSegments)));
+		const float TotalSweep = HoldProgress * UE_TWO_PI;
+		const float StartAngle = -UE_HALF_PI;
+
+		const FLinearColor ArcLinearColor = FMath::Lerp(
+			FLinearColor(0.0f, 0.88f, 1.0f, Opacity),
+			FLinearColor(0.15f, 1.0f, 0.45f, Opacity),
+			FMath::Pow(HoldProgress, 1.4f));
+		const FColor ArcColor = ArcLinearColor.ToFColor(true);
+
+		const float InnerRadius = RingRadius - 2.3f;
+		const float OuterRadius = RingRadius + 2.3f;
+
+		TArray<FSlateVertex> ArcVertices;
+		TArray<SlateIndex> ArcIndices;
+		TArray<FVector2f> ArcLinePoints;
+		ArcVertices.Reserve((ActiveSegments + 1) * 2);
+		ArcIndices.Reserve(ActiveSegments * 6);
+		ArcLinePoints.Reserve(ActiveSegments + 1);
+
+		for (int32 i = 0; i <= ActiveSegments; ++i)
+		{
+			const float Alpha = static_cast<float>(i) / static_cast<float>(ActiveSegments);
+			const float Angle = StartAngle + Alpha * TotalSweep;
+			const FVector2D Dir(FMath::Cos(Angle), FMath::Sin(Angle));
+
+			ArcVertices.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(
+				RenderTransform, FVector2f(Center + Dir * InnerRadius), FVector2f(0.5f, 0.5f), ArcColor));
+			ArcVertices.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(
+				RenderTransform, FVector2f(Center + Dir * OuterRadius), FVector2f(0.5f, 0.5f), ArcColor));
+			ArcLinePoints.Add(FVector2f(Center + Dir * RingRadius));
+		}
+
+		for (int32 i = 0; i < ActiveSegments; ++i)
+		{
+			const SlateIndex BaseIdx = static_cast<SlateIndex>(i * 2);
+			ArcIndices.Add(BaseIdx);
+			ArcIndices.Add(BaseIdx + 1);
+			ArcIndices.Add(BaseIdx + 2);
+			ArcIndices.Add(BaseIdx + 1);
+			ArcIndices.Add(BaseIdx + 3);
+			ArcIndices.Add(BaseIdx + 2);
+		}
+
+		FSlateDrawElement::MakeCustomVerts(
+			OutDrawElements, BaseLayerId, ResourceHandle, ArcVertices, ArcIndices, nullptr, 0, 0);
+		FSlateDrawElement::MakeLines(
+			OutDrawElements, BaseLayerId + 1, AllottedGeometry.ToPaintGeometry(),
+			MoveTemp(ArcLinePoints), ESlateDrawEffect::None, ArcLinearColor, true, 4.5f);
+	}
+
+	void DrawSquareIcon(
+		FSlateWindowElementList& OutDrawElements,
+		int32 LayerId,
+		const FGeometry& AllottedGeometry,
+		const FSlateBrush* WhiteBrush,
+		const FVector2D& Center,
+		float Opacity) const
+	{
+		const float HalfSize = (HoldProgress > 0.001f) ? 7.2f : 8.0f;
+		const float Size = HalfSize * 2.0f;
+		const float Thickness = 2.6f;
+		const FVector2D TopLeft = Center - FVector2D(HalfSize, HalfSize);
+
+		const FLinearColor SquareColor = (HoldProgress > 0.001f)
+			? FLinearColor(1.0f, 0.50f, 0.80f, Opacity)
+			: FLinearColor(1.0f, 0.32f, 0.65f, Opacity);
+
+		const TPair<FVector2D, FVector2D> Bars[4] = {
+			{ TopLeft, FVector2D(Size, Thickness) },
+			{ TopLeft + FVector2D(0.0f, Size - Thickness), FVector2D(Size, Thickness) },
+			{ TopLeft, FVector2D(Thickness, Size) },
+			{ TopLeft + FVector2D(Size - Thickness, 0.0f), FVector2D(Thickness, Size) }
+		};
+
+		for (const auto& Bar : Bars)
+		{
+			FSlateDrawElement::MakeBox(
+				OutDrawElements,
+				LayerId,
+				AllottedGeometry.ToPaintGeometry(Bar.Value, FSlateLayoutTransform(Bar.Key)),
+				WhiteBrush,
+				ESlateDrawEffect::None,
+				SquareColor);
+		}
+	}
+
 	float BadgeSize = 54.0f;
 	float HoldProgress = 0.0f;
 };
@@ -337,34 +280,10 @@ void UInteractPromptWidget::NativeTick(const FGeometry& MyGeometry, float InDelt
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
-	// Smoothly interpolate alpha
 	CurrentAlpha = FMath::FInterpTo(CurrentAlpha, TargetAlpha, InDeltaTime, 14.0f);
 	SetRenderOpacity(CurrentAlpha);
 
-	if (bIsPromptVisible)
-	{
-		SetVisibility(ESlateVisibility::HitTestInvisible);
-
-		// If following target in screen space
-		if (!bAnchorToScreenBottom && TargetActor.IsValid())
-		{
-			if (APlayerController* PC = GetOwningPlayer())
-			{
-				const FVector WorldPos = TargetActor->GetActorLocation() + WorldSpaceOffset;
-				FVector2D ScreenPos;
-				if (PC->ProjectWorldLocationToScreen(WorldPos, ScreenPos, false))
-				{
-					// Center the prompt above the actor
-					SetRenderTranslation(ScreenPos - FVector2D(80.0f, 40.0f));
-				}
-			}
-		}
-		else
-		{
-			SetRenderTranslation(FVector2D::ZeroVector);
-		}
-	}
-	else
+	if (!bIsPromptVisible)
 	{
 		if (CurrentAlpha <= 0.01f)
 		{
@@ -372,6 +291,41 @@ void UInteractPromptWidget::NativeTick(const FGeometry& MyGeometry, float InDelt
 			SetRenderOpacity(0.0f);
 			SetVisibility(ESlateVisibility::Collapsed);
 		}
+		return;
+	}
+
+	SetVisibility(ESlateVisibility::HitTestInvisible);
+
+	if (bAnchorToScreenBottom || !TargetActor.IsValid())
+	{
+		SetRenderTranslation(FVector2D::ZeroVector);
+		return;
+	}
+
+	APlayerController* PC = GetOwningPlayer();
+	if (!PC)
+	{
+		return;
+	}
+
+	const FVector WorldPos = TargetActor->GetActorLocation() + WorldSpaceOffset;
+	FVector2D ScreenPos;
+	if (PC->ProjectWorldLocationToScreen(WorldPos, ScreenPos, false))
+	{
+		SetRenderTranslation(ScreenPos - FVector2D(80.0f, 40.0f));
+	}
+}
+
+void UInteractPromptWidget::UpdatePromptLabels()
+{
+	if (ActionTextBlock.IsValid())
+	{
+		ActionTextBlock->SetText(ActionText);
+	}
+	if (TargetTextBlock.IsValid())
+	{
+		TargetTextBlock->SetText(TargetNameText);
+		TargetTextBlock->SetVisibility(TargetNameText.IsEmpty() ? EVisibility::Collapsed : EVisibility::HitTestInvisible);
 	}
 }
 
@@ -386,16 +340,7 @@ void UInteractPromptWidget::ShowPrompt(AActor* InTargetActor, const FText& InAct
 
 	SetVisibility(ESlateVisibility::HitTestInvisible);
 	SetRenderOpacity(1.0f);
-
-	if (ActionTextBlock.IsValid())
-	{
-		ActionTextBlock->SetText(ActionText);
-	}
-	if (TargetTextBlock.IsValid())
-	{
-		TargetTextBlock->SetText(TargetNameText);
-		TargetTextBlock->SetVisibility(TargetNameText.IsEmpty() ? EVisibility::Collapsed : EVisibility::HitTestInvisible);
-	}
+	UpdatePromptLabels();
 
 	OnShowPrompt(InActionText, InTargetName);
 }
@@ -421,16 +366,7 @@ void UInteractPromptWidget::UpdatePromptText(const FText& InActionText, const FT
 {
 	ActionText = InActionText;
 	TargetNameText = InTargetName;
-
-	if (ActionTextBlock.IsValid())
-	{
-		ActionTextBlock->SetText(ActionText);
-	}
-	if (TargetTextBlock.IsValid())
-	{
-		TargetTextBlock->SetText(TargetNameText);
-		TargetTextBlock->SetVisibility(TargetNameText.IsEmpty() ? EVisibility::Collapsed : EVisibility::HitTestInvisible);
-	}
+	UpdatePromptLabels();
 }
 
 void UInteractPromptWidget::SetHoldProgress(float InProgress)
@@ -450,7 +386,6 @@ EVisibility UInteractPromptWidget::GetPromptSlateVisibility() const
 
 TSharedRef<SWidget> UInteractPromptWidget::RebuildWidget()
 {
-	// Only defer to Super if a Widget Blueprint tree with root content actually exists
 	if (WidgetTree && WidgetTree->RootWidget)
 	{
 		return Super::RebuildWidget();
@@ -467,10 +402,8 @@ TSharedRef<SWidget> UInteractPromptWidget::RebuildWidget()
 		[
 			SAssignNew(PromptContainerBox, SBox)
 			[
-				// Minimal Layout: Circular UI with Square Button Logo in the center + radial progress bar + text
 				SNew(SHorizontalBox)
 
-				// 1. Circular UI with PlayStation Square Button Logo in Center & 0-5s Circular Progress Ring
 				+ SHorizontalBox::Slot()
 				.AutoWidth()
 				.VAlign(VAlign_Center)
@@ -480,14 +413,12 @@ TSharedRef<SWidget> UInteractPromptWidget::RebuildWidget()
 					.Size(54.0f)
 				]
 
-				// 2. Text (Action + Target details with clean drop shadow)
 				+ SHorizontalBox::Slot()
 				.AutoWidth()
 				.VAlign(VAlign_Center)
 				[
 					SNew(SVerticalBox)
 
-					// Action Title: "Hold Square to Attach Battery" / "Press Square to Collect Battery"
 					+ SVerticalBox::Slot()
 					.AutoHeight()
 					.Padding(FMargin(0.0f, 0.0f, 0.0f, 1.0f))
@@ -500,14 +431,13 @@ TSharedRef<SWidget> UInteractPromptWidget::RebuildWidget()
 						.ShadowOffset(FVector2D(1.5f, 1.5f))
 					]
 
-					// Target Subtitle: "Laser Gun (ID: 1001)"
 					+ SVerticalBox::Slot()
 					.AutoHeight()
 					[
 						SAssignNew(TargetTextBlock, STextBlock)
 						.Text(TargetNameText)
 						.Font(TargetNameFont)
-						.ColorAndOpacity(FLinearColor(0.0f, 0.88f, 1.0f, 0.95f)) // Subtle electric cyan
+						.ColorAndOpacity(FLinearColor(0.0f, 0.88f, 1.0f, 0.95f))
 						.ShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 0.95f))
 						.ShadowOffset(FVector2D(1.5f, 1.5f))
 					]

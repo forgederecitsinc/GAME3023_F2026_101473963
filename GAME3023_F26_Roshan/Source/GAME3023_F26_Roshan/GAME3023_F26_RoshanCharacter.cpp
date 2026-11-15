@@ -1,17 +1,3 @@
-// =============================================================================
-// Student: Roshan - 101473963
-// Course: GAME3023 - Game Engines 3
-// File: GAME3023_F26_RoshanCharacter.cpp
-// Description: Implementation of the Main Player Character.
-// Handles:
-// 1. Cinematic 2.5D top-down camera framing.
-// 2. WASD movement & PS5 gamepad aiming/controls.
-// 3. Picking up, carrying, and dropping battery capsules.
-// 4. 5-second hold interaction to attach batteries into laser cylinders.
-// 5. Dynamic see-through cutout mask for roofs and catwalks.
-// 6. Player health HUD, taking damage, and respawning.
-// =============================================================================
-
 #include "GAME3023_F26_RoshanCharacter.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/DamageEvents.h"
@@ -52,22 +38,17 @@ DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
 AGAME3023_F26_RoshanCharacter::AGAME3023_F26_RoshanCharacter()
 {
-	// enable tick so we can poll dualsense analog sticks and twin-stick aiming smoothly
 	PrimaryActorTick.bCanEverTick = true;
 
-	// player capsule size
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 		
-	// dont rotate pawn with controller rotation
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 
-	// make character turn towards where they are walking
 	GetCharacterMovement()->bOrientRotationToMovement = true;
-	GetCharacterMovement()->RotationRate = FRotator(0.0f, 650.0f, 0.0f); // snappy rotation speed
+	GetCharacterMovement()->RotationRate = FRotator(0.0f, 650.0f, 0.0f);
 
-	// movement params (jumping disabled)
 	GetCharacterMovement()->JumpZVelocity = 0.f;
 	GetCharacterMovement()->AirControl = 0.0f;
 	GetCharacterMovement()->MaxWalkSpeed = 500.f;
@@ -75,42 +56,35 @@ AGAME3023_F26_RoshanCharacter::AGAME3023_F26_RoshanCharacter()
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
 
-	// hades style 2.5d top-down cinematic camera boom
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	// locking absolute rotation so the boom NEVER rotates when player turns
 	CameraBoom->SetUsingAbsoluteRotation(true);
 	CameraBoom->TargetArmLength = CameraDistance;
 	CameraBoom->SetRelativeRotation(FRotator(CameraPitch, CameraYaw, 0.0f));
-	CameraBoom->bUsePawnControlRotation = false; // do not spin with mouse or controller
+	CameraBoom->bUsePawnControlRotation = false;
 	CameraBoom->bInheritPitch = false;
 	CameraBoom->bInheritYaw = false;
 	CameraBoom->bInheritRoll = false;
-	// turning off collision test so the camera doesn't zoom in crazy when walking under catwalks
 	CameraBoom->bDoCollisionTest = bEnableCameraCollision;
 	CameraBoom->ProbeSize = 12.0f;
 	CameraBoom->SocketOffset = CameraSocketOffset;
 
-	// camera lag gives that smooth drone crane feel
 	CameraBoom->bEnableCameraLag = true;
 	CameraBoom->CameraLagSpeed = CameraLagSpeed;
 	CameraBoom->CameraLagMaxDistance = 600.0f;
 	CameraBoom->bEnableCameraRotationLag = false;
 
-	// follow camera with wide imax fov
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
 	FollowCamera->SetFieldOfView(CameraFOV);
 
-	// automatically assign the LiveWire substation background music track if available
 	static ConstructorHelpers::FObjectFinder<USoundBase> BGMFinder(TEXT("/Game/Sound/LiveWire_Substation_Theme.LiveWire_Substation_Theme"));
 	if (BGMFinder.Succeeded())
 	{
 		BackgroundMusicTrack = BGMFinder.Object;
 	}
 
-	// player health: starts with 100 HP
 	MaxHealth = 100.0f;
 	CurrentHealth = 100.0f;
 	bIsDead = false;
@@ -120,39 +94,32 @@ void AGAME3023_F26_RoshanCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// apply our camera settings again here so blueprint defaults don't overwrite them
 	ApplyCinematicCameraSettings();
 
-	// initialize smoothed cutout target position to player chest
 	SmoothedOcclusionTargetPos = GetActorLocation() + FVector(0.0f, 0.0f, 35.0f);
 
-	// enable custom depth on player mesh for silhouette rendering if needed
 	if (GetMesh())
 	{
 		GetMesh()->SetRenderCustomDepth(true);
 		GetMesh()->SetCustomDepthStencilValue(1);
 	}
 
-	// reset controller rotation to forward
 	if (AController* PC = GetController())
 	{
 		PC->SetControlRotation(FRotator(0.0f, CameraYaw, 0.0f));
 	}
 
-	// initialize interaction prompt and health HUD widgets for local player
 	if (IsLocallyControlled())
 	{
 		InitInteractionPromptWidget();
 		InitHealthHUDWidget();
 	}
 
-	// player starts with 100 health points when game starts
 	CurrentHealth = MaxHealth;
 	bIsDead = false;
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth, 0.0f);
 	UpdateHealthHUD();
 
-	// start playing LiveWire background music the moment the player starts playing
 	if (bAutoPlayBGM && IsLocallyControlled())
 	{
 		PlayBackgroundMusic();
@@ -183,24 +150,20 @@ void AGAME3023_F26_RoshanCharacter::PossessedBy(AController* NewController)
 
 void AGAME3023_F26_RoshanCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	// stop background music
 	StopBackgroundMusic();
 
-	// clean up interaction prompt widget
 	if (InteractionPromptWidget)
 	{
 		InteractionPromptWidget->RemoveFromParent();
 		InteractionPromptWidget = nullptr;
 	}
 
-	// clean up health HUD widget
 	if (HealthHUDWidget)
 	{
 		HealthHUDWidget->RemoveFromParent();
 		HealthHUDWidget = nullptr;
 	}
 
-	// put back original materials on any roof meshes before ending play
 	for (auto& Pair : ActiveOccludingMeshes)
 	{
 		if (UPrimitiveComponent* Comp = Pair.Key)
@@ -229,87 +192,82 @@ void AGAME3023_F26_RoshanCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// handle dualsense analog sticks and d-pad directly in c++ so it always works even without custom IMC assets
 	if (bEnableDualSenseController)
 	{
-		if (APlayerController* PC = Cast<APlayerController>(GetController()))
-		{
-			// 1. left analog stick + d-pad movement fallback (if enhanced input didn't already move us this frame)
-			if (!bMovedViaEnhancedInputThisFrame)
-			{
-				float StickX = PC->GetInputAnalogKeyState(EKeys::Gamepad_LeftX);
-				float StickY = PC->GetInputAnalogKeyState(EKeys::Gamepad_LeftY);
-
-				// also let the player walk around using the dualsense d-pad
-				if (PC->IsInputKeyDown(EKeys::Gamepad_DPad_Right)) StickX += 1.0f;
-				if (PC->IsInputKeyDown(EKeys::Gamepad_DPad_Left))  StickX -= 1.0f;
-				if (PC->IsInputKeyDown(EKeys::Gamepad_DPad_Up))    StickY += 1.0f;
-				if (PC->IsInputKeyDown(EKeys::Gamepad_DPad_Down))  StickY -= 1.0f;
-
-				FVector2D StickVec(StickX, StickY);
-				if (StickVec.Size() > ControllerStickDeadZone)
-				{
-					// clamp to 1.0 so diagonal d-pad or stick doesn't make us run faster
-					if (StickVec.SizeSquared() > 1.0f)
-					{
-						StickVec.Normalize();
-					}
-					DoMove(StickVec.X, StickVec.Y);
-				}
-			}
-
-			// 2. right analog stick twin-stick aiming so player can aim their character in 360 degrees
-			if (bEnableRightStickAiming)
-			{
-				const float RightX = PC->GetInputAnalogKeyState(EKeys::Gamepad_RightX);
-				const float RawRightY = PC->GetInputAnalogKeyState(EKeys::Gamepad_RightY);
-				const float RightY = bInvertRightStickAimY ? -RawRightY : RawRightY;
-				const FVector2D AimVec(RightX, RightY);
-
-				if (AimVec.Size() > ControllerStickDeadZone)
-				{
-					// convert right stick direction into world space relative to our fixed camera yaw
-					const FRotator CamYawRot(0.0f, CameraYaw, 0.0f);
-					const FVector AimWorldDir =
-						FRotationMatrix(CamYawRot).GetUnitAxis(EAxis::X) * AimVec.Y +
-						FRotationMatrix(CamYawRot).GetUnitAxis(EAxis::Y) * AimVec.X;
-
-					if (!AimWorldDir.IsNearlyZero())
-					{
-						// temporarily pause orient-to-movement while holding right stick so character faces aim direction
-						if (GetCharacterMovement())
-						{
-							GetCharacterMovement()->bOrientRotationToMovement = false;
-						}
-
-						const FRotator TargetRot = AimWorldDir.Rotation();
-						const FRotator NewRot = FMath::RInterpTo(GetActorRotation(), FRotator(0.0f, TargetRot.Yaw, 0.0f), DeltaTime, 15.0f);
-						SetActorRotation(NewRot);
-					}
-				}
-				else
-				{
-					// when right stick is let go, go back to facing where we walk
-					if (GetCharacterMovement() && !GetCharacterMovement()->bOrientRotationToMovement)
-					{
-						GetCharacterMovement()->bOrientRotationToMovement = true;
-					}
-				}
-			}
-		}
+		UpdateDualSenseControls(DeltaTime);
 	}
 
-	// update smooth circular see-through cutout on any roofs or catwalks hiding the player
 	UpdateCameraOcclusionCutout(DeltaTime);
 
-	// update on-screen interaction prompt widget if near an interactable item
 	if (bShowInteractionWidget && IsLocallyControlled())
 	{
 		UpdateInteractionPrompt(DeltaTime);
 	}
 
-	// reset flag at end of frame
 	bMovedViaEnhancedInputThisFrame = false;
+}
+
+void AGAME3023_F26_RoshanCharacter::UpdateDualSenseControls(float DeltaTime)
+{
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC)
+	{
+		return;
+	}
+
+	if (!bMovedViaEnhancedInputThisFrame)
+	{
+		float StickX = PC->GetInputAnalogKeyState(EKeys::Gamepad_LeftX);
+		float StickY = PC->GetInputAnalogKeyState(EKeys::Gamepad_LeftY);
+
+		if (PC->IsInputKeyDown(EKeys::Gamepad_DPad_Right)) StickX += 1.0f;
+		if (PC->IsInputKeyDown(EKeys::Gamepad_DPad_Left))  StickX -= 1.0f;
+		if (PC->IsInputKeyDown(EKeys::Gamepad_DPad_Up))    StickY += 1.0f;
+		if (PC->IsInputKeyDown(EKeys::Gamepad_DPad_Down))  StickY -= 1.0f;
+
+		FVector2D StickVec(StickX, StickY);
+		if (StickVec.Size() > ControllerStickDeadZone)
+		{
+			if (StickVec.SizeSquared() > 1.0f)
+			{
+				StickVec.Normalize();
+			}
+			DoMove(StickVec.X, StickVec.Y);
+		}
+	}
+
+	if (!bEnableRightStickAiming)
+	{
+		return;
+	}
+
+	const float RightX = PC->GetInputAnalogKeyState(EKeys::Gamepad_RightX);
+	const float RawRightY = PC->GetInputAnalogKeyState(EKeys::Gamepad_RightY);
+	const FVector2D AimVec(RightX, bInvertRightStickAimY ? -RawRightY : RawRightY);
+
+	if (AimVec.Size() <= ControllerStickDeadZone)
+	{
+		if (GetCharacterMovement() && !GetCharacterMovement()->bOrientRotationToMovement)
+		{
+			GetCharacterMovement()->bOrientRotationToMovement = true;
+		}
+		return;
+	}
+
+	const FRotator CamYawRot(0.0f, CameraYaw, 0.0f);
+	const FVector AimWorldDir =
+		FRotationMatrix(CamYawRot).GetUnitAxis(EAxis::X) * AimVec.Y +
+		FRotationMatrix(CamYawRot).GetUnitAxis(EAxis::Y) * AimVec.X;
+
+	if (!AimWorldDir.IsNearlyZero())
+	{
+		if (GetCharacterMovement())
+		{
+			GetCharacterMovement()->bOrientRotationToMovement = false;
+		}
+		const FRotator TargetRot(0.0f, AimWorldDir.Rotation().Yaw, 0.0f);
+		SetActorRotation(FMath::RInterpTo(GetActorRotation(), TargetRot, DeltaTime, 15.0f));
+	}
 }
 
 void AGAME3023_F26_RoshanCharacter::UpdateCameraOcclusionCutout(float DeltaTime)
@@ -321,18 +279,13 @@ void AGAME3023_F26_RoshanCharacter::UpdateCameraOcclusionCutout(float DeltaTime)
 
 	const FVector CameraLoc = FollowCamera->GetComponentLocation();
 	const FVector PlayerTargetLoc = GetActorLocation() + FVector(0.0f, 0.0f, 35.0f);
-
-	// smoothly glide the cutout lens center so it feels organic when moving fast
 	SmoothedOcclusionTargetPos = FMath::VInterpTo(SmoothedOcclusionTargetPos, PlayerTargetLoc, DeltaTime, 18.0f);
 
-	// mark all currently tracked meshes as not hit yet for this frame
 	for (auto& Pair : ActiveOccludingMeshes)
 	{
 		Pair.Value.bHitThisFrame = false;
 	}
 
-	// sweep a sphere along the sightline from the camera to the player's torso
-	// using SweepMultiByObjectType so if there are multiple overlapping roof pieces, we catch ALL of them
 	TArray<FHitResult> Hits;
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(CameraOcclusionCutout), false, this);
 	if (CarriedBattery)
@@ -347,7 +300,7 @@ void AGAME3023_F26_RoshanCharacter::UpdateCameraOcclusionCutout(float DeltaTime)
 	const FCollisionShape SweepSphere = FCollisionShape::MakeSphere(35.0f);
 	GetWorld()->SweepMultiByObjectType(Hits, CameraLoc, PlayerTargetLoc, FQuat::Identity, ObjectParams, SweepSphere, QueryParams);
 
-	const float PlayerFeetZ = GetActorLocation().Z - 20.0f;
+	const float MinTopZ = GetActorLocation().Z + 40.0f;
 
 	for (const FHitResult& Hit : Hits)
 	{
@@ -357,66 +310,63 @@ void AGAME3023_F26_RoshanCharacter::UpdateCameraOcclusionCutout(float DeltaTime)
 		{
 			continue;
 		}
-
-		// ignore gameplay pickups/cylinders so we don't accidentally mask batteries or power cells
 		if (HitActor->IsA(ABatteryCapsule::StaticClass()) || HitActor->IsA(ARedPowerCylinder::StaticClass()))
 		{
 			continue;
 		}
-
-		// skip the floor mesh that the player is standing on!
-		// only cut out meshes whose top surface is higher than the player's waist
-		const FBox CompBox = HitComp->Bounds.GetBox();
-		if (CompBox.Max.Z < (PlayerFeetZ + 60.0f))
+		if (HitComp->Bounds.GetBox().Max.Z < MinTopZ)
 		{
 			continue;
 		}
 
-		FOccludingMeshData* ExistingData = ActiveOccludingMeshes.Find(HitComp);
-		if (!ExistingData)
-		{
-			// first frame this roof/catwalk is hiding the player!
-			// save its original materials and swap in our circular cutout dynamic material instances
-			FOccludingMeshData NewData;
-			NewData.CurrentAlpha = 0.0f;
-			NewData.bHitThisFrame = true;
-
-			const int32 NumMats = HitComp->GetNumMaterials();
-			NewData.OriginalMaterials.Reserve(NumMats);
-			NewData.CutoutMIDs.Reserve(NumMats);
-
-				for (int32 MatIdx = 0; MatIdx < NumMats; ++MatIdx)
-				{
-					UMaterialInterface* OrigMat = HitComp->GetMaterial(MatIdx);
-					NewData.OriginalMaterials.Add(OrigMat);
-
-					// only swap materials that actually declare the authored cutout feature, so we
-					// never touch engine content or anything that would lose its original look
-					UMaterialInstanceDynamic* CutoutMID = nullptr;
-					float StrengthCheck = 0.0f;
-					if (OrigMat && OrigMat->GetScalarParameterValue(FMaterialParameterInfo(TEXT("OcclusionStrength")), StrengthCheck))
-					{
-						// a dynamic instance OF the original material keeps every colour, grid scale
-						// and texture override it already had, so the object keeps its exact look and
-						// only the circular patch above the player fades out
-						CutoutMID = UMaterialInstanceDynamic::Create(OrigMat, this);
-						if (CutoutMID)
-						{
-							HitComp->SetMaterial(MatIdx, CutoutMID);
-						}
-					}
-					NewData.CutoutMIDs.Add(CutoutMID);
-				}
-
-			ActiveOccludingMeshes.Add(HitComp, MoveTemp(NewData));
-		}
-		else
-		{
-			ExistingData->bHitThisFrame = true;
-		}
+		AcquireOccludingMesh(HitComp);
 	}
 
-	// now smoothly interpolate the cutout alpha (0 -> 1 when hidden, 1 -> 0 when visible again)
+	FadeOccludingMeshes(DeltaTime, CameraLoc);
+}
+
+void AGAME3023_F26_RoshanCharacter::AcquireOccludingMesh(UPrimitiveComponent* Comp)
+{
+	if (FOccludingMeshData* ExistingData = ActiveOccludingMeshes.Find(Comp))
+	{
+		ExistingData->bHitThisFrame = true;
+		return;
+	}
+
+	FOccludingMeshData NewData;
+	NewData.CurrentAlpha = 0.0f;
+	NewData.bHitThisFrame = true;
+
+	const int32 NumMats = Comp->GetNumMaterials();
+	NewData.OriginalMaterials.Reserve(NumMats);
+	NewData.CutoutMIDs.Reserve(NumMats);
+
+	for (int32 MatIdx = 0; MatIdx < NumMats; ++MatIdx)
+	{
+		UMaterialInterface* OrigMat = Comp->GetMaterial(MatIdx);
+		NewData.OriginalMaterials.Add(OrigMat);
+
+		UMaterialInstanceDynamic* CutoutMID = nullptr;
+		float StrengthCheck = 0.0f;
+		if (OrigMat && OrigMat->GetScalarParameterValue(FMaterialParameterInfo(TEXT("OcclusionStrength")), StrengthCheck))
+		{
+			CutoutMID = UMaterialInstanceDynamic::Create(OrigMat, this);
+			if (CutoutMID)
+			{
+				Comp->SetMaterial(MatIdx, CutoutMID);
+			}
+		}
+		NewData.CutoutMIDs.Add(CutoutMID);
+	}
+
+	ActiveOccludingMeshes.Add(Comp, MoveTemp(NewData));
+}
+
+void AGAME3023_F26_RoshanCharacter::FadeOccludingMeshes(float DeltaTime, const FVector& CameraLoc)
+{
+	const float SafeRadius = FMath::Max(OcclusionCutoutRadius, 20.0f);
+	const float SafeSoftness = FMath::Clamp(OcclusionEdgeSoftness, 10.0f, SafeRadius * 0.9f);
+
 	for (auto It = ActiveOccludingMeshes.CreateIterator(); It; ++It)
 	{
 		UPrimitiveComponent* Comp = It.Key();
@@ -430,10 +380,6 @@ void AGAME3023_F26_RoshanCharacter::UpdateCameraOcclusionCutout(float DeltaTime)
 
 		const float TargetAlpha = Data.bHitThisFrame ? 1.0f : 0.0f;
 		Data.CurrentAlpha = FMath::FInterpTo(Data.CurrentAlpha, TargetAlpha, DeltaTime, OcclusionFadeSpeed);
-
-		// drive the authored cutout feature on each material instance
-		const float SafeRadius = FMath::Max(OcclusionCutoutRadius, 20.0f);
-		const float SafeSoftness = FMath::Clamp(OcclusionEdgeSoftness, 10.0f, SafeRadius * 0.9f);
 
 		for (UMaterialInstanceDynamic* MID : Data.CutoutMIDs)
 		{
@@ -450,7 +396,6 @@ void AGAME3023_F26_RoshanCharacter::UpdateCameraOcclusionCutout(float DeltaTime)
 			}
 		}
 
-		// once the cutout has smoothly faded all the way back to solid, restore the original material!
 		if (!Data.bHitThisFrame && Data.CurrentAlpha <= 0.01f)
 		{
 			for (int32 MatIdx = 0; MatIdx < Data.OriginalMaterials.Num(); ++MatIdx)
@@ -467,7 +412,6 @@ void AGAME3023_F26_RoshanCharacter::UpdateCameraOcclusionCutout(float DeltaTime)
 
 void AGAME3023_F26_RoshanCharacter::TriggerControllerRumble(float Intensity, float Duration, bool bHeavyLeft, bool bLightRight)
 {
-	// play haptic rumble on dualsense controller if enabled
 	if (!bEnableControllerVibration) return;
 
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
@@ -488,7 +432,6 @@ void AGAME3023_F26_RoshanCharacter::TriggerControllerRumble(float Intensity, flo
 void AGAME3023_F26_RoshanCharacter::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
-	// applies camera distance/pitch changes in editor viewport
 	ApplyCinematicCameraSettings();
 }
 
@@ -499,7 +442,6 @@ void AGAME3023_F26_RoshanCharacter::PostEditChangeProperty(FPropertyChangedEvent
 
 	const FName PropName = PropertyChangedEvent.Property ? PropertyChangedEvent.Property->GetFName() : NAME_None;
 
-	// if user changed TargetArmLength directly on CameraBoom in the components inspector, sync CameraDistance!
 	if (CameraBoom)
 	{
 		if (PropName == GET_MEMBER_NAME_CHECKED(USpringArmComponent, TargetArmLength))
@@ -512,7 +454,6 @@ void AGAME3023_F26_RoshanCharacter::PostEditChangeProperty(FPropertyChangedEvent
 		}
 	}
 
-	// if user changed CameraDistance under Cinematic Camera in inspector, push it straight into CameraBoom
 	if (PropName == GET_MEMBER_NAME_CHECKED(AGAME3023_F26_RoshanCharacter, CameraDistance))
 	{
 		if (CameraBoom)
@@ -521,14 +462,12 @@ void AGAME3023_F26_RoshanCharacter::PostEditChangeProperty(FPropertyChangedEvent
 		}
 	}
 
-	// live refresh in viewport
 	ApplyCinematicCameraSettings();
 }
 #endif
 
 void AGAME3023_F26_RoshanCharacter::ApplyCinematicCameraSettings()
 {
-	// lock controller rotation
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
@@ -573,36 +512,26 @@ void AGAME3023_F26_RoshanCharacter::ApplyCinematicCameraSettings()
 
 void AGAME3023_F26_RoshanCharacter::AddControllerYawInput(float Val)
 {
-	// empty on purpose: player cannot spin the camera with mouse or controller
 }
 
 void AGAME3023_F26_RoshanCharacter::AddControllerPitchInput(float Val)
 {
-	// empty on purpose: player cannot pitch the camera
 }
 
 void AGAME3023_F26_RoshanCharacter::AddControllerRollInput(float Val)
 {
-	// empty on purpose: no roll
 }
 
 void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
-	// enhanced input bindings
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
 		
-		// jump (disabled)
-		// EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
-		// EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 
-		// wasd move
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AGAME3023_F26_RoshanCharacter::Move);
 
-		// look actions bound to empty Look function just in case
 		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AGAME3023_F26_RoshanCharacter::Look);
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AGAME3023_F26_RoshanCharacter::Look);
 
-		// interact (E / Square)
 		if (InteractAction)
 		{
 			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
@@ -610,7 +539,6 @@ void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* P
 			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Canceled, this, &AGAME3023_F26_RoshanCharacter::DoInteractRelease);
 		}
 
-		// drop (R)
 		if (DropAction)
 		{
 			EnhancedInputComponent->BindAction(DropAction, ETriggerEvent::Started, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
@@ -621,26 +549,17 @@ void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* P
 		UE_LOG(LogGAME3023_F26_Roshan, Error, TEXT("'%s' Failed to find an Enhanced Input component!"), *GetNameSafe(this));
 	}
 
-	// hardcoded key fallbacks so E (interact) and R/Q (drop) work without needing to setup IMC assets
 	PlayerInputComponent->BindKey(EKeys::E, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
 	PlayerInputComponent->BindKey(EKeys::E, IE_Released, this, &AGAME3023_F26_RoshanCharacter::DoInteractRelease);
 	PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
-	PlayerInputComponent->BindKey(EKeys::Q, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery); // Q also works as drop backup
+	PlayerInputComponent->BindKey(EKeys::Q, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
 
-	// debug / test keys for player health points & HUD (K = take 15 damage, H = heal 15 HP)
 	PlayerInputComponent->BindKey(EKeys::K, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::TestTakeDamage);
 	PlayerInputComponent->BindKey(EKeys::H, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::TestHeal);
 
-	// dualsense ps5 controller button bindings so gamepad works out of the box!
-	// cross (X button on ps5) -> jump (disabled)
-	// PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoJumpStart);
-	// PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Released, this, &AGAME3023_F26_RoshanCharacter::DoJumpEnd);
-
-	// square button -> interact (pick up battery instantly / hold 5s to attach to cylinder)
 	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Left, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
 	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Left, IE_Released, this, &AGAME3023_F26_RoshanCharacter::DoInteractRelease);
 
-	// circle button -> drop battery onto floor
 	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Right, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
 }
 
@@ -661,11 +580,6 @@ void AGAME3023_F26_RoshanCharacter::DoMove(float Right, float Forward)
 {
 	if (GetController() != nullptr)
 	{
-		// 2.5d hades top-down movement:
-		// W is always screen up (+X)
-		// S is always screen down (-X)
-		// D is always screen right (+Y)
-		// A is always screen left (-Y)
 		const FRotator YawRotation(0.0f, CameraYaw, 0.0f);
 
 		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
@@ -678,44 +592,58 @@ void AGAME3023_F26_RoshanCharacter::DoMove(float Right, float Forward)
 
 void AGAME3023_F26_RoshanCharacter::DoLook(float Yaw, float Pitch)
 {
-	// intentionally left empty: player cannot spin or pitch the top-down 2.5d camera
 }
 
 void AGAME3023_F26_RoshanCharacter::DoJumpStart()
 {
-	// jumping is disabled
 }
 
 void AGAME3023_F26_RoshanCharacter::DoJumpEnd()
 {
-	// jumping is disabled
 }
 
 bool AGAME3023_F26_RoshanCharacter::CanJumpInternal_Implementation() const
 {
-	// jumping is completely disabled for the player
 	return false;
 }
 
 void AGAME3023_F26_RoshanCharacter::Jump()
 {
-	// jumping is disabled
 }
 
 void AGAME3023_F26_RoshanCharacter::StopJumping()
 {
-	// jumping is disabled
+}
+
+bool AGAME3023_F26_RoshanCharacter::InteractWithCylinder(ARedPowerCylinder* Cylinder)
+{
+	if (!Cylinder || !Cylinder->CanPlayerInteract(this))
+	{
+		return false;
+	}
+
+	if (!Cylinder->bHasBattery && HasBattery())
+	{
+		bIsHoldingToAttach = true;
+		HoldingTargetCylinder = Cylinder;
+		CurrentAttachHoldTime = 0.0f;
+		HoldRumblePulseTimer = 0.0f;
+		TriggerControllerRumble(0.25f, 0.08f, false, true);
+		return true;
+	}
+
+	ResetBatteryAttachHold();
+	if (Cylinder->bHasBattery)
+	{
+		bRequireFreshPressForHold = true;
+	}
+	Cylinder->Interact(this);
+	return true;
 }
 
 void AGAME3023_F26_RoshanCharacter::DoInteract()
 {
-	if (bIsDead)
-	{
-		return;
-	}
-
-	// guard against duplicate firing on the same frame when both Enhanced Input and raw key bindings are active
-	if (LastInteractPressFrame == GFrameCounter)
+	if (bIsDead || LastInteractPressFrame == GFrameCounter)
 	{
 		return;
 	}
@@ -725,48 +653,13 @@ void AGAME3023_F26_RoshanCharacter::DoInteract()
 	bRawInteractKeyHeld = true;
 	bRequireFreshPressForHold = false;
 
-	auto HandleRedCylinderInteract = [this](ARedPowerCylinder* RedCell) -> bool
-	{
-		if (!RedCell || !RedCell->CanPlayerInteract(this))
-		{
-			return false;
-		}
-
-		// Case 1: Cylinder already has a battery -> collect it back INSTANTLY without holding!
-		if (RedCell->bHasBattery)
-		{
-			ResetBatteryAttachHold();
-			bRequireFreshPressForHold = true;
-			RedCell->Interact(this);
-			return true;
-		}
-
-		// Case 2: Cylinder is empty and player is carrying a battery -> start 5-second hold to attach!
-		if (HasBattery())
-		{
-			bIsHoldingToAttach = true;
-			HoldingTargetCylinder = RedCell;
-			CurrentAttachHoldTime = 0.0f;
-			HoldRumblePulseTimer = 0.0f;
-			TriggerControllerRumble(0.25f, 0.08f, false, true);
-			return true;
-		}
-
-		// Case 3: Cylinder is empty and player has no battery -> show offline warning immediately
-		ResetBatteryAttachHold();
-		RedCell->Interact(this);
-		return true;
-	};
-
-	// step 1: check if we are currently inside an overlap trigger
 	if (CurrentInteractable)
 	{
 		if (ARedPowerCylinder* RedCell = Cast<ARedPowerCylinder>(CurrentInteractable))
 		{
-			HandleRedCylinderInteract(RedCell);
+			InteractWithCylinder(RedCell);
 			return;
 		}
-
 		if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(CurrentInteractable))
 		{
 			ResetBatteryAttachHold();
@@ -776,44 +669,44 @@ void AGAME3023_F26_RoshanCharacter::DoInteract()
 		}
 	}
 
-	// step 2: fallback sphere sweep around player just in case overlap didn't trigger
 	UWorld* World = GetWorld();
-	if (!World) return;
+	if (!World)
+	{
+		return;
+	}
 
 	const FVector TraceStart = GetActorLocation();
 	const FVector TraceEnd = TraceStart + GetActorForwardVector() * 100.0f;
 	TArray<FHitResult> HitResults;
-	FCollisionShape Sphere = FCollisionShape::MakeSphere(180.0f);
-
 	FCollisionQueryParams QueryParams;
 	QueryParams.AddIgnoredActor(this);
 
-	if (World->SweepMultiByChannel(HitResults, TraceStart, TraceEnd, FQuat::Identity, ECC_WorldDynamic, Sphere, QueryParams))
+	if (!World->SweepMultiByChannel(HitResults, TraceStart, TraceEnd, FQuat::Identity, ECC_WorldDynamic, FCollisionShape::MakeSphere(180.0f), QueryParams))
 	{
-		// prioritize cylinder if nearby
-		for (const FHitResult& Hit : HitResults)
+		return;
+	}
+
+	for (const FHitResult& Hit : HitResults)
+	{
+		if (ARedPowerCylinder* RedCell = Cast<ARedPowerCylinder>(Hit.GetActor()))
 		{
-			if (ARedPowerCylinder* RedCell = Cast<ARedPowerCylinder>(Hit.GetActor()))
+			if (InteractWithCylinder(RedCell))
 			{
-				if (HandleRedCylinderInteract(RedCell))
-				{
-					return;
-				}
+				return;
 			}
 		}
+	}
 
-		// otherwise grab nearby battery instantly (no hold required)
-		for (const FHitResult& Hit : HitResults)
+	for (const FHitResult& Hit : HitResults)
+	{
+		if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(Hit.GetActor()))
 		{
-			if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(Hit.GetActor()))
+			if (!Battery->bIsCarried && !Battery->bIsSocketed)
 			{
-				if (!Battery->bIsCarried && !Battery->bIsSocketed)
-				{
-					ResetBatteryAttachHold();
-					bRequireFreshPressForHold = true;
-					Battery->Interact(this);
-					return;
-				}
+				ResetBatteryAttachHold();
+				bRequireFreshPressForHold = true;
+				Battery->Interact(this);
+				return;
 			}
 		}
 	}
@@ -879,11 +772,8 @@ bool AGAME3023_F26_RoshanCharacter::TryPickupBattery(ABatteryCapsule* Battery)
 {
 	if (!Battery) return false;
 
-	// assignment rule: player can only carry 1 battery at a time!
-	// if already holding one, reject it and print debug message
 	if (HasBattery())
 	{
-		// short error buzz on dualsense controller
 		TriggerControllerRumble(0.8f, 0.15f, true, false);
 
 		UE_LOG(LogGAME3023_F26_Roshan, Warning, TEXT("[Live Wire] Inventory Full! Player is already carrying a Battery Capsule."));
@@ -906,7 +796,6 @@ bool AGAME3023_F26_RoshanCharacter::TryPickupBattery(ABatteryCapsule* Battery)
 	CarriedBattery = Battery;
 	Battery->OnCollected(this);
 
-	// crisp pickup vibration on dualsense controller
 	TriggerControllerRumble(0.5f, 0.18f, false, true);
 
 	if (CurrentInteractable == Battery)
@@ -939,7 +828,6 @@ void AGAME3023_F26_RoshanCharacter::DoDropBattery()
 	}
 	else
 	{
-		// nothing to drop
 		if (GEngine)
 		{
 			GEngine->AddOnScreenDebugMessage(
@@ -961,11 +849,9 @@ ABatteryCapsule* AGAME3023_F26_RoshanCharacter::DropCurrentBattery()
 	ABatteryCapsule* Dropped = CarriedBattery;
 	CarriedBattery = nullptr;
 
-	// place battery in front of player
 	const FVector ForwardOffset = GetActorForwardVector() * 120.0f;
 	FVector DropLocation = GetActorLocation() + ForwardOffset;
 
-	// do a line trace down so it lands on top of floor instead of floating
 	FHitResult FloorHit;
 	FCollisionQueryParams TraceParams;
 	TraceParams.AddIgnoredActor(this);
@@ -1057,6 +943,152 @@ void AGAME3023_F26_RoshanCharacter::UpdateHealthHUD()
 	}
 }
 
+AActor* AGAME3023_F26_RoshanCharacter::FindBestInteractable()
+{
+	AActor* BestCandidate = nullptr;
+	float BestDistSq = MAX_flt;
+	const FVector PlayerLoc = GetActorLocation();
+
+	auto ConsiderCandidate = [&](AActor* Candidate, float MaxDistSq)
+	{
+		if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(Candidate))
+		{
+			if (Battery->bIsCarried || Battery->bIsSocketed)
+			{
+				return false;
+			}
+			const float DistSq = FVector::DistSquared(PlayerLoc, Battery->GetActorLocation());
+			if (DistSq <= MaxDistSq && DistSq < BestDistSq)
+			{
+				BestCandidate = Battery;
+				BestDistSq = DistSq;
+			}
+			return DistSq <= MaxDistSq;
+		}
+		if (ARedPowerCylinder* Cylinder = Cast<ARedPowerCylinder>(Candidate))
+		{
+			if (!Cylinder->CanPlayerInteract(this))
+			{
+				return false;
+			}
+			const float DistSq = FVector::DistSquared(PlayerLoc, Cylinder->GetActorLocation());
+			if (DistSq < BestDistSq)
+			{
+				BestCandidate = Cylinder;
+				BestDistSq = DistSq;
+			}
+			return true;
+		}
+		return false;
+	};
+
+	if (CurrentInteractable && IsValid(CurrentInteractable))
+	{
+		if (!ConsiderCandidate(CurrentInteractable, FMath::Square(InteractionDetectionRadius + 60.0f)))
+		{
+			CurrentInteractable = nullptr;
+		}
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return BestCandidate;
+	}
+
+	TArray<FOverlapResult> Overlaps;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+	if (CarriedBattery)
+	{
+		Params.AddIgnoredActor(CarriedBattery);
+	}
+
+	FCollisionObjectQueryParams ObjectParams;
+	ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+	ObjectParams.AddObjectTypesToQuery(ECC_Pawn);
+
+	if (World->OverlapMultiByObjectType(Overlaps, PlayerLoc, FQuat::Identity, ObjectParams, FCollisionShape::MakeSphere(InteractionDetectionRadius), Params))
+	{
+		for (const FOverlapResult& Overlap : Overlaps)
+		{
+			AActor* OverlapActor = Overlap.GetActor();
+			if (OverlapActor && OverlapActor != this)
+			{
+				ConsiderCandidate(OverlapActor, MAX_flt);
+			}
+		}
+	}
+
+	return BestCandidate;
+}
+
+void AGAME3023_F26_RoshanCharacter::UpdateCylinderHoldPrompt(ARedPowerCylinder* Cylinder, float DeltaTime, bool bInputHeld, FString& OutAction, FString& OutTarget)
+{
+	if (Cylinder->bHasBattery)
+	{
+		ResetBatteryAttachHold();
+		InteractionPromptWidget->SetHoldProgress(0.0f);
+		OutAction = TEXT("Press Square to Collect Battery");
+		OutTarget = FString::Printf(TEXT("Laser Gun (ID: %d) - Online"), Cylinder->CellID);
+		return;
+	}
+
+	if (!HasBattery())
+	{
+		ResetBatteryAttachHold();
+		InteractionPromptWidget->SetHoldProgress(0.0f);
+		OutAction = TEXT("Laser Gun (Requires Battery)");
+		OutTarget = FString::Printf(TEXT("Laser Gun (ID: %d) - Offline"), Cylinder->CellID);
+		return;
+	}
+
+	if (!bInputHeld || bRequireFreshPressForHold || bIsDead)
+	{
+		ResetBatteryAttachHold();
+		InteractionPromptWidget->SetHoldProgress(0.0f);
+		OutAction = FString::Printf(TEXT("Hold Square (%.0fs) to Attach Battery"), FMath::Max(BatteryAttachHoldDuration, 0.5f));
+		OutTarget = FString::Printf(TEXT("Laser Gun (ID: %d) - Ready"), Cylinder->CellID);
+		return;
+	}
+
+	if (!bIsHoldingToAttach || HoldingTargetCylinder != Cylinder)
+	{
+		bIsHoldingToAttach = true;
+		HoldingTargetCylinder = Cylinder;
+		CurrentAttachHoldTime = 0.0f;
+		HoldRumblePulseTimer = 0.0f;
+	}
+
+	CurrentAttachHoldTime += DeltaTime;
+	HoldRumblePulseTimer += DeltaTime;
+
+	const float SafeHoldDuration = FMath::Max(BatteryAttachHoldDuration, 0.5f);
+	const float Progress = FMath::Clamp(CurrentAttachHoldTime / SafeHoldDuration, 0.0f, 1.0f);
+	InteractionPromptWidget->SetHoldProgress(Progress);
+
+	if (HoldRumblePulseTimer >= 0.25f)
+	{
+		HoldRumblePulseTimer = 0.0f;
+		TriggerControllerRumble(0.15f + 0.35f * Progress, 0.06f, false, true);
+	}
+
+	if (CurrentAttachHoldTime >= SafeHoldDuration)
+	{
+		ResetBatteryAttachHold();
+		bRequireFreshPressForHold = true;
+		TriggerControllerRumble(0.85f, 0.25f, true, true);
+		Cylinder->Interact(this);
+
+		OutAction = TEXT("Press Square to Collect Battery");
+		OutTarget = FString::Printf(TEXT("Laser Gun (ID: %d) - Online"), Cylinder->CellID);
+		return;
+	}
+
+	OutAction = FString::Printf(TEXT("Attaching Battery... %.1fs / %.0fs"), CurrentAttachHoldTime, SafeHoldDuration);
+	OutTarget = FString::Printf(TEXT("Laser Gun (ID: %d) - Charging"), Cylinder->CellID);
+}
+
 void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
 {
 	if (!InteractionPromptWidget)
@@ -1068,262 +1100,56 @@ void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
 		}
 	}
 
-	AActor* BestCandidate = nullptr;
-	float BestDistSq = MAX_flt;
-	const FVector PlayerLoc = GetActorLocation();
-
-	// 1. Check CurrentInteractable (if previously set by overlap)
-	if (CurrentInteractable && IsValid(CurrentInteractable))
-	{
-		bool bIsValidTarget = true;
-
-		if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(CurrentInteractable))
-		{
-			if (Battery->bIsCarried || Battery->bIsSocketed)
-			{
-				bIsValidTarget = false;
-			}
-			else
-			{
-				const float DistSq = FVector::DistSquared(PlayerLoc, Battery->GetActorLocation());
-				if (DistSq > FMath::Square(InteractionDetectionRadius + 60.0f))
-				{
-					bIsValidTarget = false;
-				}
-				else
-				{
-					BestCandidate = Battery;
-					BestDistSq = DistSq;
-				}
-			}
-		}
-		else if (ARedPowerCylinder* Cylinder = Cast<ARedPowerCylinder>(CurrentInteractable))
-		{
-			if (!Cylinder->CanPlayerInteract(this))
-			{
-				bIsValidTarget = false;
-			}
-			else
-			{
-				BestCandidate = Cylinder;
-				BestDistSq = FVector::DistSquared(PlayerLoc, Cylinder->GetActorLocation());
-			}
-		}
-
-		if (!bIsValidTarget)
-		{
-			CurrentInteractable = nullptr;
-		}
-	}
-
-	// 2. Proximity sweep for nearby interactables (catches dropped batteries, entering radius, etc.)
-	UWorld* World = GetWorld();
-	if (World)
-	{
-		TArray<FOverlapResult> Overlaps;
-		FCollisionShape Sphere = FCollisionShape::MakeSphere(InteractionDetectionRadius);
-		FCollisionQueryParams Params;
-		Params.AddIgnoredActor(this);
-		if (CarriedBattery)
-		{
-			Params.AddIgnoredActor(CarriedBattery);
-		}
-
-		FCollisionObjectQueryParams ObjectParams;
-		ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
-		ObjectParams.AddObjectTypesToQuery(ECC_Pawn);
-
-		if (World->OverlapMultiByObjectType(Overlaps, PlayerLoc, FQuat::Identity, ObjectParams, Sphere, Params))
-		{
-			for (const FOverlapResult& Overlap : Overlaps)
-			{
-				AActor* OverlapActor = Overlap.GetActor();
-				if (!OverlapActor || OverlapActor == this) continue;
-
-				if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(OverlapActor))
-				{
-					if (!Battery->bIsCarried && !Battery->bIsSocketed)
-					{
-						const float DistSq = FVector::DistSquared(PlayerLoc, Battery->GetActorLocation());
-						if (DistSq < BestDistSq)
-						{
-							BestCandidate = Battery;
-							BestDistSq = DistSq;
-						}
-					}
-				}
-				else if (ARedPowerCylinder* Cylinder = Cast<ARedPowerCylinder>(OverlapActor))
-				{
-					if (Cylinder->CanPlayerInteract(this))
-					{
-						const float DistSq = FVector::DistSquared(PlayerLoc, Cylinder->GetActorLocation());
-						if (DistSq < BestDistSq)
-						{
-							BestCandidate = Cylinder;
-							BestDistSq = DistSq;
-						}
-					}
-				}
-			}
-		}
-	}
-
-	// 3. Update 5-second battery attach hold timer & widget based on best candidate
 	const bool bInputCurrentlyHeld = IsInteractInputHeld();
 	if (!bInputCurrentlyHeld)
 	{
 		bRequireFreshPressForHold = false;
-		if (bIsHoldingToAttach || CurrentAttachHoldTime > 0.0f)
-		{
-			ResetBatteryAttachHold();
-		}
+		ResetBatteryAttachHold();
 	}
 
-	if (BestCandidate)
+	AActor* BestCandidate = FindBestInteractable();
+	if (!BestCandidate)
 	{
-		CurrentInteractable = BestCandidate;
-		InteractionPromptWidget->bAnchorToScreenBottom = bAnchorPromptToScreenBottom;
-
-		FString ActionStr = TEXT("Press Square to Interact");
-		FString TargetStr = TEXT("");
-
-		if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(BestCandidate))
-		{
-			if (bIsHoldingToAttach || CurrentAttachHoldTime > 0.0f)
-			{
-				ResetBatteryAttachHold();
-			}
-			InteractionPromptWidget->SetHoldProgress(0.0f);
-
-			if (HasBattery())
-			{
-				ActionStr = TEXT("Hands Full (Drop Battery First)");
-				TargetStr = FString::Printf(TEXT("Battery Capsule (ID: %d)"), Battery->BatteryID);
-			}
-			else
-			{
-				ActionStr = TEXT("Press Square to Collect Battery");
-				TargetStr = FString::Printf(TEXT("Battery Capsule (ID: %d)"), Battery->BatteryID);
-			}
-		}
-		else if (ARedPowerCylinder* Cylinder = Cast<ARedPowerCylinder>(BestCandidate))
-		{
-			if (Cylinder->bHasBattery)
-			{
-				// Collecting battery back from the cylinder is instant (no hold needed)
-				if (bIsHoldingToAttach || CurrentAttachHoldTime > 0.0f)
-				{
-					ResetBatteryAttachHold();
-				}
-				InteractionPromptWidget->SetHoldProgress(0.0f);
-
-				ActionStr = TEXT("Press Square to Collect Battery");
-				TargetStr = FString::Printf(TEXT("Laser Gun (ID: %d) - Online"), Cylinder->CellID);
-			}
-			else if (HasBattery())
-			{
-				// Attaching a battery to any RedPowerCylinder requires holding for 5 seconds
-				if (bInputCurrentlyHeld && !bRequireFreshPressForHold && !bIsDead)
-				{
-					if (!bIsHoldingToAttach || HoldingTargetCylinder != Cylinder)
-					{
-						bIsHoldingToAttach = true;
-						HoldingTargetCylinder = Cylinder;
-						CurrentAttachHoldTime = 0.0f;
-						HoldRumblePulseTimer = 0.0f;
-					}
-
-					CurrentAttachHoldTime += DeltaTime;
-					HoldRumblePulseTimer += DeltaTime;
-
-					const float SafeHoldDuration = FMath::Max(BatteryAttachHoldDuration, 0.5f);
-					const float Progress = FMath::Clamp(CurrentAttachHoldTime / SafeHoldDuration, 0.0f, 1.0f);
-					InteractionPromptWidget->SetHoldProgress(Progress);
-
-					// Gentle rising haptic pulse while charging the 5-second attachment ring
-					if (HoldRumblePulseTimer >= 0.25f)
-					{
-						HoldRumblePulseTimer = 0.0f;
-						TriggerControllerRumble(0.15f + 0.35f * Progress, 0.06f, false, true);
-					}
-
-					if (CurrentAttachHoldTime >= SafeHoldDuration)
-					{
-						// 5 seconds reached! Attach the battery to the RedPowerCylinder
-						ResetBatteryAttachHold();
-						bRequireFreshPressForHold = true;
-						TriggerControllerRumble(0.85f, 0.25f, true, true);
-						Cylinder->Interact(this);
-
-						ActionStr = TEXT("Press Square to Collect Battery");
-						TargetStr = FString::Printf(TEXT("Laser Gun (ID: %d) - Online"), Cylinder->CellID);
-					}
-					else
-					{
-						ActionStr = FString::Printf(TEXT("Attaching Battery... %.1fs / %.0fs"), CurrentAttachHoldTime, SafeHoldDuration);
-						TargetStr = FString::Printf(TEXT("Laser Gun (ID: %d) - Charging"), Cylinder->CellID);
-					}
-				}
-				else
-				{
-					if (bIsHoldingToAttach || CurrentAttachHoldTime > 0.0f)
-					{
-						ResetBatteryAttachHold();
-					}
-					InteractionPromptWidget->SetHoldProgress(0.0f);
-
-					ActionStr = FString::Printf(TEXT("Hold Square (%.0fs) to Attach Battery"), FMath::Max(BatteryAttachHoldDuration, 0.5f));
-					TargetStr = FString::Printf(TEXT("Laser Gun (ID: %d) - Ready"), Cylinder->CellID);
-				}
-			}
-			else
-			{
-				if (bIsHoldingToAttach || CurrentAttachHoldTime > 0.0f)
-				{
-					ResetBatteryAttachHold();
-				}
-				InteractionPromptWidget->SetHoldProgress(0.0f);
-
-				ActionStr = TEXT("Laser Gun (Requires Battery)");
-				TargetStr = FString::Printf(TEXT("Laser Gun (ID: %d) - Offline"), Cylinder->CellID);
-			}
-		}
-
-		InteractionPromptWidget->ShowPrompt(
-			BestCandidate,
-			FText::FromString(ActionStr),
-			FText::FromString(TargetStr)
-		);
-	}
-	else
-	{
-		if (bIsHoldingToAttach || CurrentAttachHoldTime > 0.0f)
-		{
-			ResetBatteryAttachHold();
-		}
-
-		if (CurrentInteractable)
-		{
-			CurrentInteractable = nullptr;
-		}
-
+		ResetBatteryAttachHold();
+		CurrentInteractable = nullptr;
 		InteractionPromptWidget->HidePrompt();
+		return;
 	}
-}
 
-// ==========================================
-// LiveWire Background Music (BGM) Implementation
-// ==========================================
+	CurrentInteractable = BestCandidate;
+	InteractionPromptWidget->bAnchorToScreenBottom = bAnchorPromptToScreenBottom;
+
+	FString ActionStr = TEXT("Press Square to Interact");
+	FString TargetStr;
+
+	if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(BestCandidate))
+	{
+		ResetBatteryAttachHold();
+		InteractionPromptWidget->SetHoldProgress(0.0f);
+		ActionStr = HasBattery()
+			? TEXT("Hands Full (Drop Battery First)")
+			: TEXT("Press Square to Collect Battery");
+		TargetStr = FString::Printf(TEXT("Battery Capsule (ID: %d)"), Battery->BatteryID);
+	}
+	else if (ARedPowerCylinder* Cylinder = Cast<ARedPowerCylinder>(BestCandidate))
+	{
+		UpdateCylinderHoldPrompt(Cylinder, DeltaTime, bInputCurrentlyHeld, ActionStr, TargetStr);
+	}
+
+	InteractionPromptWidget->ShowPrompt(
+		BestCandidate,
+		FText::FromString(ActionStr),
+		FText::FromString(TargetStr)
+	);
+}
 
 void AGAME3023_F26_RoshanCharacter::PlayBackgroundMusic()
 {
-	// Avoid duplicate playback if already playing
 	if (BGMAudioComponent && BGMAudioComponent->IsPlaying())
 	{
 		return;
 	}
 
-	// If not assigned yet, dynamically load the LiveWire substation theme asset
 	if (!BackgroundMusicTrack)
 	{
 		BackgroundMusicTrack = LoadObject<USoundBase>(nullptr, TEXT("/Game/Sound/LiveWire_Substation_Theme.LiveWire_Substation_Theme"));
@@ -1331,13 +1157,11 @@ void AGAME3023_F26_RoshanCharacter::PlayBackgroundMusic()
 
 	if (BackgroundMusicTrack)
 	{
-		// Enable looping on SoundWave asset
 		if (USoundWave* Wave = Cast<USoundWave>(BackgroundMusicTrack))
 		{
 			Wave->bLooping = true;
 		}
 
-		// Spawn 2D non-spatialized stereo background audio component
 		BGMAudioComponent = UGameplayStatics::SpawnSound2D(
 			this,
 			BackgroundMusicTrack,
@@ -1345,8 +1169,8 @@ void AGAME3023_F26_RoshanCharacter::PlayBackgroundMusic()
 			BGMPitch,
 			0.0f,
 			nullptr,
-			false, // bPersistAcrossLevelTransition
-			false  // bAutoDestroy: false to keep component alive for seamless looping
+			false,
+			false
 		);
 
 		if (BGMAudioComponent)
@@ -1396,10 +1220,6 @@ void AGAME3023_F26_RoshanCharacter::OnBGMAudioFinished()
 	}
 }
 
-// ==========================================
-// LiveWire Player Health System
-// ==========================================
-
 float AGAME3023_F26_RoshanCharacter::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
 	if (bIsDead || DamageAmount <= 0.0f)
@@ -1429,26 +1249,22 @@ void AGAME3023_F26_RoshanCharacter::HandleDeath()
 
 	OnPlayerDied.Broadcast();
 
-	// drop carried battery if player is carrying one
 	if (HasBattery())
 	{
 		DropCurrentBattery();
 	}
 
-	// disable player movement on death
 	if (GetCharacterMovement())
 	{
 		GetCharacterMovement()->DisableMovement();
 		GetCharacterMovement()->StopMovementImmediately();
 	}
 
-	// dualsense rumble pulse on death
 	if (bEnableControllerVibration)
 	{
 		TriggerControllerRumble(1.0f, 0.5f, true, true);
 	}
 
-	// schedule respawn at the designated respawn location (X=56, Y=0, Z=745)
 	if (UWorld* World = GetWorld())
 	{
 		if (RespawnDelay > 0.0f)
@@ -1475,16 +1291,13 @@ void AGAME3023_F26_RoshanCharacter::RespawnPlayer()
 		World->GetTimerManager().ClearTimer(RespawnTimerHandle);
 	}
 
-	// reset death state and revive player with full health
 	bIsDead = false;
 	CurrentHealth = MaxHealth;
 	UpdateHealthHUD();
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth, MaxHealth);
 
-	// reset hold and interaction state
 	ResetBatteryAttachHold();
 
-	// detach and reset any EnemyDrone that latched onto or was chasing the player back to its starting spawn point
 	if (UWorld* World = GetWorld())
 	{
 		TArray<AActor*> FoundDrones;
@@ -1500,7 +1313,6 @@ void AGAME3023_F26_RoshanCharacter::RespawnPlayer()
 			}
 		}
 
-		// Reset any EnemyBatteryThief that was following the player back to ground NavMesh patrol
 		TArray<AActor*> FoundThieves;
 		UGameplayStatics::GetAllActorsOfClass(World, AEnemyBatteryThief::StaticClass(), FoundThieves);
 		for (AActor* Actor : FoundThieves)
@@ -1515,17 +1327,14 @@ void AGAME3023_F26_RoshanCharacter::RespawnPlayer()
 		}
 	}
 
-	// teleport player to the exact respawn location
 	TeleportTo(RespawnLocation, GetActorRotation(), false, true);
 
-	// re-enable and reset character movement
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
 		MoveComp->Velocity = FVector::ZeroVector;
 		MoveComp->SetMovementMode(MOVE_Walking);
 	}
 
-	// reset camera occlusion smoothed target to avoid sudden lens drag
 	SmoothedOcclusionTargetPos = RespawnLocation + FVector(0.0f, 0.0f, 35.0f);
 
 	UE_LOG(LogTemplateCharacter, Log, TEXT("[LiveWire Health] Player '%s' respawned at %s with full health (%.0f HP)!"),
@@ -1552,7 +1361,16 @@ void AGAME3023_F26_RoshanCharacter::ApplyHealing(float Healing, AActor* Healer)
 
 void AGAME3023_F26_RoshanCharacter::NotifyDanger(const FVector& DangerLocation, AActor* DangerSource)
 {
-	// danger notification warning
+}
+
+void AGAME3023_F26_RoshanCharacter::ApplyHealthChange(float NewHealth)
+{
+	const float OldHealth = CurrentHealth;
+	CurrentHealth = FMath::Clamp(NewHealth, 0.0f, MaxHealth);
+	const float DeltaHealth = CurrentHealth - OldHealth;
+
+	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth, DeltaHealth);
+	UpdateHealthHUD();
 }
 
 void AGAME3023_F26_RoshanCharacter::ApplyDamageToPlayer(float DamageAmount, AActor* DamageCauser)
@@ -1562,17 +1380,10 @@ void AGAME3023_F26_RoshanCharacter::ApplyDamageToPlayer(float DamageAmount, AAct
 		return;
 	}
 
-	const float OldHealth = CurrentHealth;
-	CurrentHealth = FMath::Clamp(CurrentHealth - DamageAmount, 0.0f, MaxHealth);
-	const float DeltaHealth = CurrentHealth - OldHealth;
-
+	ApplyHealthChange(CurrentHealth - DamageAmount);
 	UE_LOG(LogTemplateCharacter, Log, TEXT("[LiveWire Health] Player took %.1f damage from '%s'. Health: %.1f / %.1f"),
 		DamageAmount, *GetNameSafe(DamageCauser), CurrentHealth, MaxHealth);
 
-	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth, DeltaHealth);
-	UpdateHealthHUD();
-
-	// rumble feedback when player takes damage
 	if (bEnableControllerVibration)
 	{
 		TriggerControllerRumble(0.75f, 0.2f, true, false);
@@ -1591,24 +1402,15 @@ void AGAME3023_F26_RoshanCharacter::HealPlayer(float HealAmount)
 		return;
 	}
 
-	const float OldHealth = CurrentHealth;
-	CurrentHealth = FMath::Clamp(CurrentHealth + HealAmount, 0.0f, MaxHealth);
-	const float DeltaHealth = CurrentHealth - OldHealth;
-
+	ApplyHealthChange(CurrentHealth + HealAmount);
 	UE_LOG(LogTemplateCharacter, Log, TEXT("[LiveWire Health] Player healed for %.1f. Health: %.1f / %.1f"),
 		HealAmount, CurrentHealth, MaxHealth);
-
-	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth, DeltaHealth);
-	UpdateHealthHUD();
 }
 
 void AGAME3023_F26_RoshanCharacter::SetHealth(float NewHealth)
 {
-	const float OldHealth = CurrentHealth;
-	CurrentHealth = FMath::Clamp(NewHealth, 0.0f, MaxHealth);
-	const float DeltaHealth = CurrentHealth - OldHealth;
-
-	if (bIsDead && CurrentHealth > 0.0f)
+	const float Clamped = FMath::Clamp(NewHealth, 0.0f, MaxHealth);
+	if (bIsDead && Clamped > 0.0f)
 	{
 		bIsDead = false;
 		if (GetCharacterMovement())
@@ -1617,8 +1419,7 @@ void AGAME3023_F26_RoshanCharacter::SetHealth(float NewHealth)
 		}
 	}
 
-	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth, DeltaHealth);
-	UpdateHealthHUD();
+	ApplyHealthChange(Clamped);
 
 	if (CurrentHealth <= 0.0f && !bIsDead)
 	{

@@ -1,4 +1,3 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "GAME3023_F26_Roshan.h"
 #include "Modules/ModuleManager.h"

@@ -1,17 +1,3 @@
-// =============================================================================
-// Student: Roshan - 101473963
-// Course: GAME3023 - Game Engines 3
-// File: GAME3023_F26_RoshanCharacter.h
-// Description: LiveWire Substation Main Player Character.
-// Features:
-// - Fixed 2.5D IMAX top-down cinematic camera (Hades-style, never rotates with mouse)
-// - Smooth WASD keyboard movement + full PS5 DualSense controller support
-// - 1-slot inventory carrying a single Battery Capsule at a time
-// - 5-second hold interaction (Hold [Square] / [E]) to attach battery to cylinder
-// - Diablo/Hades-style circular see-through occlusion cutout when under roofs/catwalks
-// - Combat health system (100 HP), damage handling, and respawn logic
-// =============================================================================
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -19,7 +5,6 @@
 #include "Logging/LogMacros.h"
 #include "CombatDamageable.h"
 
-// Delegates for player health events
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnPlayerHealthChanged, float, CurrentHealth, float, MaxHealth, float, DeltaHealth);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerDied);
 
@@ -35,24 +20,19 @@ class UMaterialInstanceDynamic;
 class UMaterial;
 class UPrimitiveComponent;
 
-// struct to keep track of each roof/catwalk mesh that is currently hiding the player
 USTRUCT()
 struct FOccludingMeshData
 {
 	GENERATED_BODY()
 
-	// original materials on the mesh so we can put them back when the player walks out
 	UPROPERTY()
 	TArray<TObjectPtr<UMaterialInterface>> OriginalMaterials;
 
-	// dynamic cutout materials with the circular see-through mask
 	UPROPERTY()
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> CutoutMIDs;
 
-	// current 0..1 fade alpha (smoothly lerps up when under roof, down when leaving)
 	float CurrentAlpha = 0.0f;
 
-	// whether the camera-to-player trace hit this mesh on the current frame
 	bool bHitThisFrame = false;
 };
 
@@ -63,23 +43,19 @@ class UAudioComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
-// main player character for the project
 UCLASS(abstract)
 class AGAME3023_F26_RoshanCharacter : public ACharacter, public ICombatDamageable
 {
 	GENERATED_BODY()
 
-	// spring arm boom positioning the camera above the player
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	USpringArmComponent* CameraBoom;
 
-	// camera component attached to boom
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FollowCamera;
 	
 protected:
 
-	// enhanced input actions
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* JumpAction;
 
@@ -92,99 +68,88 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* MouseLookAction;
 
-	// interact with E
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* InteractAction;
 
-	// drop battery with R
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* DropAction;
 
-	// inventory: can only hold ONE battery capsule at a time (assignment rule)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Inventory")
 	TObjectPtr<ABatteryCapsule> CarriedBattery;
 
-	// actor we are standing close to (cylinder or battery)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Interaction")
 	TObjectPtr<AActor> CurrentInteractable;
 
 public:
-	// hades style 2.5d top-down cinematic camera
-	// fixed top angle looking down at arena so player gets an imax view and never gets dizzy
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
-	float CameraPitch = -60.0f; // pitch down looking at arena (hades style)
+	float CameraPitch = -60.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
-	float CameraYaw = 0.0f; // facing forward down x axis
+	float CameraYaw = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera", meta = (ClampMin = "200.0", ClampMax = "4000.0"))
-	float CameraDistance = 1600.0f; // arm length for wide arena view (editable in inspector)
+	float CameraDistance = 1600.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
-	FVector CameraSocketOffset = FVector(0.0f, 0.0f, 100.0f); // slight height offset
+	FVector CameraSocketOffset = FVector(0.0f, 0.0f, 100.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
-	float CameraFOV = 85.0f; // wide imax field of view
+	float CameraFOV = 85.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
-	float CameraLagSpeed = 4.0f; // smooth camera crane tracking speed
+	float CameraLagSpeed = 4.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
-	bool bEnableCameraCollision = false; // keep off so camera doesn't zoom in crazy when walking under catwalks
+	bool bEnableCameraCollision = false;
 
-	// helper to lock down all camera settings
 	UFUNCTION(BlueprintCallable, Category = "Cinematic Camera")
 	void ApplyCinematicCameraSettings();
 
-	// dualsense / gamepad controller settings so i can play and test with my ps5 controller
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller")
-	bool bEnableDualSenseController = true; // toggle controller support on/off
+	bool bEnableDualSenseController = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller", meta = (ClampMin = "0.05", ClampMax = "0.9"))
-	float ControllerStickDeadZone = 0.2f; // deadzone so stick drift doesn't move the character
+	float ControllerStickDeadZone = 0.2f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller")
-	float GamepadLookSensitivity = 1.5f; // dualsense right stick look speed for death stranding camera
+	float GamepadLookSensitivity = 1.5f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller")
-	bool bEnableRightStickAiming = true; // twin-stick style aiming fallback if in top-down mode
+	bool bEnableRightStickAiming = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller")
-	bool bInvertRightStickAimY = true; // inverts right stick Y axis so stick UP turns character forward / screen-up and stick DOWN turns backward
+	bool bInvertRightStickAimY = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller")
-	bool bEnableControllerVibration = true; // rumble feedback when picking up or plugging in batteries
+	bool bEnableControllerVibration = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float VibrationIntensity = 0.75f; // how strong the controller rumble feels
+	float VibrationIntensity = 0.75f;
 
-	// helper function to rumble the dualsense controller on actions
 	UFUNCTION(BlueprintCallable, Category = "DualSense Controller")
 	void TriggerControllerRumble(float Intensity = 0.6f, float Duration = 0.2f, bool bHeavyLeft = true, bool bLightRight = true);
 
-	// occlusion cutout settings (hades / diablo style circular see-through lens when player walks under catwalks or roofs)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)")
-	bool bEnableOcclusionCutout = true; // turn the roof see-through cutout on or off
+	bool bEnableOcclusionCutout = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)", meta = (ClampMin = "50.0", ClampMax = "1000.0"))
-	float OcclusionCutoutRadius = 260.0f; // size of the circular hole right above the player
+	float OcclusionCutoutRadius = 260.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)", meta = (ClampMin = "10.0", ClampMax = "600.0"))
-	float OcclusionEdgeSoftness = 140.0f; // how soft/feathered the border of the circle is
+	float OcclusionEdgeSoftness = 140.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)", meta = (ClampMin = "1.0", ClampMax = "30.0"))
-	float OcclusionFadeSpeed = 6.0f; // how smoothly the circle fades in and out when walking under a mesh
+	float OcclusionFadeSpeed = 6.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)", meta = (ClampMin = "0.0", ClampMax = "0.8"))
-	float OcclusionMinCenterOpacity = 0.05f; // opacity right in the center above the player (0 = full cutout, 0.05 = slight glass feel)
+	float OcclusionMinCenterOpacity = 0.05f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)")
-	FLinearColor OcclusionRimColor = FLinearColor(0.0f, 0.75f, 1.0f, 1.0f); // subtle electric cyan hue on the cutout edge like hades/tunic
+	FLinearColor OcclusionRimColor = FLinearColor(0.0f, 0.75f, 1.0f, 1.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)", meta = (ClampMin = "0.0", ClampMax = "10.0"))
-	float OcclusionRimIntensity = 1.2f; // set to 0 if you want zero glow on the border
+	float OcclusionRimIntensity = 1.2f;
 
-	// override controller rotation inputs so mouse look does nothing to camera
 	virtual void AddControllerYawInput(float Val) override;
 	virtual void AddControllerPitchInput(float Val) override;
 	virtual void AddControllerRollInput(float Val) override;
@@ -201,42 +166,32 @@ protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 #if WITH_EDITOR
-	// live update camera when changing settings in the editor inspector details panel
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
-	// tracks if enhanced input already handled movement this frame so left stick doesn't double-add
 	bool bMovedViaEnhancedInputThisFrame = false;
 
-	// smoothed world position of the cutout center so the lens glides smoothly with the player
 	FVector SmoothedOcclusionTargetPos = FVector::ZeroVector;
 
-	// map of meshes currently fading in/out above the player
 	UPROPERTY(Transient)
 	TMap<TObjectPtr<UPrimitiveComponent>, FOccludingMeshData> ActiveOccludingMeshes;
 
-	// runs every tick to check if any roof or catwalk is between the camera and player
 	void UpdateCameraOcclusionCutout(float DeltaTime);
 
-	// input bindings setup
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 protected:
 
-	// enhanced input callbacks
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
 
-	// disable jumping for the player character
 	virtual bool CanJumpInternal_Implementation() const override;
 
 public:
 
-	// jump overrides to prevent jumping
 	virtual void Jump() override;
 	virtual void StopJumping() override;
 
-	// wasd movement handling
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoMove(float Right, float Forward);
 
@@ -249,29 +204,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpEnd();
 
-	// pressing E / Square
 	UFUNCTION(BlueprintCallable, Category="Interaction")
 	virtual void DoInteract();
 
-	// releasing E / Square - cancels any active 5-second battery attach hold immediately
 	UFUNCTION(BlueprintCallable, Category="Interaction")
 	virtual void DoInteractRelease();
 
-	// returns normalized 0.0 to 1.0 progress for the 5-second battery attach hold
 	UFUNCTION(BlueprintPure, Category="Interaction")
 	float GetBatteryAttachHoldProgress() const;
 
-	// returns true if any interact button (Square, R1, E, or Enhanced Input InteractAction) is currently held down
 	bool IsInteractInputHeld() const;
 
-	// immediately resets the 5-second battery attach hold timer and UI progress ring back to 0
 	void ResetBatteryAttachHold();
 
-	// pressing R - drops battery on floor in front of player
 	UFUNCTION(BlueprintCallable, Category="Inventory")
 	virtual void DoDropBattery();
 
-	// inventory helpers
 	UFUNCTION(BlueprintCallable, Category="Inventory")
 	bool TryPickupBattery(ABatteryCapsule* Battery);
 
@@ -281,208 +229,147 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Inventory")
 	ABatteryCapsule* TakeCarriedBattery();
 
-	// check if holding a battery
 	UFUNCTION(BlueprintPure, Category="Inventory")
 	bool HasBattery() const { return CarriedBattery != nullptr; }
 
 	UFUNCTION(BlueprintPure, Category="Inventory")
 	ABatteryCapsule* GetCarriedBattery() const { return CarriedBattery; }
 
-	// getters and setters for current interactable
 	void SetCurrentInteractable(AActor* Interactable) { CurrentInteractable = Interactable; }
 	AActor* GetCurrentInteractable() const { return CurrentInteractable; }
 
-	// --- Interaction UI Widget ---
-
-	// custom widget class to use for the interaction prompt (defaults to UInteractPromptWidget)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Interaction UI", meta = (DisplayName = "Interaction Prompt Widget Class"))
 	TSubclassOf<UInteractPromptWidget> InteractionPromptWidgetClass;
 
-	// active runtime interaction prompt widget instance
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "LiveWire|Interaction UI")
 	TObjectPtr<UInteractPromptWidget> InteractionPromptWidget;
 
-	// toggle to enable or disable the on-screen interaction prompt widget
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Interaction UI", meta = (DisplayName = "Show Interaction Widget"))
 	bool bShowInteractionWidget = true;
 
-	// radius around character to scan for nearby interactables (batteries, cylinders)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Interaction UI", meta = (DisplayName = "Interaction Detection Radius"))
 	float InteractionDetectionRadius = 260.0f;
 
-	// whether interaction prompt docks at bottom-center of screen (recommended for 2.5d top-down)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Interaction UI", meta = (DisplayName = "Anchor Prompt To Screen Bottom"))
 	bool bAnchorPromptToScreenBottom = true;
 
-	// initialize and spawn the interaction prompt widget on the viewport
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Interaction UI")
 	void InitInteractionPromptWidget();
 
-	// updates interaction prompt visibility and text based on nearby interactable actors
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Interaction UI")
 	void UpdateInteractionPrompt(float DeltaTime);
 
-	// duration in seconds the player must hold Square / E to attach a battery to a RedPowerCylinder
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Interaction UI", meta = (ClampMin = "0.5", DisplayName = "Battery Attach Hold Duration (Seconds)"))
 	float BatteryAttachHoldDuration = 5.0f;
 
-	// current elapsed hold time (0.0 to BatteryAttachHoldDuration) while attaching a battery
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Interaction UI", meta = (DisplayName = "Current Attach Hold Time"))
 	float CurrentAttachHoldTime = 0.0f;
 
-	// whether the player is currently holding the interact button to attach a battery to a RedPowerCylinder
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Interaction UI", meta = (DisplayName = "Is Holding To Attach Battery"))
 	bool bIsHoldingToAttach = false;
 
 protected:
-	// cylinder currently being targeted during a 5-second hold attachment
 	UPROPERTY(Transient)
 	TObjectPtr<class ARedPowerCylinder> HoldingTargetCylinder = nullptr;
 
-	// tracks whether the interact input is currently held
 	bool bEnhancedInteractHeld = false;
 	bool bRawInteractKeyHeld = false;
 
-	// prevents an instant pickup/collect press from immediately chaining into an attach hold without releasing first
 	bool bRequireFreshPressForHold = false;
 
-	// prevents duplicate DoInteract triggers on the same frame when both EnhancedInput and raw key bindings fire
 	uint64 LastInteractPressFrame = 0;
 
-	// timer for subtle haptic feedback ticks while holding to attach the battery
 	float HoldRumblePulseTimer = 0.0f;
 
 public:
 
-	// ==========================================
-	// LiveWire Player Health HUD Widget (Top-Right)
-	// ==========================================
-
-	// custom widget class to use for player health HUD (defaults to UPlayerHealthHUDWidget)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health HUD", meta = (DisplayName = "Health HUD Widget Class"))
 	TSubclassOf<UPlayerHealthHUDWidget> HealthHUDWidgetClass;
 
-	// active runtime player health HUD widget instance (anchored to top-right of screen)
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "LiveWire|Health HUD")
 	TObjectPtr<UPlayerHealthHUDWidget> HealthHUDWidget;
 
-	// toggle to enable or disable the on-screen top-right player health HUD
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health HUD", meta = (DisplayName = "Show Health HUD"))
 	bool bShowHealthHUD = true;
 
-	// initialize and spawn player health HUD widget on the viewport
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health HUD")
 	void InitHealthHUDWidget();
 
-	// updates the player health HUD widget with current health points
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health HUD")
 	void UpdateHealthHUD();
 
-	// ==========================================
-	// LiveWire Background Music (BGM)
-	// ==========================================
-
-	// Background music track asset to play (defaults to /Game/Sound/LiveWire_Substation_Theme)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Audio", meta = (DisplayName = "Background Music Track"))
 	TObjectPtr<USoundBase> BackgroundMusicTrack;
 
-	// Volume multiplier for the background music (0.0 = silent, 1.0 = normal, clamp 0 to 2)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Audio", meta = (DisplayName = "BGM Volume", ClampMin = "0.0", ClampMax = "2.0", UIMin = "0.0", UIMax = "1.0"))
 	float BGMVolume = 0.65f;
 
-	// Pitch multiplier for the background music (1.0 = normal speed/pitch)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Audio", meta = (DisplayName = "BGM Pitch", ClampMin = "0.2", ClampMax = "2.0"))
 	float BGMPitch = 1.0f;
 
-	// Whether background music starts playing automatically the moment player enters the level
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Audio", meta = (DisplayName = "Auto-Play BGM On Start"))
 	bool bAutoPlayBGM = true;
 
-	// Starts playing the background music track (loops continuously)
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Audio")
 	void PlayBackgroundMusic();
 
-	// Stops the background music track
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Audio")
 	void StopBackgroundMusic();
 
-	// Sets the volume of the background music at runtime
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Audio")
 	void SetBGMVolume(float NewVolume);
 
-	// Called automatically when the BGM track reaches the end to loop it seamlessly
 	UFUNCTION()
 	void OnBGMAudioFinished();
 
-	// Currently active 2D audio component playing the background music
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Audio", meta = (DisplayName = "Active BGM Audio Component"))
 	TObjectPtr<UAudioComponent> BGMAudioComponent;
 
-	// ==========================================
-	// LiveWire Player Health System
-	// ==========================================
-
-	// Maximum health points for the player
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (ClampMin = "1.0", DisplayName = "Max Health"))
 	float MaxHealth = 100.0f;
 
-	// Current health points for the player (starts at 100 when game begins)
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (DisplayName = "Current Health"))
 	float CurrentHealth = 100.0f;
 
-	// Whether the player is currently dead
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Health", meta = (DisplayName = "Is Dead"))
 	bool bIsDead = false;
 
-	// Event fired when player health changes (CurrentHealth, MaxHealth, DeltaHealth)
 	UPROPERTY(BlueprintAssignable, Category = "LiveWire|Health")
 	FOnPlayerHealthChanged OnHealthChanged;
 
-	// Event fired when player health reaches zero
 	UPROPERTY(BlueprintAssignable, Category = "LiveWire|Health")
 	FOnPlayerDied OnPlayerDied;
 
-	// Standard Unreal Engine TakeDamage override
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 
-	// ICombatDamageable interface implementation
 	virtual void ApplyDamage(float Damage, AActor* DamageCauser, const FVector& DamageLocation, const FVector& DamageImpulse) override;
 	virtual void HandleDeath() override;
 	virtual void ApplyHealing(float Healing, AActor* Healer) override;
 	virtual void NotifyDanger(const FVector& DangerLocation, AActor* DangerSource) override;
 
-	// Deals damage to player and updates health points
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
 	void ApplyDamageToPlayer(float DamageAmount, AActor* DamageCauser = nullptr);
 
-	// Heals the player by a specified amount up to MaxHealth
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
 	void HealPlayer(float HealAmount);
 
-	// Directly sets the player's health points
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
 	void SetHealth(float NewHealth);
 
-	// Resets player health back to MaxHealth (100) and revives player
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
 	void ResetHealth();
 
-	// Location where the player respawns when health reaches zero (defaults to X=56, Y=0, Z=745)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (DisplayName = "Respawn Location"))
 	FVector RespawnLocation = FVector(56.0f, 0.0f, 745.0f);
 
-	// Delay in seconds before respawning at RespawnLocation after death (0.0 = instant respawn)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (ClampMin = "0.0", ClampMax = "10.0", DisplayName = "Respawn Delay (Seconds)"))
 	float RespawnDelay = 1.0f;
 
-	// Timer handle for scheduling the respawn
 	FTimerHandle RespawnTimerHandle;
 
-	// Respawns the player character at RespawnLocation, restores health to 100, and re-enables movement
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
 	void RespawnPlayer();
 
-	// Health getters
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Health")
 	float GetCurrentHealth() const { return CurrentHealth; }
 
@@ -495,14 +382,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Health")
 	bool IsDead() const { return bIsDead; }
 
-	// Convenience HP aliases
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Health", meta = (DisplayName = "Get Current HP"))
 	float GetCurrentHP() const { return CurrentHealth; }
 
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Health", meta = (DisplayName = "Get Max HP"))
 	float GetMaxHP() const { return MaxHealth; }
 
-	// Debug key actions to test damage and healing on the health HUD
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
 	void TestTakeDamage();
 
@@ -513,4 +398,13 @@ public:
 
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+
+private:
+	void UpdateDualSenseControls(float DeltaTime);
+	void AcquireOccludingMesh(class UPrimitiveComponent* Comp);
+	void FadeOccludingMeshes(float DeltaTime, const FVector& CameraLoc);
+	bool InteractWithCylinder(class ARedPowerCylinder* Cylinder);
+	AActor* FindBestInteractable();
+	void UpdateCylinderHoldPrompt(class ARedPowerCylinder* Cylinder, float DeltaTime, bool bInputHeld, FString& OutAction, FString& OutTarget);
+	void ApplyHealthChange(float NewHealth);
 };
