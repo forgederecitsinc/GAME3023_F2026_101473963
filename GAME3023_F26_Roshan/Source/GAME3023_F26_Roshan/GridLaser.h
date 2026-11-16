@@ -57,7 +57,7 @@ public:
 	float LaserEmissiveIntensity = 25.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Damage", meta = (ClampMin = "0.0", UIMin = "0.0"))
-	float DamageAmount = 10.0f;
+	float DamageAmount = 25.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Damage", meta = (ClampMin = "0.1", UIMin = "0.1"))
 	float DamageTickInterval = 0.5f;
