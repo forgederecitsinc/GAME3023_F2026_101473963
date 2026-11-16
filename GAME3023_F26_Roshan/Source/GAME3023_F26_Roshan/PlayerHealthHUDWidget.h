@@ -50,7 +50,7 @@ public:
 	float HealthBarWidth = 260.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player Health HUD")
-	float HealthBarHeight = 8.0f;
+	float HealthBarHeight = 14.0f;
 
 protected:
  // NativeConstruct: native construct
