@@ -9,9 +9,9 @@
 AGAME3023_F26_RoshanGameMode::AGAME3023_F26_RoshanGameMode()
 {
 	BatteryThiefSpawnLocations = {
-		FVector(-878.0f, -3679.0f, 100.0f),
-		FVector(1700.0f, 2900.0f, 100.0f),
-		FVector(-1700.0f, 2900.0f, 100.0f)
+		FVector(-878.0f, -3679.0f, 10.0f),
+		FVector(1700.0f, 2900.0f, 10.0f),
+		FVector(-1700.0f, 2900.0f, 10.0f)
 	};
 
 	static ConstructorHelpers::FClassFinder<AEnemyBatteryThief> BPThiefFinder(TEXT("/Game/_Blueprints/Enemy/BP_EnemyBatteryThief"));
@@ -29,13 +29,14 @@ void AGAME3023_F26_RoshanGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
+	//start spawning thieves
 	UWorld* World = GetWorld();
 	if (!bEnableBatteryThiefSpawning || !World)
 	{
 		return;
 	}
 
-	const int32 SlotCount = GetSpawnSlotCount();
+	const int32 SlotCount = GetSpawnSlotCount(); //counts how much is spawned
 	SpawnSlotStates.SetNum(SlotCount);
 	ThiefToSpawnSlotMap.Empty();
 
@@ -201,6 +202,31 @@ void AGAME3023_F26_RoshanGameMode::RegisterThief(AEnemyBatteryThief* Thief, int3
 	}
 }
 
+bool AGAME3023_F26_RoshanGameMode::IsSpawnLocationOccupied(const FVector& Location, float ClearRadius) const
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+
+	const float ClearRadiusSq = FMath::Square(ClearRadius);
+	TArray<AActor*> FoundThieves;
+	UGameplayStatics::GetAllActorsOfClass(World, AEnemyBatteryThief::StaticClass(), FoundThieves);
+	for (AActor* Act : FoundThieves)
+	{
+		const AEnemyBatteryThief* Thief = Cast<AEnemyBatteryThief>(Act);
+		if (IsValid(Thief) && !Thief->bIsDead)
+		{
+			if (FVector::DistSquared2D(Thief->GetActorLocation(), Location) < ClearRadiusSq)
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 AEnemyBatteryThief* AGAME3023_F26_RoshanGameMode::TrySpawnBatteryThiefAtSlot(int32 SlotIndex)
 {
 	UWorld* World = GetWorld();
@@ -209,24 +235,44 @@ AEnemyBatteryThief* AGAME3023_F26_RoshanGameMode::TrySpawnBatteryThiefAtSlot(int
 		return nullptr;
 	}
 
-	const FBatteryThiefSpawnSlotState& SlotState = SpawnSlotStates[SlotIndex];
+	FBatteryThiefSpawnSlotState& SlotState = SpawnSlotStates[SlotIndex];
 	if (SlotState.TotalSpawned >= MaxTotalSpawnsPerLocation ||
 		GetActiveCountForSlot(SlotIndex) >= MaxActivePerSpawnLocation)
 	{
 		return nullptr;
 	}
 
+	// Enforce at least MinSpawnIntervalPerLocation (5s) between spawns at the same location
+	const double Now = World->GetTimeSeconds();
+	if (SlotState.LastSpawnTime >= 0.0 && (Now - SlotState.LastSpawnTime) < static_cast<double>(MinSpawnIntervalPerLocation))
+	{
+		return nullptr;
+	}
+
+	FVector ChosenSpawnLocation = GetSpawnLocationForSlot(SlotIndex);
+	FVector ProjectedSpawn;
+	if (LiveWireUtils::ProjectToNavMesh(World, ChosenSpawnLocation, FVector(150.0f, 150.0f, 250.0f), ProjectedSpawn))
+	{
+		ChosenSpawnLocation = ProjectedSpawn;
+	}
+
+	// Prevent spawning on top of another thief that is still standing on the spawn pad
+	if (IsSpawnLocationOccupied(ChosenSpawnLocation, 110.0f))
+	{
+		return nullptr;
+	}
+
 	TSubclassOf<AEnemyBatteryThief> SpawnClass = BatteryThiefClass ? *BatteryThiefClass : AEnemyBatteryThief::StaticClass();
 	FActorSpawnParameters SpawnParams;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 
-	const FVector ChosenSpawnLocation = GetSpawnLocationForSlot(SlotIndex);
 	AEnemyBatteryThief* SpawnedThief = World->SpawnActor<AEnemyBatteryThief>(SpawnClass, ChosenSpawnLocation, FRotator::ZeroRotator, SpawnParams);
 	if (!SpawnedThief)
 	{
 		return nullptr;
 	}
 
+	SlotState.LastSpawnTime = Now;
 	RegisterThief(SpawnedThief, SlotIndex, true);
 	SpawnedThief->MarkAsSpawnedUnit(ChosenSpawnLocation);
 	SpawnedThief->PickNextNavMeshPatrolDestination();
@@ -359,6 +405,35 @@ void AGAME3023_F26_RoshanGameMode::HandleReplacementRespawnForSlot(int32 SlotInd
 		return;
 	}
 
-	SpawnSlotStates[SlotIndex].PendingReplacements = FMath::Max(0, SpawnSlotStates[SlotIndex].PendingReplacements - 1);
-	TrySpawnBatteryThiefAtSlot(SlotIndex);
+	FBatteryThiefSpawnSlotState& SlotState = SpawnSlotStates[SlotIndex];
+	if (SlotState.TotalSpawned >= MaxTotalSpawnsPerLocation ||
+		GetActiveCountForSlot(SlotIndex) >= MaxActivePerSpawnLocation)
+	{
+		SlotState.PendingReplacements = FMath::Max(0, SlotState.PendingReplacements - 1);
+		return;
+	}
+
+	if (TrySpawnBatteryThiefAtSlot(SlotIndex))
+	{
+		SlotState.PendingReplacements = FMath::Max(0, SlotState.PendingReplacements - 1);
+		return;
+	}
+
+	// Slot was occupied or within the 5s cooldown; retry after MinSpawnIntervalPerLocation
+	if (UWorld* World = GetWorld())
+	{
+		FTimerHandle RetryTimer;
+		FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
+			this,
+			&AGAME3023_F26_RoshanGameMode::HandleReplacementRespawnForSlot,
+			SlotIndex
+		);
+		World->GetTimerManager().SetTimer(
+			RetryTimer,
+			RetryDelegate,
+			FMath::Max(0.5f, MinSpawnIntervalPerLocation),
+			false
+		);
+		ReplacementTimerHandles.Add(RetryTimer);
+	}
 }

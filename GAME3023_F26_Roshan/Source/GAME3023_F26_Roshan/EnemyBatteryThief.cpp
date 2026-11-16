@@ -14,7 +14,6 @@
 #include "NavigationPath.h"
 #include "Kismet/GameplayStatics.h"
 #include "UObject/ConstructorHelpers.h"
-#include "Engine/StaticMesh.h"
 #include "Engine/Engine.h"
 #include "Materials/MaterialInterface.h"
 #include "Engine/World.h"
@@ -26,14 +25,6 @@ AEnemyBatteryThief::AEnemyBatteryThief()
 
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	SetRootComponent(SceneRoot);
-
-	ThiefMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ThiefMesh"));
-	ThiefMesh->SetupAttachment(SceneRoot);
-	ThiefMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 18.0f));
-	ThiefMesh->SetRelativeScale3D(BodyMeshScale);
-	ThiefMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
-	ThiefMesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
-	ThiefMesh->SetCanEverAffectNavigation(false);
 
 	static ConstructorHelpers::FClassFinder<AActor> DropSpotClassFinder(TEXT("/Game/_Blueprints/LevelAssets/BP_BatteryDropSpot"));
 	if (DropSpotClassFinder.Succeeded())
@@ -92,11 +83,6 @@ void AEnemyBatteryThief::PostEditChangeProperty(FPropertyChangedEvent& PropertyC
 
 void AEnemyBatteryThief::RefreshEnemySettings()
 {
-	if (ThiefMesh)
-	{
-		ThiefMesh->SetRelativeScale3D(BodyMeshScale);
-	}
-
 	if (ScannerLight)
 	{
 		ScannerLight->SetIntensity(ScannerLightIntensity);
@@ -144,6 +130,18 @@ void AEnemyBatteryThief::MarkAsSpawnedUnit(const FVector& InHomeOrigin)
 void AEnemyBatteryThief::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Ensure Blueprint-added visual meshes don't carve the NavMesh or block other thieves/pawns
+	TArray<UStaticMeshComponent*> MeshComps;
+	GetComponents<UStaticMeshComponent>(MeshComps);
+	for (UStaticMeshComponent* MeshComp : MeshComps)
+	{
+		if (MeshComp)
+		{
+			MeshComp->SetCanEverAffectNavigation(false);
+			MeshComp->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+		}
+	}
 
 	CurrentHealth = MaxHealth;
 	bIsDead = false;

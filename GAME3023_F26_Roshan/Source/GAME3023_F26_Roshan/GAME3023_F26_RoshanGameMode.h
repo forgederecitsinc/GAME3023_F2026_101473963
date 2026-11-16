@@ -7,10 +7,6 @@
 
 class AEnemyBatteryThief;
 
-/**
- * AGAME3023_F26_RoshanGameMode
- * Base GameMode for our level. Controls enemy wave pacing and respawns.
- */
 UCLASS(abstract)
 class AGAME3023_F26_RoshanGameMode : public AGameModeBase
 {
@@ -23,31 +19,34 @@ public:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Battery Thief Spawning")
-	bool bEnableBatteryThiefSpawning = true;
+	bool bEnableBatteryThiefSpawning = true; //toggle battery thief spawning
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Battery Thief Spawning")
-	TArray<FVector> BatteryThiefSpawnLocations;
+	TArray<FVector> BatteryThiefSpawnLocations; //world location battery thieves will spawn
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Battery Thief Spawning")
-	FVector DefaultBatteryThiefSpawnLocation = FVector(-878.0f, -3679.0f, 100.0f);
+	FVector DefaultBatteryThiefSpawnLocation = FVector(-878.0f, -3679.0f, 10.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Battery Thief Spawning", meta = (ClampMin = "1", ClampMax = "50"))
-	int32 MaxActivePerSpawnLocation = 2;
+	int32 MaxActivePerSpawnLocation = 2; //per location only 2 comes out and stays active
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Battery Thief Spawning", meta = (ClampMin = "1", ClampMax = "100"))
-	int32 MaxTotalSpawnsPerLocation = 10;
+	int32 MaxTotalSpawnsPerLocation = 10; //max spawns until it stops
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Battery Thief Spawning", meta = (ClampMin = "1", ClampMax = "50"))
-	int32 MaxActiveBatteryThieves = 6;
+	int32 MaxActiveBatteryThieves = 6; //max in the whole arena
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Battery Thief Spawning", meta = (ClampMin = "0.5"))
-	float InitialWaveSpawnInterval = 10.0f;
+	float InitialWaveSpawnInterval = 5.0f; //time between spawning thieves at the same location
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Battery Thief Spawning", meta = (ClampMin = "0.5"))
+	float MinSpawnIntervalPerLocation = 5.0f; //minimum 5s interval between spawns at the same location
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Battery Thief Spawning", meta = (ClampMin = "1.0"))
-	float ReplacementRespawnDelay = 60.0f;
+	float ReplacementRespawnDelay = 60.0f; //replacement spawns in 60s after one dies
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Battery Thief Spawning", meta = (ClampMin = "10.0"))
-	float BatteryThiefMoveSpeed = 300.0f;
+	float BatteryThiefMoveSpeed = 300.0f; //move speed
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Battery Thief Spawning")
 	TSubclassOf<AEnemyBatteryThief> BatteryThiefClass;
@@ -71,12 +70,14 @@ private:
 	{
 		int32 TotalSpawned = 0;
 		int32 PendingReplacements = 0;
+		double LastSpawnTime = -100.0;
 		TArray<TWeakObjectPtr<AEnemyBatteryThief>> ActiveThieves;
 	};
 
 	int32 GetSpawnSlotCount() const;
 	FVector GetSpawnLocationForSlot(int32 SlotIndex) const;
 	int32 GetActiveCountForSlot(int32 SlotIndex) const;
+	bool IsSpawnLocationOccupied(const FVector& Location, float ClearRadius = 110.0f) const;
 	int32 FindNearestSpawnSlotIndex(const FVector& Location) const;
 	AEnemyBatteryThief* TrySpawnBatteryThiefAtSlot(int32 SlotIndex);
 	void RegisterThief(AEnemyBatteryThief* Thief, int32 SlotIndex, bool bAddToSlotTracking);

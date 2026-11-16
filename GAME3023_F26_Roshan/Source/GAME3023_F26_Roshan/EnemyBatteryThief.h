@@ -7,7 +7,6 @@
 #include "EnemyBatteryThief.generated.h"
 
 class USceneComponent;
-class UStaticMeshComponent;
 class USpotLightComponent;
 class USphereComponent;
 class UFloatingPawnMovement;
@@ -60,9 +59,6 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USceneComponent> SceneRoot;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (DisplayName = "Thief Body Mesh"))
-	TObjectPtr<UStaticMeshComponent> ThiefMesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (DisplayName = "Carried Battery Mount"))
 	TObjectPtr<USceneComponent> CarriedBatterySocket;
@@ -128,7 +124,7 @@ public:
 	int32 MaxEnemiesToSpawn = 5;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Spawn Interval (Seconds)", ClampMin = "0.5"))
-	float SpawnInterval = 10.0f;
+	float SpawnInterval = 5.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Replacement Respawn Delay After Death (Seconds)", ClampMin = "1.0"))
 	float RespawnDelayAfterDeath = 60.0f;
@@ -195,9 +191,6 @@ public:
 
 	UPROPERTY(EditInstanceOnly, BlueprintReadWrite, Category = "Battery Thief|Patrol & Movement", meta = (DisplayName = "Custom Patrol Waypoints (Optional)"))
 	TArray<TObjectPtr<AActor>> CustomPatrolWaypoints;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Appearance", meta = (DisplayName = "Body Mesh Scale"))
-	FVector BodyMeshScale = FVector(0.65f, 0.50f, 0.35f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Scanner Light", meta = (DisplayName = "Patrol Scanner Light Color"))
 	FLinearColor ScannerLightColor = FLinearColor(1.0f, 0.35f, 0.05f);
