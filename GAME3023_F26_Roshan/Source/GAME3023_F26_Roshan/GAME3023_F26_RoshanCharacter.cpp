@@ -732,10 +732,15 @@ void AGAME3023_F26_RoshanCharacter::DoInteract()
 		{
 			if (!Battery->bIsCarried && !Battery->bIsSocketed)
 			{
-				ResetBatteryAttachHold();
-				bRequireFreshPressForHold = true;
-				Battery->Interact(this);
-				return;
+				const FVector BatteryLoc = Battery->GetActorLocation();
+				if (FVector::DistSquared2D(TraceStart, BatteryLoc) <= FMath::Square(Battery->BatteryPickupRadius) &&
+					FMath::Abs(TraceStart.Z - BatteryLoc.Z) <= 160.0f)
+				{
+					ResetBatteryAttachHold();
+					bRequireFreshPressForHold = true;
+					Battery->Interact(this);
+					return;
+				}
 			}
 		}
 	}
@@ -998,13 +1003,20 @@ AActor* AGAME3023_F26_RoshanCharacter::FindBestInteractable()
 			{
 				return false;
 			}
-			const float DistSq = FVector::DistSquared(PlayerLoc, Battery->GetActorLocation());
-			if (DistSq <= MaxDistSq && DistSq < BestDistSq)
+			const FVector BatteryLoc = Battery->GetActorLocation();
+			const float PickupLimitSq = FMath::Min(MaxDistSq, FMath::Square(Battery->BatteryPickupRadius));
+			const float DistSq2D = FVector::DistSquared2D(PlayerLoc, BatteryLoc);
+			if (DistSq2D <= PickupLimitSq && FMath::Abs(PlayerLoc.Z - BatteryLoc.Z) <= 160.0f)
 			{
-				BestCandidate = Battery;
-				BestDistSq = DistSq;
+				const float DistSq = FVector::DistSquared(PlayerLoc, BatteryLoc);
+				if (DistSq < BestDistSq)
+				{
+					BestCandidate = Battery;
+					BestDistSq = DistSq;
+				}
+				return true;
 			}
-			return DistSq <= MaxDistSq;
+			return false;
 		}
 		if (ARedPowerCylinder* Cylinder = Cast<ARedPowerCylinder>(Candidate))
 		{

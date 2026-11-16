@@ -199,6 +199,9 @@ private:
 	TObjectPtr<UMaterialInstanceDynamic> PowerDomeGreenDynMaterial;
 
 	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> PowerDomeRedDynMaterial;
+
+	UPROPERTY(Transient)
 	TObjectPtr<UPointLightComponent> PowerDomeLight;
 
 	float PowerDomeBlinkTimer = 0.0f;

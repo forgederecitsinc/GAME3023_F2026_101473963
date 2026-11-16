@@ -159,6 +159,25 @@ void ARedPowerCylinder::InitPowerDome()
 		}
 	}
 
+	if (!PowerDomeRedDynMaterial)
+	{
+		if (UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
+		{
+			PowerDomeRedDynMaterial = UMaterialInstanceDynamic::Create(BaseMat, this);
+			if (PowerDomeRedDynMaterial)
+			{
+				const FLinearColor RedBase(1.0f, 0.05f, 0.05f, 1.0f);
+				const FLinearColor RedEmissive = RedBase * PowerDomeGlowIntensity;
+				PowerDomeRedDynMaterial->SetVectorParameterValue(TEXT("Color"), RedBase);
+				PowerDomeRedDynMaterial->SetVectorParameterValue(TEXT("BaseColor"), RedBase);
+				PowerDomeRedDynMaterial->SetVectorParameterValue(TEXT("Base Color"), RedBase);
+				PowerDomeRedDynMaterial->SetVectorParameterValue(TEXT("EmissiveColor"), RedEmissive);
+				PowerDomeRedDynMaterial->SetVectorParameterValue(TEXT("Emissive Color"), RedEmissive);
+				PowerDomeRedDynMaterial->SetVectorParameterValue(TEXT("Emissive"), RedEmissive);
+			}
+		}
+	}
+
 	if (!PowerDomeLight && PowerDomeLightIntensity > 0.0f && GetWorld() && GetWorld()->IsGameWorld())
 	{
 		PowerDomeLight = NewObject<UPointLightComponent>(this, TEXT("PowerDomeBlinkLight"));
@@ -175,7 +194,7 @@ void ARedPowerCylinder::InitPowerDome()
 		}
 	}
 
-	bPowerDomeLightOn = (bIsPowered && bHasBattery);
+	bPowerDomeLightOn = bHasBattery;
 	ApplyPowerDomeLightState(bPowerDomeLightOn);
 }
 
@@ -183,7 +202,9 @@ void ARedPowerCylinder::InitPowerDome()
 void ARedPowerCylinder::ApplyPowerDomeLightState(bool bLightOn)
 {
 	const bool bPoweredActive = (bIsPowered && bHasBattery);
+	const bool bMismatchActive = (!bIsPowered && bHasBattery);
 	const bool bShowGreen = bPoweredActive && bLightOn;
+	const bool bShowRed = bMismatchActive && bLightOn;
 
 	if (PowerDomeMesh)
 	{
@@ -192,6 +213,10 @@ void ARedPowerCylinder::ApplyPowerDomeLightState(bool bLightOn)
 			if (bShowGreen && PowerDomeGreenDynMaterial)
 			{
 				PowerDomeMesh->SetMaterial(i, PowerDomeGreenDynMaterial);
+			}
+			else if (bShowRed && PowerDomeRedDynMaterial)
+			{
+				PowerDomeMesh->SetMaterial(i, PowerDomeRedDynMaterial);
 			}
 			else if (PowerDomeOriginalMaterials[i])
 			{
@@ -203,8 +228,8 @@ void ARedPowerCylinder::ApplyPowerDomeLightState(bool bLightOn)
 	if (PowerDomeLight)
 	{
 		PowerDomeLight->SetIntensity(PowerDomeLightIntensity);
-		PowerDomeLight->SetLightColor(bShowGreen ? FColor(20, 255, 50) : FColor(255, 130, 15));
-		PowerDomeLight->SetVisibility(bPoweredActive);
+		PowerDomeLight->SetLightColor(bShowGreen ? FColor(20, 255, 50) : (bShowRed ? FColor(255, 25, 25) : FColor(255, 130, 15)));
+		PowerDomeLight->SetVisibility(bPoweredActive || bMismatchActive);
 	}
 }
 
@@ -482,7 +507,7 @@ void ARedPowerCylinder::Tick(float DeltaTime)
 		UpdateLaserBeam();
 	}
 
-	if (bIsGame && bIsPowered && bHasBattery)
+	if (bIsGame && bHasBattery)
 	{
 		PowerDomeBlinkTimer += DeltaTime;
 		if (PowerDomeBlinkTimer >= FMath::Max(0.05f, PowerDomeBlinkInterval))
@@ -674,6 +699,10 @@ bool ARedPowerCylinder::InsertBattery(ABatteryCapsule* Battery)
 	}
 	else
 	{
+		PowerDomeBlinkTimer = 0.0f;
+		bPowerDomeLightOn = true;
+		ApplyPowerDomeLightState(true);
+
 		LiveWireUtils::ShowScreenMessage(-1, 5.0f, FColor::Orange,
 			FString::Printf(TEXT("[ID MISMATCH] Battery (ID: %d) attached, but Laser Gun (ID: %d) WON'T POWER ON!"), Battery->BatteryID, CellID), 1.4f);
 	}

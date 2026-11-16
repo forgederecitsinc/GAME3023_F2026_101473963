@@ -44,6 +44,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery|Visual")
 	float RotationSpeed = 90.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery|Interaction", meta = (DisplayName = "Pickup Distance (cm)", ClampMin = "50.0"))
+	float BatteryPickupRadius = 115.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery|Visual")
 	float BobFrequency = 2.0f;
 

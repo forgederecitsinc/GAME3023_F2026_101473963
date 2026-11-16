@@ -17,7 +17,7 @@ ABatteryCapsule::ABatteryCapsule()
 
 	InteractionZone = CreateDefaultSubobject<USphereComponent>(TEXT("InteractionZone"));
 	InteractionZone->SetupAttachment(RootComponent);
-	InteractionZone->SetSphereRadius(180.0f);
+	InteractionZone->SetSphereRadius(BatteryPickupRadius);
 	InteractionZone->SetCollisionProfileName(TEXT("Trigger"));
 }
 
@@ -25,6 +25,10 @@ ABatteryCapsule::ABatteryCapsule()
 void ABatteryCapsule::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
+	if (InteractionZone)
+	{
+		InteractionZone->SetSphereRadius(BatteryPickupRadius);
+	}
 	ApplyColorFromID();
 }
 
@@ -113,6 +117,15 @@ bool ABatteryCapsule::Interact(AGAME3023_F26_RoshanCharacter* Player)
 	{
 		return false;
 	}
+
+	const FVector PlayerLoc = Player->GetActorLocation();
+	const FVector BatteryLoc = GetActorLocation();
+	if (FVector::DistSquared2D(PlayerLoc, BatteryLoc) > FMath::Square(BatteryPickupRadius) ||
+		FMath::Abs(PlayerLoc.Z - BatteryLoc.Z) > 160.0f)
+	{
+		return false;
+	}
+
 	return Player->TryPickupBattery(this);
 }
 
