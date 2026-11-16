@@ -19,6 +19,7 @@
 #include "Engine/World.h"
 #include "TimerManager.h"
 
+// Sets up thief movement, scanner light, carried battery socket, and sensors
 AEnemyBatteryThief::AEnemyBatteryThief()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -67,6 +68,7 @@ AEnemyBatteryThief::AEnemyBatteryThief()
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 }
 
+// Validates settings in editor viewport
 void AEnemyBatteryThief::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
@@ -74,6 +76,7 @@ void AEnemyBatteryThief::OnConstruction(const FTransform& Transform)
 }
 
 #if WITH_EDITOR
+// Refreshes movement and scanner settings on editor change
 void AEnemyBatteryThief::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
@@ -81,6 +84,7 @@ void AEnemyBatteryThief::PostEditChangeProperty(FPropertyChangedEvent& PropertyC
 }
 #endif
 
+// Updates light intensity and colors from instance properties
 void AEnemyBatteryThief::RefreshEnemySettings()
 {
 	if (ScannerLight)
@@ -110,6 +114,7 @@ void AEnemyBatteryThief::RefreshEnemySettings()
 	}
 }
 
+// Stores initial spawn coordinates and marks thief as active unit
 void AEnemyBatteryThief::MarkAsSpawnedUnit(const FVector& InHomeOrigin)
 {
 	bIsSpawnedChildUnit = true;
@@ -127,6 +132,7 @@ void AEnemyBatteryThief::MarkAsSpawnedUnit(const FVector& InHomeOrigin)
 	WallContactTimer = 0.0f;
 }
 
+// Disables mesh NavMesh carving, sets health, and starts patrol loop
 void AEnemyBatteryThief::BeginPlay()
 {
 	Super::BeginPlay();
@@ -200,6 +206,7 @@ void AEnemyBatteryThief::BeginPlay()
 	}
 }
 
+// EndPlay: handles cleanup and clears active timers on shutdown
 void AEnemyBatteryThief::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	if (UWorld* World = GetWorld())
@@ -223,6 +230,7 @@ void AEnemyBatteryThief::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+// Applies damage to thief health and triggers death when depleted
 float AEnemyBatteryThief::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
 	if (bIsDead || DamageAmount <= 0.0f)
@@ -235,6 +243,7 @@ float AEnemyBatteryThief::TakeDamage(float DamageAmount, FDamageEvent const& Dam
 	return ActualDamage;
 }
 
+// ApplyDamage: updates health and processes damage
 void AEnemyBatteryThief::ApplyDamage(float Damage, AActor* DamageCauser, const FVector& DamageLocation, const FVector& DamageImpulse)
 {
 	if (bIsDead || Damage <= 0.0f)
@@ -249,11 +258,13 @@ void AEnemyBatteryThief::ApplyDamage(float Damage, AActor* DamageCauser, const F
 	}
 }
 
+// HandleDeath: handles elimination effects and actor cleanup
 void AEnemyBatteryThief::HandleDeath()
 {
 	KillBatteryThief();
 }
 
+// ApplyHealing: handles apply healing
 void AEnemyBatteryThief::ApplyHealing(float Healing, AActor* Healer)
 {
 	if (bIsDead || Healing <= 0.0f)
@@ -264,10 +275,12 @@ void AEnemyBatteryThief::ApplyHealing(float Healing, AActor* Healer)
 	CurrentHealth = FMath::Clamp(CurrentHealth + Healing, 0.0f, MaxHealth);
 }
 
+// NotifyDanger: handles notify danger
 void AEnemyBatteryThief::NotifyDanger(const FVector& DangerLocation, AActor* DangerSource)
 {
 }
 
+// KillBatteryThief: manages battery attachment and state
 void AEnemyBatteryThief::KillBatteryThief()
 {
 	if (bIsDead)
@@ -294,6 +307,7 @@ void AEnemyBatteryThief::KillBatteryThief()
 	Destroy();
 }
 
+// KillPermanently: handles kill permanently
 void AEnemyBatteryThief::KillPermanently()
 {
 	if (bIsDead)
@@ -314,6 +328,7 @@ void AEnemyBatteryThief::KillPermanently()
 	KillBatteryThief();
 }
 
+// SpawnThiefAtTargetLocation: handles spawning logic and placement
 AEnemyBatteryThief* AEnemyBatteryThief::SpawnThiefAtTargetLocation()
 {
 	UWorld* World = GetWorld();
@@ -375,6 +390,7 @@ AEnemyBatteryThief* AEnemyBatteryThief::SpawnThiefAtTargetLocation()
 	return NewThief;
 }
 
+// IsPointOnWalkableSurface: handles is point on walkable surface
 bool AEnemyBatteryThief::IsPointOnWalkableSurface(const FVector& Point) const
 {
 	UWorld* World = GetWorld();
@@ -392,6 +408,7 @@ bool AEnemyBatteryThief::IsPointOnWalkableSurface(const FVector& Point) const
 	return true;
 }
 
+// IsGroundNavPathValid: updates movement pathfinding and waypoint navigation
 bool AEnemyBatteryThief::IsGroundNavPathValid(const UNavigationPath* NavPath) const
 {
 	if (!NavPath || !NavPath->IsValid() || NavPath->IsPartial() || NavPath->PathPoints.Num() < 2)
@@ -421,6 +438,7 @@ bool AEnemyBatteryThief::IsGroundNavPathValid(const UNavigationPath* NavPath) co
 	return true;
 }
 
+// GetCylinderTriggerGroundCenter: handles get cylinder trigger ground center
 FVector AEnemyBatteryThief::GetCylinderTriggerGroundCenter(const ARedPowerCylinder* Cylinder) const
 {
 	if (!IsValid(Cylinder))
@@ -458,6 +476,7 @@ FVector AEnemyBatteryThief::GetCylinderTriggerGroundCenter(const ARedPowerCylind
 	return CylinderBase;
 }
 
+// ComputeGroundStealApproachPoint: handles compute ground steal approach point
 bool AEnemyBatteryThief::ComputeGroundStealApproachPoint(const ARedPowerCylinder* Cylinder, FVector& OutGroundPoint, float& OutNavPathLength) const
 {
 	OutGroundPoint = FVector::ZeroVector;
@@ -558,6 +577,7 @@ bool AEnemyBatteryThief::ComputeGroundStealApproachPoint(const ARedPowerCylinder
 	return bFoundValidGroundRoute;
 }
 
+// IsNearestThiefForCylinder: battery thief AI behavior
 bool AEnemyBatteryThief::IsNearestThiefForCylinder(const ARedPowerCylinder* Cylinder, float MyGroundPathLength) const
 {
 	UWorld* World = GetWorld();
@@ -615,6 +635,7 @@ bool AEnemyBatteryThief::IsNearestThiefForCylinder(const ARedPowerCylinder* Cyli
 	return true;
 }
 
+// DoesLaserHaveWorkingBattery: manages battery attachment and state
 bool AEnemyBatteryThief::DoesLaserHaveWorkingBattery(const ARedPowerCylinder* Cylinder) const
 {
 	if (!IsValid(Cylinder))
@@ -628,6 +649,7 @@ bool AEnemyBatteryThief::DoesLaserHaveWorkingBattery(const ARedPowerCylinder* Cy
 		(Cylinder->InsertedBattery->BatteryID == Cylinder->CellID);
 }
 
+// FindNearestWorkingBatteryLaser: manages battery attachment and state
 ARedPowerCylinder* AEnemyBatteryThief::FindNearestWorkingBatteryLaser() const
 {
 	UWorld* World = GetWorld();
@@ -681,6 +703,7 @@ ARedPowerCylinder* AEnemyBatteryThief::FindNearestWorkingBatteryLaser() const
 	return NearestValidLaser;
 }
 
+// Finds nearest drop pad to carry stolen battery to
 AActor* AEnemyBatteryThief::FindClosestBatteryDropSpot() const
 {
 	UWorld* World = GetWorld();
@@ -778,6 +801,7 @@ AActor* AEnemyBatteryThief::FindClosestBatteryDropSpot() const
 	return ClosestDropSpot;
 }
 
+// Projects location onto NavMesh floor to prevent floating or sinking
 float AEnemyBatteryThief::SampleGroundNavMeshZ(const FVector& WorldPos) const
 {
 	FVector ProjectedNav;
@@ -808,6 +832,7 @@ float AEnemyBatteryThief::SampleGroundNavMeshZ(const FVector& WorldPos) const
 	return WorldPos.Z;
 }
 
+// BuildPathToWorldLocation: handles build path to world location
 bool AEnemyBatteryThief::BuildPathToWorldLocation(const FVector& DestinationWorldPos)
 {
 	CurrentPathPoints.Reset();
@@ -850,6 +875,7 @@ bool AEnemyBatteryThief::BuildPathToWorldLocation(const FVector& DestinationWorl
 	return false;
 }
 
+// Picks random reachable spot on NavMesh for ambient patrol
 void AEnemyBatteryThief::PickNextNavMeshPatrolDestination()
 {
 	CurrentPathPoints.Reset();
@@ -960,6 +986,7 @@ void AEnemyBatteryThief::PickNextNavMeshPatrolDestination()
 	}
 }
 
+// Detects if thief is stuck against geometry and reroutes path
 bool AEnemyBatteryThief::HandleStuckWatchdog(float DeltaTime, float SpeedToUse, const FVector& CurrentLocation)
 {
 	const float DistMoved2D = FVector::Dist2D(CurrentLocation, LastStuckCheckPosition);
@@ -1016,6 +1043,7 @@ bool AEnemyBatteryThief::HandleStuckWatchdog(float DeltaTime, float SpeedToUse, 
 	return true;
 }
 
+// MoveWithWallSlide: updates movement pathfinding and waypoint navigation
 void AEnemyBatteryThief::MoveWithWallSlide(const FVector& CurrentLocation, const FVector& MoveDir2D, float StepDist, float TargetZ, bool bHasNextCorner, float DeltaTime)
 {
 	FVector DesiredNewXY(
@@ -1109,6 +1137,7 @@ void AEnemyBatteryThief::MoveWithWallSlide(const FVector& CurrentLocation, const
 	}
 }
 
+// Advances thief movement along current calculated path corners
 void AEnemyBatteryThief::FollowCurrentNavPath(float DeltaTime, float SpeedToUse)
 {
 	if (!CurrentPathPoints.IsValidIndex(CurrentPathCornerIndex))
@@ -1150,6 +1179,7 @@ void AEnemyBatteryThief::FollowCurrentNavPath(float DeltaTime, float SpeedToUse)
 	MoveWithWallSlide(CurrentLocation, MoveDir2D, StepDist, TargetZ, bHasNextCorner, DeltaTime);
 }
 
+// ReturnToPatrol: updates movement pathfinding and waypoint navigation
 void AEnemyBatteryThief::ReturnToPatrol()
 {
 	TargetLaserCylinder = nullptr;
@@ -1171,6 +1201,7 @@ void AEnemyBatteryThief::ReturnToPatrol()
 	}
 }
 
+// CompleteBatteryRemoval: manages battery attachment and state
 void AEnemyBatteryThief::CompleteBatteryRemoval()
 {
 	if (!DoesLaserHaveWorkingBattery(TargetLaserCylinder))
@@ -1225,6 +1256,7 @@ void AEnemyBatteryThief::CompleteBatteryRemoval()
 	}
 }
 
+// DepositStolenBatteryAtDropOff: manages battery attachment and state
 void AEnemyBatteryThief::DepositStolenBatteryAtDropOff()
 {
 	if (IsValid(StolenBattery))
@@ -1260,6 +1292,7 @@ void AEnemyBatteryThief::DepositStolenBatteryAtDropOff()
 	PickNextNavMeshPatrolDestination();
 }
 
+// PinToGroundSurface: handles pin to ground surface
 void AEnemyBatteryThief::PinToGroundSurface()
 {
 	const FVector CurrentLoc = GetActorLocation();
@@ -1268,6 +1301,7 @@ void AEnemyBatteryThief::PinToGroundSurface()
 	SetActorLocation(FVector(CurrentLoc.X, CurrentLoc.Y, SurfaceZ + GroundHeightOffset));
 }
 
+// CheckPlayerProximityTouch: handles check player proximity touch
 void AEnemyBatteryThief::CheckPlayerProximityTouch()
 {
 	if (bIsFollowingPlayer || bIsDead)
@@ -1290,6 +1324,7 @@ void AEnemyBatteryThief::CheckPlayerProximityTouch()
 	}
 }
 
+// Handles thief AI state machine (patrol, hunt battery, steal, flee, follow)
 void AEnemyBatteryThief::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -1328,6 +1363,7 @@ void AEnemyBatteryThief::Tick(float DeltaTime)
 	}
 }
 
+// TickPatrolling: updates movement pathfinding and waypoint navigation
 void AEnemyBatteryThief::TickPatrolling(float DeltaTime)
 {
 	if (ARedPowerCylinder* WorkingLaser = FindNearestWorkingBatteryLaser())
@@ -1375,6 +1411,7 @@ void AEnemyBatteryThief::TickPatrolling(float DeltaTime)
 	}
 }
 
+// TickCarrying: handles tick carrying
 void AEnemyBatteryThief::TickCarrying(float DeltaTime)
 {
 	if (!IsValid(StolenBattery))
@@ -1413,6 +1450,7 @@ void AEnemyBatteryThief::TickCarrying(float DeltaTime)
 	}
 }
 
+// TickApproaching: handles tick approaching
 void AEnemyBatteryThief::TickApproaching(float DeltaTime)
 {
 	if (!DoesLaserHaveWorkingBattery(TargetLaserCylinder))
@@ -1464,6 +1502,7 @@ void AEnemyBatteryThief::TickApproaching(float DeltaTime)
 	FollowCurrentNavPath(DeltaTime, PatrolSpeed);
 }
 
+// TickRemoving: handles tick removing
 void AEnemyBatteryThief::TickRemoving(float DeltaTime)
 {
 	if (!DoesLaserHaveWorkingBattery(TargetLaserCylinder))
@@ -1505,6 +1544,7 @@ void AEnemyBatteryThief::TickRemoving(float DeltaTime)
 	}
 }
 
+// TickFollowingPlayer: handles tick following player
 void AEnemyBatteryThief::TickFollowingPlayer(float DeltaTime)
 {
 	const AGAME3023_F26_RoshanCharacter* PlayerChar = Cast<AGAME3023_F26_RoshanCharacter>(TargetPlayerPawn);
@@ -1547,6 +1587,7 @@ void AEnemyBatteryThief::TickFollowingPlayer(float DeltaTime)
 		1.2f);
 }
 
+// StartFollowingPlayer: handles start following player
 void AEnemyBatteryThief::StartFollowingPlayer(APawn* InPlayerPawn)
 {
 	if (!IsValid(InPlayerPawn) || bIsDead)
@@ -1591,6 +1632,7 @@ void AEnemyBatteryThief::StartFollowingPlayer(APawn* InPlayerPawn)
 	}
 }
 
+// StopFollowingPlayerAndResumePatrol: updates movement pathfinding and waypoint navigation
 void AEnemyBatteryThief::StopFollowingPlayerAndResumePatrol()
 {
 	bIsFollowingPlayer = false;
@@ -1612,6 +1654,7 @@ void AEnemyBatteryThief::StopFollowingPlayerAndResumePatrol()
 	}
 }
 
+// OnPlayerTouchBeginOverlap: trigger zone overlap event
 void AEnemyBatteryThief::OnPlayerTouchBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (bIsDead || bIsFollowingPlayer || !IsValid(OtherActor))
@@ -1634,6 +1677,7 @@ void AEnemyBatteryThief::OnPlayerTouchBeginOverlap(UPrimitiveComponent* Overlapp
 	}
 }
 
+// Unused input binding hook for enemy pawn
 void AEnemyBatteryThief::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);

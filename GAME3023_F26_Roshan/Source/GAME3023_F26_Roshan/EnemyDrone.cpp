@@ -13,6 +13,7 @@
 #include "GameFramework/Pawn.h"
 #include "Engine/World.h"
 
+// Sets up drone root, visual mesh, scanner light, and collision
 AEnemyDrone::AEnemyDrone()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -39,6 +40,7 @@ AEnemyDrone::AEnemyDrone()
 	LaserParticleClass = ADroneLaserParticle::StaticClass();
 }
 
+// Enforces minimum patrol height (Z >= 1000) in editor
 void AEnemyDrone::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
@@ -46,6 +48,7 @@ void AEnemyDrone::OnConstruction(const FTransform& Transform)
 }
 
 #if WITH_EDITOR
+// Validates patrol height and settings when modified in editor
 void AEnemyDrone::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
@@ -53,12 +56,14 @@ void AEnemyDrone::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedE
 }
 #endif
 
+// Calculates drone flight altitude above ground level
 float AEnemyDrone::ComputeHoverAltitudeZ() const
 {
 	const float EnforcedMinZ = FMath::Max(1000.0f, MinimumFlightZ);
 	return FMath::Max(EnforcedMinZ, CurrentGroundZ + FMath::Max(1000.0f, PatrolHeight));
 }
 
+// Updates spotlight and flight settings from properties
 void AEnemyDrone::RefreshDroneSettings()
 {
 	MinimumFlightZ = FMath::Max(1000.0f, MinimumFlightZ);
@@ -78,6 +83,7 @@ void AEnemyDrone::RefreshDroneSettings()
 	}
 }
 
+// Initializes patrol path, spotlight settings, and player tracking
 void AEnemyDrone::BeginPlay()
 {
 	Super::BeginPlay();
@@ -116,6 +122,7 @@ void AEnemyDrone::BeginPlay()
 	AdvanceToNextPatrolDestination();
 }
 
+// Teleports drone back to start point and restarts patrol path
 void AEnemyDrone::ResetToStartAndResumePatrol()
 {
 	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
@@ -135,6 +142,7 @@ void AEnemyDrone::ResetToStartAndResumePatrol()
 	AdvanceToNextPatrolDestination();
 }
 
+// Checks if pawn is covered by a roof or umbrella to avoid detection
 bool AEnemyDrone::IsPawnHidingUnderCover(const APawn* TargetPawn) const
 {
 	if (!IsValid(TargetPawn))
@@ -190,6 +198,7 @@ bool AEnemyDrone::IsPawnHidingUnderCover(const APawn* TargetPawn) const
 	return false;
 }
 
+// Checks if target pawn is inside the drone spotlight cone
 bool AEnemyDrone::IsPawnUnderLight(const APawn* TargetPawn) const
 {
 	if (!IsValid(TargetPawn) || !DownwardLaserLight || LaserLightIntensity <= 0.0f)
@@ -238,6 +247,7 @@ bool AEnemyDrone::IsPawnUnderLight(const APawn* TargetPawn) const
 	return true;
 }
 
+// DropLaserParticle: controls laser trace and hit detection
 void AEnemyDrone::DropLaserParticle(APawn* TargetPawn)
 {
 	UWorld* World = GetWorld();
@@ -270,6 +280,7 @@ void AEnemyDrone::DropLaserParticle(APawn* TargetPawn)
 	}
 }
 
+// LatchAndKillPlayer: handles latch and kill player
 void AEnemyDrone::LatchAndKillPlayer(APawn* TargetPawn)
 {
 	if (!IsValid(TargetPawn))
@@ -313,6 +324,7 @@ void AEnemyDrone::LatchAndKillPlayer(APawn* TargetPawn)
 	);
 }
 
+// ClampLocationToNavMesh: updates movement pathfinding and waypoint navigation
 bool AEnemyDrone::ClampLocationToNavMesh(const FVector& WorldPos, FVector& OutNavGroundPos, float HorizontalSearchRadius) const
 {
 	const float QueryZ = bHasValidGroundZ ? CurrentGroundZ : WorldPos.Z;
@@ -323,6 +335,7 @@ bool AEnemyDrone::ClampLocationToNavMesh(const FVector& WorldPos, FVector& OutNa
 		OutNavGroundPos);
 }
 
+// UpdateLightRangeForAltitude: handles update light range for altitude
 void AEnemyDrone::UpdateLightRangeForAltitude(float CurrentZ, float GroundZ)
 {
 	if (!DownwardLaserLight)
@@ -343,6 +356,7 @@ void AEnemyDrone::UpdateLightRangeForAltitude(float CurrentZ, float GroundZ)
 	}
 }
 
+// SampleNavMeshGroundZ: updates movement pathfinding and waypoint navigation
 float AEnemyDrone::SampleNavMeshGroundZ(const FVector& WorldPos) const
 {
 	FVector ProjectedGroundPos;
@@ -360,6 +374,7 @@ float AEnemyDrone::SampleNavMeshGroundZ(const FVector& WorldPos) const
 	return (TracedZ != 0.0f || !bHasValidGroundZ) ? TracedZ : CurrentGroundZ;
 }
 
+// BuildNavMeshCoveragePoints: updates movement pathfinding and waypoint navigation
 void AEnemyDrone::BuildNavMeshCoveragePoints()
 {
 	PatrolGroundPoints.Reset();
@@ -460,6 +475,7 @@ void AEnemyDrone::BuildNavMeshCoveragePoints()
 	}
 }
 
+// AdvanceToNextPatrolDestination: updates movement pathfinding and waypoint navigation
 void AEnemyDrone::AdvanceToNextPatrolDestination()
 {
 	CurrentPathPoints.Reset();
@@ -540,6 +556,7 @@ void AEnemyDrone::AdvanceToNextPatrolDestination()
 	CurrentPathCornerIndex = 0;
 }
 
+// Runs drone flight movement, spotlight scanning, and dive attacks
 void AEnemyDrone::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -574,6 +591,7 @@ void AEnemyDrone::Tick(float DeltaTime)
 	}
 }
 
+// TickLatched: handles tick latched
 void AEnemyDrone::TickLatched(APawn* PlayerPawn, bool bIsPlayerDead)
 {
 	if (!IsValid(PlayerPawn) || !bIsPlayerDead)
@@ -582,6 +600,7 @@ void AEnemyDrone::TickLatched(APawn* PlayerPawn, bool bIsPlayerDead)
 	}
 }
 
+// TickDiving: handles tick diving
 void AEnemyDrone::TickDiving(float DeltaTime, APawn* PlayerPawn, bool bIsPlayerDead)
 {
 	if (!IsValid(PlayerPawn) || bIsPlayerDead)
@@ -607,6 +626,7 @@ void AEnemyDrone::TickDiving(float DeltaTime, APawn* PlayerPawn, bool bIsPlayerD
 	FaceDirection2D(DiveDir, DeltaTime, 2.0f);
 }
 
+// TickTracking: handles tick tracking
 void AEnemyDrone::TickTracking(float DeltaTime, APawn* PlayerPawn, bool bIsPlayerDead)
 {
 	if (bIsPlayerDead)
@@ -683,6 +703,7 @@ void AEnemyDrone::TickTracking(float DeltaTime, APawn* PlayerPawn, bool bIsPlaye
 	UpdateHoverPosition(TargetXY, PlayerLoc.Z, DeltaTime);
 }
 
+// TickPatrolling: updates movement pathfinding and waypoint navigation
 void AEnemyDrone::TickPatrolling(float DeltaTime, APawn* PlayerPawn)
 {
 	if (IsPawnUnderLight(PlayerPawn))
@@ -749,6 +770,7 @@ void AEnemyDrone::TickPatrolling(float DeltaTime, APawn* PlayerPawn)
 	UpdateHoverPosition(TargetXY, TargetCornerGround.Z, DeltaTime);
 }
 
+// UpdateHoverPosition: handles update hover position
 void AEnemyDrone::UpdateHoverPosition(const FVector& TargetXY, float FallbackZ, float DeltaTime)
 {
 	FVector NewLocation = TargetXY;
@@ -774,6 +796,7 @@ void AEnemyDrone::UpdateHoverPosition(const FVector& TargetXY, float FallbackZ, 
 	SetActorLocation(NewLocation);
 }
 
+// FaceDirection2D: handles face direction 2 d
 void AEnemyDrone::FaceDirection2D(const FVector& Dir2D, float DeltaTime, float SpeedMultiplier)
 {
 	const FRotator DesiredRotation(0.0f, Dir2D.Rotation().Yaw, 0.0f);

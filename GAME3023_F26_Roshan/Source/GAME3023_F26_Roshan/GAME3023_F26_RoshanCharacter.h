@@ -103,6 +103,7 @@ public:
 	bool bEnableCameraCollision = false;
 
 	UFUNCTION(BlueprintCallable, Category = "Cinematic Camera")
+ // ApplyCinematicCameraSettings: apply cinematic camera settings
 	void ApplyCinematicCameraSettings();
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller")
@@ -127,6 +128,7 @@ public:
 	float VibrationIntensity = 0.75f;
 
 	UFUNCTION(BlueprintCallable, Category = "DualSense Controller")
+ // TriggerControllerRumble: trigger controller rumble
 	void TriggerControllerRumble(float Intensity = 0.6f, float Duration = 0.2f, bool bHeavyLeft = true, bool bLightRight = true);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)")
@@ -150,8 +152,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)", meta = (ClampMin = "0.0", ClampMax = "10.0"))
 	float OcclusionRimIntensity = 1.2f;
 
+ // AddControllerYawInput: add controller yaw input
 	virtual void AddControllerYawInput(float Val) override;
+ // AddControllerPitchInput: add controller pitch input
 	virtual void AddControllerPitchInput(float Val) override;
+ // AddControllerRollInput: add controller roll input
 	virtual void AddControllerRollInput(float Val) override;
 
 public:
@@ -159,13 +164,19 @@ public:
 	AGAME3023_F26_RoshanCharacter();	
 
 protected:
+ // Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+ // PossessedBy: possessed by
 	virtual void PossessedBy(AController* NewController) override;
+ // EndPlay: end play
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+ // Called every frame
 	virtual void Tick(float DeltaTime) override;
+ // Editor construction script
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 #if WITH_EDITOR
+ // Editor property change callback
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
@@ -176,66 +187,90 @@ protected:
 	UPROPERTY(Transient)
 	TMap<TObjectPtr<UPrimitiveComponent>, FOccludingMeshData> ActiveOccludingMeshes;
 
+ // UpdateCameraOcclusionCutout: update camera occlusion cutout
 	void UpdateCameraOcclusionCutout(float DeltaTime);
 
+ // Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 protected:
 
+ // Move: move
 	void Move(const FInputActionValue& Value);
+ // Look: look
 	void Look(const FInputActionValue& Value);
 
+ // CanJumpInternal_Implementation: can jump internal implementation
 	virtual bool CanJumpInternal_Implementation() const override;
 
 public:
 
+ // Jump: jump
 	virtual void Jump() override;
+ // StopJumping: stop jumping
 	virtual void StopJumping() override;
 
 	UFUNCTION(BlueprintCallable, Category="Input")
+ // DoMove: do move
 	virtual void DoMove(float Right, float Forward);
 
 	UFUNCTION(BlueprintCallable, Category="Input")
+ // DoLook: do look
 	virtual void DoLook(float Yaw, float Pitch);
 
 	UFUNCTION(BlueprintCallable, Category="Input")
+ // DoJumpStart: do jump start
 	virtual void DoJumpStart();
 
 	UFUNCTION(BlueprintCallable, Category="Input")
+ // DoJumpEnd: do jump end
 	virtual void DoJumpEnd();
 
 	UFUNCTION(BlueprintCallable, Category="Interaction")
+ // Handles DoInteract interaction
 	virtual void DoInteract();
 
 	UFUNCTION(BlueprintCallable, Category="Interaction")
+ // Handles DoInteractRelease interaction
 	virtual void DoInteractRelease();
 
 	UFUNCTION(BlueprintPure, Category="Interaction")
+ // Battery state and handling
 	float GetBatteryAttachHoldProgress() const;
 
+ // Handles IsInteractInputHeld interaction
 	bool IsInteractInputHeld() const;
 
+ // Battery state and handling
 	void ResetBatteryAttachHold();
 
 	UFUNCTION(BlueprintCallable, Category="Inventory")
+ // Battery state and handling
 	virtual void DoDropBattery();
 
 	UFUNCTION(BlueprintCallable, Category="Inventory")
+ // Battery state and handling
 	bool TryPickupBattery(ABatteryCapsule* Battery);
 
 	UFUNCTION(BlueprintCallable, Category="Inventory")
+ // Battery state and handling
 	ABatteryCapsule* DropCurrentBattery();
 
 	UFUNCTION(BlueprintCallable, Category="Inventory")
+ // Battery state and handling
 	ABatteryCapsule* TakeCarriedBattery();
 
 	UFUNCTION(BlueprintPure, Category="Inventory")
+ // Battery state and handling
 	bool HasBattery() const { return CarriedBattery != nullptr; }
 
 	UFUNCTION(BlueprintPure, Category="Inventory")
+ // Battery state and handling
 	ABatteryCapsule* GetCarriedBattery() const { return CarriedBattery; }
 
+ // Handles SetCurrentInteractable interaction
 	void SetCurrentInteractable(AActor* Interactable) { CurrentInteractable = Interactable; }
+ // Handles GetCurrentInteractable interaction
 	AActor* GetCurrentInteractable() const { return CurrentInteractable; }
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Interaction UI", meta = (DisplayName = "Interaction Prompt Widget Class"))
@@ -254,9 +289,11 @@ public:
 	bool bAnchorPromptToScreenBottom = true;
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Interaction UI")
+ // Handles InitInteractionPromptWidget interaction
 	void InitInteractionPromptWidget();
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Interaction UI")
+ // Handles UpdateInteractionPrompt interaction
 	void UpdateInteractionPrompt(float DeltaTime);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Interaction UI", meta = (ClampMin = "0.5", DisplayName = "Battery Attach Hold Duration (Seconds)"))
@@ -293,9 +330,11 @@ public:
 	bool bShowHealthHUD = true;
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health HUD")
+ // Health and damage management
 	void InitHealthHUDWidget();
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health HUD")
+ // Health and damage management
 	void UpdateHealthHUD();
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Audio", meta = (DisplayName = "Background Music Track"))
@@ -311,15 +350,19 @@ public:
 	bool bAutoPlayBGM = true;
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Audio")
+ // PlayBackgroundMusic: play background music
 	void PlayBackgroundMusic();
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Audio")
+ // StopBackgroundMusic: stop background music
 	void StopBackgroundMusic();
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Audio")
+ // SetBGMVolume: set bgm volume
 	void SetBGMVolume(float NewVolume);
 
 	UFUNCTION()
+ // OnBGMAudioFinished: on bgm audio finished
 	void OnBGMAudioFinished();
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Audio", meta = (DisplayName = "Active BGM Audio Component"))
@@ -340,23 +383,32 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "LiveWire|Health")
 	FOnPlayerDied OnPlayerDied;
 
+ // Health and damage management
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 
+ // Health and damage management
 	virtual void ApplyDamage(float Damage, AActor* DamageCauser, const FVector& DamageLocation, const FVector& DamageImpulse) override;
+ // Death and elimination handling
 	virtual void HandleDeath() override;
+ // ApplyHealing: apply healing
 	virtual void ApplyHealing(float Healing, AActor* Healer) override;
+ // NotifyDanger: notify danger
 	virtual void NotifyDanger(const FVector& DangerLocation, AActor* DangerSource) override;
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
+ // Health and damage management
 	void ApplyDamageToPlayer(float DamageAmount, AActor* DamageCauser = nullptr);
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
+ // HealPlayer: heal player
 	void HealPlayer(float HealAmount);
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
+ // Health and damage management
 	void SetHealth(float NewHealth);
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
+ // Health and damage management
 	void ResetHealth();
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (DisplayName = "Respawn Location"))
@@ -368,43 +420,61 @@ public:
 	FTimerHandle RespawnTimerHandle;
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
+ // Spawning logic and management
 	void RespawnPlayer();
 
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Health")
+ // Health and damage management
 	float GetCurrentHealth() const { return CurrentHealth; }
 
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Health")
+ // Health and damage management
 	float GetMaxHealth() const { return MaxHealth; }
 
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Health")
+ // Health and damage management
 	float GetHealthPercent() const { return MaxHealth > 0.0f ? FMath::Clamp(CurrentHealth / MaxHealth, 0.0f, 1.0f) : 0.0f; }
 
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Health")
+ // IsDead: is dead
 	bool IsDead() const { return bIsDead; }
 
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Health", meta = (DisplayName = "Get Current HP"))
+ // GetCurrentHP: get current hp
 	float GetCurrentHP() const { return CurrentHealth; }
 
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Health", meta = (DisplayName = "Get Max HP"))
+ // GetMaxHP: get max hp
 	float GetMaxHP() const { return MaxHealth; }
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
+ // Health and damage management
 	void TestTakeDamage();
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
+ // TestHeal: test heal
 	void TestHeal();
 
 public:
 
+ // GetCameraBoom: get camera boom
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
+ // GetFollowCamera: get follow camera
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 
 private:
+ // UpdateDualSenseControls: update dual sense controls
 	void UpdateDualSenseControls(float DeltaTime);
+ // AcquireOccludingMesh: acquire occluding mesh
 	void AcquireOccludingMesh(class UPrimitiveComponent* Comp);
+ // FadeOccludingMeshes: fade occluding meshes
 	void FadeOccludingMeshes(float DeltaTime, const FVector& CameraLoc);
+ // Handles InteractWithCylinder interaction
 	bool InteractWithCylinder(class ARedPowerCylinder* Cylinder);
+ // Handles FindBestInteractable interaction
 	AActor* FindBestInteractable();
+ // UpdateCylinderHoldPrompt: update cylinder hold prompt
 	void UpdateCylinderHoldPrompt(class ARedPowerCylinder* Cylinder, float DeltaTime, bool bInputHeld, FString& OutAction, FString& OutTarget);
+ // Health and damage management
 	void ApplyHealthChange(float NewHealth);
 };

@@ -18,6 +18,7 @@ public:
 	UBatteryThiefTimerWidget(const FObjectInitializer& ObjectInitializer);
 
 	UFUNCTION(BlueprintCallable, Category = "Battery Thief Timer")
+ // UpdateTimer: update timer
 	void UpdateTimer(float InRemainingTime, float InTotalDuration);
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battery Thief Timer")
@@ -36,14 +37,19 @@ public:
 	float ProgressBarHeight = 8.0f;
 
 protected:
+ // NativeConstruct: native construct
 	virtual void NativeConstruct() override;
+ // Called every frame
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+ // RebuildWidget: rebuild widget
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Battery Thief Timer")
+ // OnTimerUpdated: on timer updated
 	void OnTimerUpdated(float InRemainingTime, float InProgressPercent);
 
 private:
+ // RefreshVisuals: refresh visuals
 	void RefreshVisuals();
 
 	float DisplayedPercent = 1.0f;

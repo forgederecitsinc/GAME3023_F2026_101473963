@@ -7,12 +7,14 @@
 #include "Widgets/Text/STextBlock.h"
 #include "Blueprint/WidgetTree.h"
 
+// Constructor: sets up component hierarchy and default properties
 UPlayerHealthHUDWidget::UPlayerHealthHUDWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
 	bIsVolatile = true;
 }
 
+// Binds health bar, damage vignette, and text elements
 void UPlayerHealthHUDWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
@@ -20,6 +22,7 @@ void UPlayerHealthHUDWidget::NativeConstruct()
 	RefreshVisuals();
 }
 
+// Smoothly interpolates health bar fill and fades damage flashes
 void UPlayerHealthHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
@@ -59,6 +62,7 @@ void UPlayerHealthHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDel
 	}
 }
 
+// Updates current health and max health percentages
 void UPlayerHealthHUDWidget::UpdateHealth(float NewCurrentHealth, float NewMaxHealth)
 {
 	const float OldHealth = CurrentHealth;
@@ -75,11 +79,13 @@ void UPlayerHealthHUDWidget::UpdateHealth(float NewCurrentHealth, float NewMaxHe
 	OnHealthUpdated(CurrentHealth, MaxHealth, HealthPercent);
 }
 
+// SetHealthPercent: updates health and processes damage
 void UPlayerHealthHUDWidget::SetHealthPercent(float InPercent)
 {
 	UpdateHealth(InPercent * MaxHealth, MaxHealth);
 }
 
+// RefreshVisuals: handles refresh visuals
 void UPlayerHealthHUDWidget::RefreshVisuals()
 {
 	if (HealthValueTextBlock.IsValid())
@@ -89,6 +95,7 @@ void UPlayerHealthHUDWidget::RefreshVisuals()
 	}
 }
 
+// RebuildWidget: updates UI display and widget visibility
 TSharedRef<SWidget> UPlayerHealthHUDWidget::RebuildWidget()
 {
 	if (WidgetTree && WidgetTree->RootWidget)

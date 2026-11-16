@@ -17,6 +17,7 @@ class GAME3023_F26_ROSHAN_API ADroneLaserParticle : public AActor
 public:
 	ADroneLaserParticle();
 
+ // Called every frame
 	virtual void Tick(float DeltaTime) override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -40,9 +41,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Laser Particle", meta = (ExposeOnSpawn = "true"))
 	FLinearColor ParticleColor = FLinearColor(1.0f, 0.08f, 0.08f);
 
+ // InitializeParticle: initialize particle
 	void InitializeParticle(float InDamage, float InSpeed, const FVector& InDirection, const FLinearColor& InColor);
 
 protected:
+ // Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
 private:
@@ -52,5 +55,6 @@ private:
 	bool bHasDealtDamage = false;
 
 	UFUNCTION()
+ // Collision overlap callback
 	void OnParticleOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 };

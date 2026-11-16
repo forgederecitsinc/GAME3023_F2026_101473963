@@ -17,6 +17,7 @@ class GAME3023_F26_ROSHAN_API ABatteryCapsule : public AActor
 public:
 	ABatteryCapsule();
 
+ // Called every frame
 	virtual void Tick(float DeltaTime) override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Battery ID (4-Digit)"))
@@ -59,41 +60,55 @@ public:
 	FVector SpawnOrigin;
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Color")
+ // ID color mapping and dynamic materials
 	void ApplyColorFromID();
 
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
+ // ID color mapping and dynamic materials
 	FLinearColor GetColorForID(int32 InID) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Battery|Actions")
+ // Handles Interact interaction
 	bool Interact(AGAME3023_F26_RoshanCharacter* Player);
 
 	UFUNCTION(BlueprintCallable, Category = "Battery|Actions")
+ // OnCollected: on collected
 	void OnCollected(AGAME3023_F26_RoshanCharacter* Player);
 
 	UFUNCTION(BlueprintCallable, Category = "Battery|Actions")
+ // OnSocketed: on socketed
 	void OnSocketed(AActor* SocketActor, USceneComponent* AttachTargetComp);
 
 	UFUNCTION(BlueprintCallable, Category = "Battery|Actions")
+ // OnDropped: on dropped
 	void OnDropped(const FVector& DropLocation);
 
 	UFUNCTION(BlueprintCallable, Category = "Battery|Actions")
+ // Spawning logic and management
 	void RespawnToOrigin();
 
 protected:
+ // Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+ // Editor construction script
 	virtual void OnConstruction(const FTransform& Transform) override;
 #if WITH_EDITOR
+ // Editor property change callback
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
 	UFUNCTION()
+ // Handles OnInteractionBeginOverlap interaction
 	void OnInteractionBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
 	UFUNCTION()
+ // Handles OnInteractionEndOverlap interaction
 	void OnInteractionEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 private:
+ // SetAttachmentCollisionEnabled: set attachment collision enabled
 	void SetAttachmentCollisionEnabled(bool bEnabled);
+ // ResetToWorldLocation: reset to world location
 	void ResetToWorldLocation(const FVector& TargetLocation);
 
 	float RunningTime = 0.0f;

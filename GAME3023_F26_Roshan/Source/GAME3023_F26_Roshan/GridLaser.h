@@ -20,6 +20,7 @@ class GAME3023_F26_ROSHAN_API AGridLaser : public AActor
 public:
 	AGridLaser();
 
+ // Called every frame
 	virtual void Tick(float DeltaTime) override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser", meta = (DisplayName = "Is Laser On"))
@@ -62,31 +63,40 @@ public:
 	float DamageTickInterval = 0.5f;
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|GridLaser")
+ // Laser trace and collision
 	void SetLaserState(bool bNewActive);
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|GridLaser")
+ // Laser trace and collision
 	void ToggleLaser();
 
 	UFUNCTION(BlueprintPure, Category = "LiveWire|GridLaser")
+ // Laser trace and collision
 	bool IsLaserOn() const { return bIsLaserOn; }
 
 	UPROPERTY(BlueprintAssignable, Category = "LiveWire|GridLaser")
 	FOnGridLaserStateChanged OnLaserStateChanged;
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|GridLaser")
+ // Laser trace and collision
 	void RebuildLaserGrid();
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|GridLaser")
+ // Laser trace and collision
 	void UpdateLaserState();
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|GridLaser")
+ // Laser trace and collision
 	void UpdateLaserVisuals();
 
 protected:
+ // Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+ // Editor construction script
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 #if WITH_EDITOR
+ // Editor property change callback
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
@@ -108,12 +118,16 @@ private:
 
 	float OverlapDamageTimer = 0.0f;
 
+ // ConfigureHazardCollision: configure hazard collision
 	void ConfigureHazardCollision();
+ // Health and damage management
 	void DealLaserDamage(AActor* TargetActor);
 
 	UFUNCTION()
+ // Collision overlap callback
 	void OnHazardBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
 	UFUNCTION()
+ // Collision overlap callback
 	void OnHazardEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 };

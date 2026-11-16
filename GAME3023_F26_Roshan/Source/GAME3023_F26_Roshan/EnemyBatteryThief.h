@@ -18,10 +18,15 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBatteryThiefKilled, class AEnemyB
 UENUM(BlueprintType)
 enum class EBatteryThiefState : uint8
 {
+ // UMETA: umeta
 	Patrolling		UMETA(DisplayName = "Patrolling NavMesh"),
+ // UMETA: umeta
 	Approaching		UMETA(DisplayName = "Moving To Working Battery"),
+ // UMETA: umeta
 	Removing		UMETA(DisplayName = "Removing Battery (10s Timer)"),
+ // UMETA: umeta
 	Carrying		UMETA(DisplayName = "Carrying Stolen Battery To Closest BP_BatteryDropSpot"),
+ // UMETA: umeta
 	FollowingPlayer	UMETA(DisplayName = "Following Player (Speed +70)")
 };
 
@@ -34,24 +39,35 @@ public:
 	AEnemyBatteryThief();
 
 protected:
+ // Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+ // EndPlay: end play
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+ // Editor construction script
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 #if WITH_EDITOR
+ // Editor property change callback
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
 public:	
+ // Called every frame
 	virtual void Tick(float DeltaTime) override;
 
+ // Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+ // Health and damage management
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 
+ // Health and damage management
 	virtual void ApplyDamage(float Damage, AActor* DamageCauser, const FVector& DamageLocation, const FVector& DamageImpulse) override;
+ // Death and elimination handling
 	virtual void HandleDeath() override;
+ // ApplyHealing: apply healing
 	virtual void ApplyHealing(float Healing, AActor* Healer) override;
+ // NotifyDanger: notify danger
 	virtual void NotifyDanger(const FVector& DangerLocation, AActor* DangerSource) override;
 
 	UPROPERTY(BlueprintAssignable, Category = "Battery Thief|Health & Death")
@@ -82,12 +98,15 @@ public:
 	TObjectPtr<APawn> TargetPlayerPawn = nullptr;
 
 	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Player Follow")
+ // StartFollowingPlayer: start following player
 	void StartFollowingPlayer(APawn* InPlayerPawn);
 
 	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Player Follow")
+ // Navigation and pathfinding
 	void StopFollowingPlayerAndResumePatrol();
 
 	UFUNCTION(BlueprintPure, Category = "Battery Thief|Player Follow")
+ // IsFollowingPlayer: is following player
 	bool IsFollowingPlayer() const { return bIsFollowingPlayer; }
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Health & Death", meta = (DisplayName = "Max Health", ClampMin = "1.0"))
@@ -100,9 +119,11 @@ public:
 	bool bIsDead = false;
 
 	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Health & Death")
+ // Battery state and handling
 	void KillBatteryThief();
 
 	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Health & Death")
+ // KillPermanently: kill permanently
 	void KillPermanently();
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Spawn Location"))
@@ -208,26 +229,34 @@ public:
 	float ScannerOuterConeAngle = 28.0f;
 
 	UFUNCTION(BlueprintCallable, Category = "Battery Thief")
+ // RefreshEnemySettings: refresh enemy settings
 	void RefreshEnemySettings();
 
 	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Patrol & Movement")
+ // Navigation and pathfinding
 	void PickNextNavMeshPatrolDestination();
 
 	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Sabotage & Removal")
+ // Battery state and handling
 	ARedPowerCylinder* FindNearestWorkingBatteryLaser() const;
 
 	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Sabotage & Removal")
+ // Battery state and handling
 	AActor* FindClosestBatteryDropSpot() const;
 
 	UFUNCTION(BlueprintPure, Category = "Battery Thief|Sabotage & Removal")
+ // Battery state and handling
 	bool DoesLaserHaveWorkingBattery(const ARedPowerCylinder* Cylinder) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Sabotage & Removal")
+ // Battery state and handling
 	void DepositStolenBatteryAtDropOff();
 
 	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Spawning")
+ // Spawning logic and management
 	AEnemyBatteryThief* SpawnThiefAtTargetLocation();
 
+ // Spawning logic and management
 	void MarkAsSpawnedUnit(const FVector& InHomeOrigin);
 
 private:
@@ -259,36 +288,56 @@ private:
 	int32 TotalSpawnedCount = 0;
 	FTimerHandle SpawnTimerHandle;
 
+ // IsPointOnWalkableSurface: is point on walkable surface
 	bool IsPointOnWalkableSurface(const FVector& Point) const;
 
+ // Navigation and pathfinding
 	bool IsGroundNavPathValid(const class UNavigationPath* NavPath) const;
 
+ // GetCylinderTriggerGroundCenter: get cylinder trigger ground center
 	FVector GetCylinderTriggerGroundCenter(const ARedPowerCylinder* Cylinder) const;
 
+ // ComputeGroundStealApproachPoint: compute ground steal approach point
 	bool ComputeGroundStealApproachPoint(const ARedPowerCylinder* Cylinder, FVector& OutGroundPoint, float& OutNavPathLength) const;
 
+ // IsNearestThiefForCylinder: is nearest thief for cylinder
 	bool IsNearestThiefForCylinder(const ARedPowerCylinder* Cylinder, float MyGroundPathLength) const;
 
+ // BuildPathToWorldLocation: build path to world location
 	bool BuildPathToWorldLocation(const FVector& DestinationWorldPos);
 
+ // Navigation and pathfinding
 	void FollowCurrentNavPath(float DeltaTime, float SpeedToUse);
 
+ // Battery state and handling
 	void CompleteBatteryRemoval();
 
+ // Navigation and pathfinding
 	void ReturnToPatrol();
 
+ // Navigation and pathfinding
 	float SampleGroundNavMeshZ(const FVector& WorldPos) const;
 
 	UFUNCTION()
+ // Collision overlap callback
 	void OnPlayerTouchBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
+ // HandleStuckWatchdog: handle stuck watchdog
 	bool HandleStuckWatchdog(float DeltaTime, float SpeedToUse, const FVector& CurrentLocation);
+ // MoveWithWallSlide: move with wall slide
 	void MoveWithWallSlide(const FVector& CurrentLocation, const FVector& MoveDir2D, float StepDist, float TargetZ, bool bHasNextCorner, float DeltaTime);
+ // PinToGroundSurface: pin to ground surface
 	void PinToGroundSurface();
+ // CheckPlayerProximityTouch: check player proximity touch
 	void CheckPlayerProximityTouch();
+ // Called every frame
 	void TickPatrolling(float DeltaTime);
+ // Called every frame
 	void TickApproaching(float DeltaTime);
+ // Called every frame
 	void TickRemoving(float DeltaTime);
+ // Called every frame
 	void TickCarrying(float DeltaTime);
+ // Called every frame
 	void TickFollowingPlayer(float DeltaTime);
 };

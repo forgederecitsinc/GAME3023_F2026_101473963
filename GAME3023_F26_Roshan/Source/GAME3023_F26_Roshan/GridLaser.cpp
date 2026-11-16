@@ -8,6 +8,7 @@
 #include "Engine/StaticMesh.h"
 #include "Kismet/GameplayStatics.h"
 
+// Sets up beam mesh, box trigger volume, and audio components
 AGridLaser::AGridLaser()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -27,6 +28,7 @@ AGridLaser::AGridLaser()
 	HazardBox->SetGenerateOverlapEvents(true);
 }
 
+// Initializes laser power state, collision overlaps, and dynamic material
 void AGridLaser::BeginPlay()
 {
 	Super::BeginPlay();
@@ -42,6 +44,7 @@ void AGridLaser::BeginPlay()
 	UpdateLaserState();
 }
 
+// Scales laser beam and collision box according to length and width in editor
 void AGridLaser::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
@@ -51,6 +54,7 @@ void AGridLaser::OnConstruction(const FTransform& Transform)
 }
 
 #if WITH_EDITOR
+// Refreshes laser visuals when length or toggle properties change
 void AGridLaser::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
@@ -60,6 +64,7 @@ void AGridLaser::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEv
 }
 #endif
 
+// RebuildLaserGrid: controls laser trace and hit detection
 void AGridLaser::RebuildLaserGrid()
 {
 	if (!LaserBeamInstances)
@@ -110,10 +115,12 @@ void AGridLaser::RebuildLaserGrid()
 	}
 }
 
+// Adjusts beam mesh scale and particle endpoints
 void AGridLaser::UpdateLaserVisuals()
 {
 }
 
+// ConfigureHazardCollision: handles configure hazard collision
 void AGridLaser::ConfigureHazardCollision()
 {
 	if (!HazardBox)
@@ -155,6 +162,7 @@ void AGridLaser::ConfigureHazardCollision()
 	}
 }
 
+// UpdateLaserState: controls laser trace and hit detection
 void AGridLaser::UpdateLaserState()
 {
 	if (LaserBeamInstances)
@@ -164,6 +172,7 @@ void AGridLaser::UpdateLaserState()
 	ConfigureHazardCollision();
 }
 
+// SetLaserState: controls laser trace and hit detection
 void AGridLaser::SetLaserState(bool bNewActive)
 {
 	if (bIsLaserOn != bNewActive)
@@ -174,11 +183,13 @@ void AGridLaser::SetLaserState(bool bNewActive)
 	}
 }
 
+// Inverts current laser active state
 void AGridLaser::ToggleLaser()
 {
 	SetLaserState(!bIsLaserOn);
 }
 
+// DealLaserDamage: updates health and processes damage
 void AGridLaser::DealLaserDamage(AActor* TargetActor)
 {
 	if (!TargetActor || !bIsLaserOn)
@@ -207,6 +218,7 @@ void AGridLaser::DealLaserDamage(AActor* TargetActor)
 	UGameplayStatics::ApplyDamage(TargetActor, DamageAmount, GetInstigatorController(), this, nullptr);
 }
 
+// OnHazardBeginOverlap: trigger zone overlap event
 void AGridLaser::OnHazardBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (!bIsLaserOn || !OtherActor || OtherActor == this)
@@ -228,6 +240,7 @@ void AGridLaser::OnHazardBeginOverlap(UPrimitiveComponent* OverlappedComp, AActo
 	}
 }
 
+// OnHazardEndOverlap: trigger zone overlap event
 void AGridLaser::OnHazardEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
 	if (OtherActor && OtherActor == OverlappingPlayer)
@@ -237,6 +250,7 @@ void AGridLaser::OnHazardEndOverlap(UPrimitiveComponent* OverlappedComp, AActor*
 	}
 }
 
+// Updates beam flicker effects or patrol movement if active
 void AGridLaser::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);

@@ -13,9 +13,13 @@ class ADroneLaserParticle;
 UENUM(BlueprintType)
 enum class EEnemyDroneState : uint8
 {
+ // UMETA: umeta
 	Patrolling		UMETA(DisplayName = "Patrolling At Z >= 1000"),
+ // UMETA: umeta
 	TrackingPlayer	UMETA(DisplayName = "Player Caught (5s Escape Timer)"),
+ // UMETA: umeta
 	DivingToLatch	UMETA(DisplayName = "Diving Down To Latch & Kill"),
+ // UMETA: umeta
 	LatchedKilled	UMETA(DisplayName = "Latched Onto Player (Killed)")
 };
 
@@ -28,14 +32,18 @@ public:
 	AEnemyDrone();
 
 protected:
+ // Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+ // Editor construction script
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 #if WITH_EDITOR
+ // Editor property change callback
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
 public:	
+ // Called every frame
 	virtual void Tick(float DeltaTime) override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -117,21 +125,27 @@ public:
 	bool bIsFollowingPlayer = false;
 
 	UFUNCTION(BlueprintCallable, Category = "Drone|Laser Light")
+ // Updates spotlight and flight settings from properties
 	void RefreshDroneSettings();
 
 	UFUNCTION(BlueprintCallable, Category = "Drone|Movement & Patrol")
+ // Navigation and pathfinding
 	void BuildNavMeshCoveragePoints();
 
 	UFUNCTION(BlueprintCallable, Category = "Drone|Movement & Patrol")
+ // Navigation and pathfinding
 	void ResetToStartAndResumePatrol();
 
 	UFUNCTION(BlueprintPure, Category = "Drone|Player Detection & Latch Kill")
+ // Spawning logic and management
 	bool IsPawnUnderLight(const APawn* TargetPawn) const;
 
 	UFUNCTION(BlueprintPure, Category = "Drone|Player Detection & Latch Kill")
+ // Spawning logic and management
 	bool IsPawnHidingUnderCover(const APawn* TargetPawn) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Drone|Laser Bomb Attack")
+ // Laser trace and collision
 	void DropLaserParticle(APawn* TargetPawn);
 
 private:
@@ -158,22 +172,34 @@ private:
 	float CurrentGroundZ = 0.0f;
 	bool bHasValidGroundZ = false;
 
+ // Calculates drone flight altitude above ground level
 	float ComputeHoverAltitudeZ() const;
 
+ // LatchAndKillPlayer: latch and kill player
 	void LatchAndKillPlayer(APawn* TargetPawn);
 
+ // Navigation and pathfinding
 	void AdvanceToNextPatrolDestination();
 
+ // Navigation and pathfinding
 	float SampleNavMeshGroundZ(const FVector& WorldPos) const;
 
+ // Navigation and pathfinding
 	bool ClampLocationToNavMesh(const FVector& WorldPos, FVector& OutNavGroundPos, float HorizontalSearchRadius = 500.0f) const;
 
+ // UpdateLightRangeForAltitude: update light range for altitude
 	void UpdateLightRangeForAltitude(float CurrentZ, float GroundZ);
 
+ // Called every frame
 	void TickLatched(APawn* PlayerPawn, bool bIsPlayerDead);
+ // Called every frame
 	void TickDiving(float DeltaTime, APawn* PlayerPawn, bool bIsPlayerDead);
+ // Called every frame
 	void TickTracking(float DeltaTime, APawn* PlayerPawn, bool bIsPlayerDead);
+ // Called every frame
 	void TickPatrolling(float DeltaTime, APawn* PlayerPawn);
+ // UpdateHoverPosition: update hover position
 	void UpdateHoverPosition(const FVector& TargetXY, float FallbackZ, float DeltaTime);
+ // FaceDirection2D: face direction 2 d
 	void FaceDirection2D(const FVector& Dir2D, float DeltaTime, float SpeedMultiplier = 1.0f);
 };

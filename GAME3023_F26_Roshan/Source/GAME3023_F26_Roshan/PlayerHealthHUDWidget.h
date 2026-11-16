@@ -18,18 +18,23 @@ public:
 	UPlayerHealthHUDWidget(const FObjectInitializer& ObjectInitializer);
 
 	UFUNCTION(BlueprintCallable, Category = "Player Health HUD")
+ // Health and damage management
 	void UpdateHealth(float NewCurrentHealth, float NewMaxHealth);
 
 	UFUNCTION(BlueprintCallable, Category = "Player Health HUD")
+ // Health and damage management
 	void SetHealthPercent(float InPercent);
 
 	UFUNCTION(BlueprintPure, Category = "Player Health HUD")
+ // Health and damage management
 	float GetCurrentHealth() const { return CurrentHealth; }
 
 	UFUNCTION(BlueprintPure, Category = "Player Health HUD")
+ // Health and damage management
 	float GetMaxHealth() const { return MaxHealth; }
 
 	UFUNCTION(BlueprintPure, Category = "Player Health HUD")
+ // Health and damage management
 	float GetHealthPercent() const { return HealthPercent; }
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player Health HUD")
@@ -48,17 +53,23 @@ public:
 	float HealthBarHeight = 24.0f;
 
 protected:
+ // NativeConstruct: native construct
 	virtual void NativeConstruct() override;
+ // Called every frame
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+ // RebuildWidget: rebuild widget
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Player Health HUD")
+ // Health and damage management
 	void OnHealthUpdated(float NewCurrentHealth, float NewMaxHealth, float NewPercent);
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Player Health HUD")
+ // Health and damage management
 	void OnPlayerDamaged(float DamageAmount);
 
 private:
+ // RefreshVisuals: refresh visuals
 	void RefreshVisuals();
 
 	float DisplayedPercent = 1.0f;

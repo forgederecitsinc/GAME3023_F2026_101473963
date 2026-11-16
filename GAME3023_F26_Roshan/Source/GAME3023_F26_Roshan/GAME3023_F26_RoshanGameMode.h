@@ -15,7 +15,9 @@ class AGAME3023_F26_RoshanGameMode : public AGameModeBase
 public:
 	AGAME3023_F26_RoshanGameMode();
 
+ // Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+ // EndPlay: end play
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Battery Thief Spawning")
@@ -52,17 +54,22 @@ public:
 	TSubclassOf<AEnemyBatteryThief> BatteryThiefClass;
 
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Battery Thief Spawning")
+ // Battery state and handling
 	int32 GetActiveBatteryThiefCount() const;
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Battery Thief Spawning")
+ // Spawning logic and management
 	AEnemyBatteryThief* TrySpawnBatteryThief();
 
 protected:
 	UFUNCTION()
+ // Spawning logic and management
 	void OnSpawnedBatteryThiefKilled(AEnemyBatteryThief* KilledThief);
 
+ // Called every frame
 	void HandleInitialWaveSpawnTick();
 
+ // Spawning logic and management
 	void HandleReplacementRespawnForSlot(int32 SlotIndex);
 
 private:
@@ -74,13 +81,21 @@ private:
 		TArray<TWeakObjectPtr<AEnemyBatteryThief>> ActiveThieves;
 	};
 
+ // Spawning logic and management
 	int32 GetSpawnSlotCount() const;
+ // Spawning logic and management
 	FVector GetSpawnLocationForSlot(int32 SlotIndex) const;
+ // GetActiveCountForSlot: get active count for slot
 	int32 GetActiveCountForSlot(int32 SlotIndex) const;
+ // Spawning logic and management
 	bool IsSpawnLocationOccupied(const FVector& Location, float ClearRadius = 110.0f) const;
+ // Spawning logic and management
 	int32 FindNearestSpawnSlotIndex(const FVector& Location) const;
+ // Spawning logic and management
 	AEnemyBatteryThief* TrySpawnBatteryThiefAtSlot(int32 SlotIndex);
+ // RegisterThief: register thief
 	void RegisterThief(AEnemyBatteryThief* Thief, int32 SlotIndex, bool bAddToSlotTracking);
+ // AreAllSlotsInitialWaveComplete: are all slots initial wave complete
 	bool AreAllSlotsInitialWaveComplete() const;
 
 	bool bInitialWaveCompleted = false;

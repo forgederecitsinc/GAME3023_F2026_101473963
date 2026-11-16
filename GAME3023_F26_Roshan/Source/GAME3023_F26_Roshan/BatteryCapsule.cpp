@@ -4,6 +4,7 @@
 #include "GAME3023_F26_RoshanCharacter.h"
 #include "LiveWireUtils.h"
 
+// Sets up default collision and interaction triggers for the battery capsule
 ABatteryCapsule::ABatteryCapsule()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -20,6 +21,7 @@ ABatteryCapsule::ABatteryCapsule()
 	InteractionZone->SetCollisionProfileName(TEXT("Trigger"));
 }
 
+// Updates editor visual state and colors when properties change in editor
 void ABatteryCapsule::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
@@ -27,6 +29,7 @@ void ABatteryCapsule::OnConstruction(const FTransform& Transform)
 }
 
 #if WITH_EDITOR
+// Handles property changes in editor viewport to refresh colors
 void ABatteryCapsule::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
@@ -34,6 +37,7 @@ void ABatteryCapsule::PostEditChangeProperty(FPropertyChangedEvent& PropertyChan
 }
 #endif
 
+// Stores spawn position and initializes ID color and collision
 void ABatteryCapsule::BeginPlay()
 {
 	Super::BeginPlay();
@@ -47,15 +51,18 @@ void ABatteryCapsule::BeginPlay()
 	ApplyColorFromID();
 }
 
+// Returns the matching linear color mapped to the 4-digit ID
 FLinearColor ABatteryCapsule::GetColorForID(int32 InID) const
 {
 	return LiveWireUtils::GetColorForID(InID);
 }
 
+// Applies dynamic material colors to the battery body based on ID
 void ABatteryCapsule::ApplyColorFromID()
 {
 }
 
+// Updates battery floating animation or state while dropped
 void ABatteryCapsule::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -71,6 +78,7 @@ void ABatteryCapsule::Tick(float DeltaTime)
 	SetActorLocation(BaseLocation + FVector(0.0f, 0.0f, DeltaZ));
 }
 
+// Shows interaction prompt when player walks into pickup range
 void ABatteryCapsule::OnInteractionBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (bIsCarried || bIsSocketed)
@@ -86,6 +94,7 @@ void ABatteryCapsule::OnInteractionBeginOverlap(UPrimitiveComponent* OverlappedC
 	}
 }
 
+// Hides interaction prompt when player leaves pickup range
 void ABatteryCapsule::OnInteractionEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
 	if (AGAME3023_F26_RoshanCharacter* Player = Cast<AGAME3023_F26_RoshanCharacter>(OtherActor))
@@ -97,6 +106,7 @@ void ABatteryCapsule::OnInteractionEndOverlap(UPrimitiveComponent* OverlappedCom
 	}
 }
 
+// Picks up or grabs the battery when player presses interact
 bool ABatteryCapsule::Interact(AGAME3023_F26_RoshanCharacter* Player)
 {
 	if (!Player || bIsCarried || bIsSocketed)
@@ -106,6 +116,8 @@ bool ABatteryCapsule::Interact(AGAME3023_F26_RoshanCharacter* Player)
 	return Player->TryPickupBattery(this);
 }
 
+//collecting the object will latch the battery to player's spine
+// Attaches battery to player socket and disables world physics
 void ABatteryCapsule::OnCollected(AGAME3023_F26_RoshanCharacter* Player)
 {
 	if (!Player)
@@ -135,6 +147,7 @@ void ABatteryCapsule::OnCollected(AGAME3023_F26_RoshanCharacter* Player)
 	SetActorRelativeScale3D(FVector(0.35f));
 }
 
+// Snaps battery into a cylinder or socket and locks its transform
 void ABatteryCapsule::OnSocketed(AActor* SocketActor, USceneComponent* AttachTargetComp)
 {
 	bIsCarried = false;
@@ -157,16 +170,19 @@ void ABatteryCapsule::OnSocketed(AActor* SocketActor, USceneComponent* AttachTar
 	SetAttachmentCollisionEnabled(false);
 }
 
+// Drops battery onto ground and re-enables collision and prompt triggers
 void ABatteryCapsule::OnDropped(const FVector& DropLocation)
 {
 	ResetToWorldLocation(DropLocation);
 }
 
+// Teleports battery back to its initial spawn point if lost
 void ABatteryCapsule::RespawnToOrigin()
 {
 	ResetToWorldLocation(SpawnOrigin);
 }
 
+// Toggles collision profiles on/off when socketing or carrying
 void ABatteryCapsule::SetAttachmentCollisionEnabled(bool bEnabled)
 {
 	SetActorEnableCollision(bEnabled);
@@ -184,6 +200,7 @@ void ABatteryCapsule::SetAttachmentCollisionEnabled(bool bEnabled)
 	}
 }
 
+// Detaches battery and places it at given world coordinates
 void ABatteryCapsule::ResetToWorldLocation(const FVector& TargetLocation)
 {
 	bIsCarried = false;

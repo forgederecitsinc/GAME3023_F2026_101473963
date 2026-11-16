@@ -4,6 +4,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
 
+// Sets up target mesh and collision trigger
 ALaserTarget::ALaserTarget()
 {
 	PrimaryActorTick.bCanEverTick = false;
@@ -12,15 +13,18 @@ ALaserTarget::ALaserTarget()
 	RootComponent = SceneRoot;
 }
 
+// GetColorForID: updates dynamic material colors based on ID
 FLinearColor ALaserTarget::GetColorForID(int32 InID) const
 {
 	return LiveWireUtils::GetColorForID(InID);
 }
 
+// ApplyColors: updates dynamic material colors based on ID
 void ALaserTarget::ApplyColors()
 {
 }
 
+// SetLaserHit: controls laser trace and hit detection
 void ALaserTarget::SetLaserHit(bool bHit, AActor* SourceActor)
 {
 	if (bIsHitByLaser == bHit)

@@ -23,7 +23,9 @@ class GAME3023_F26_ROSHAN_API ARedPowerCylinder : public AActor
 public:
 	ARedPowerCylinder();
 
+ // Called every frame
 	virtual void Tick(float DeltaTime) override;
+ // Called every frame
 	virtual bool ShouldTickIfViewportsOnly() const override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Cell ID (4-Digit)"))
@@ -102,57 +104,80 @@ public:
 	TObjectPtr<ABatteryCapsule> InsertedBattery;
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Color")
+ // ID color mapping and dynamic materials
 	void ApplyColorFromID();
 
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
+ // ID color mapping and dynamic materials
 	FLinearColor GetColorForID(int32 InID) const;
 
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Laser")
+ // CheckActorTargetIDMatch: check actor target id match
 	bool CheckActorTargetIDMatch(AActor* ActorToCheck, int32& OutFoundID) const;
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Laser")
+ // RotateGun: rotate gun
 	void RotateGun(float AngleDegrees = 90.0f);
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Laser")
+ // Laser trace and collision
 	void UpdateLaserBeam();
 
 	UFUNCTION(BlueprintCallable, Category = "Cell|Actions")
+ // Handles Interact interaction
 	bool Interact(AGAME3023_F26_RoshanCharacter* Player);
 
 	UFUNCTION(BlueprintPure, Category = "Cell|Actions")
+ // Handles CanPlayerInteract interaction
 	bool CanPlayerInteract(const AActor* InPlayerActor) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Cell|Actions")
+ // Battery state and handling
 	bool InsertBattery(ABatteryCapsule* Battery);
 
 	UFUNCTION(BlueprintCallable, Category = "Cell|Actions")
+ // Battery state and handling
 	ABatteryCapsule* RemoveBattery();
 
 	UFUNCTION(BlueprintPure, Category = "Cell|State")
+ // IsPowered: is powered
 	bool IsPowered() const { return bIsPowered; }
 
 protected:
+ // Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+ // Editor construction script
 	virtual void OnConstruction(const FTransform& Transform) override;
 #if WITH_EDITOR
+ // Editor property change callback
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
 	UFUNCTION()
+ // Handles OnInteractionBeginOverlap interaction
 	void OnInteractionBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
 	UFUNCTION()
+ // Handles OnInteractionEndOverlap interaction
 	void OnInteractionEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
+ // UpdateVisualState: update visual state
 	void UpdateVisualState();
+ // BuildGunComponents: build gun components
 	void BuildGunComponents();
+ // InitPowerDome: init power dome
 	void InitPowerDome();
+ // ApplyPowerDomeLightState: apply power dome light state
 	void ApplyPowerDomeLightState(bool bLightOn);
 
 private:
+ // ClearDetectedTargets: clear detected targets
 	void ClearDetectedTargets();
+ // Laser trace and collision
 	AActor* TraceLaserBeam(float& OutDistance, bool& bOutHitObstacle) const;
+ // Laser trace and collision
 	void ApplyLaserBurnToPlayer(AActor* HitActor);
+ // UpdateDetectedTargets: update detected targets
 	void UpdateDetectedTargets(AActor* HitActor);
 
 	bool bHasPrintedNoTarget = false;

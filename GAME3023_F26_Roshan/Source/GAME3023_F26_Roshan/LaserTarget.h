@@ -29,11 +29,14 @@ public:
 	FOnLaserTargetHitStateChanged OnLaserHitStateChanged;
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Gameplay")
+ // Laser trace and collision
 	void SetLaserHit(bool bHit, AActor* SourceActor = nullptr);
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Color")
+ // ID color mapping and dynamic materials
 	void ApplyColors();
 
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
+ // ID color mapping and dynamic materials
 	FLinearColor GetColorForID(int32 InID) const;
 };

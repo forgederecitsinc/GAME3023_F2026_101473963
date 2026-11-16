@@ -254,6 +254,7 @@ private:
 	float HoldProgress = 0.0f;
 };
 
+// Constructor: sets up component hierarchy and default properties
 UInteractPromptWidget::UInteractPromptWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
@@ -266,6 +267,7 @@ UInteractPromptWidget::UInteractPromptWidget(const FObjectInitializer& ObjectIni
 	bIsVolatile = true;
 }
 
+// Initializes prompt badges, button icon textures, and text elements
 void UInteractPromptWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
@@ -276,6 +278,7 @@ void UInteractPromptWidget::NativeConstruct()
 	TargetAlpha = 0.0f;
 }
 
+// Smoothly fades widget in/out and updates hold progress circle
 void UInteractPromptWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
@@ -316,6 +319,7 @@ void UInteractPromptWidget::NativeTick(const FGeometry& MyGeometry, float InDelt
 	}
 }
 
+// UpdatePromptLabels: updates UI display and widget visibility
 void UInteractPromptWidget::UpdatePromptLabels()
 {
 	if (ActionTextBlock.IsValid())
@@ -329,6 +333,7 @@ void UInteractPromptWidget::UpdatePromptLabels()
 	}
 }
 
+// Displays interaction prompt with specified action text and target name
 void UInteractPromptWidget::ShowPrompt(AActor* InTargetActor, const FText& InActionText, const FText& InTargetName)
 {
 	TargetActor = InTargetActor;
@@ -345,6 +350,7 @@ void UInteractPromptWidget::ShowPrompt(AActor* InTargetActor, const FText& InAct
 	OnShowPrompt(InActionText, InTargetName);
 }
 
+// Fades out and hides interaction prompt widget
 void UInteractPromptWidget::HidePrompt()
 {
 	bIsPromptVisible = false;
@@ -362,6 +368,7 @@ void UInteractPromptWidget::HidePrompt()
 	OnHidePrompt();
 }
 
+// UpdatePromptText: updates UI display and widget visibility
 void UInteractPromptWidget::UpdatePromptText(const FText& InActionText, const FText& InTargetName)
 {
 	ActionText = InActionText;
@@ -369,6 +376,7 @@ void UInteractPromptWidget::UpdatePromptText(const FText& InActionText, const FT
 	UpdatePromptLabels();
 }
 
+// SetHoldProgress: handles set hold progress
 void UInteractPromptWidget::SetHoldProgress(float InProgress)
 {
 	HoldProgress = FMath::Clamp(InProgress, 0.0f, 1.0f);
@@ -379,11 +387,13 @@ void UInteractPromptWidget::SetHoldProgress(float InProgress)
 	OnHoldProgressChanged(HoldProgress);
 }
 
+// GetPromptSlateVisibility: updates UI display and widget visibility
 EVisibility UInteractPromptWidget::GetPromptSlateVisibility() const
 {
 	return (CurrentAlpha > 0.001f) ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 }
 
+// RebuildWidget: updates UI display and widget visibility
 TSharedRef<SWidget> UInteractPromptWidget::RebuildWidget()
 {
 	if (WidgetTree && WidgetTree->RootWidget)

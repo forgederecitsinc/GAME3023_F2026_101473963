@@ -8,6 +8,7 @@
 #include "Engine/World.h"
 #include "TimerManager.h"
 
+// Sets up bushing mesh, spark points, and interaction zone
 ATransformerBushing::ATransformerBushing()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -30,6 +31,7 @@ ATransformerBushing::ATransformerBushing()
 	BushingLight->SetVisibility(false);
 }
 
+// SyncIDAndColor: updates dynamic material colors based on ID
 void ATransformerBushing::SyncIDAndColor(int32 NewID)
 {
 	BushingID = NewID;
@@ -40,6 +42,7 @@ void ATransformerBushing::SyncIDAndColor(int32 NewID)
 	}
 }
 
+// Updates editor visual appearance and ID colors
 void ATransformerBushing::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
@@ -48,6 +51,7 @@ void ATransformerBushing::OnConstruction(const FTransform& Transform)
 }
 
 #if WITH_EDITOR
+// Refreshes bushing settings on editor property change
 void ATransformerBushing::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
@@ -67,6 +71,7 @@ void ATransformerBushing::PostEditChangeProperty(FPropertyChangedEvent& Property
 }
 #endif
 
+// Initializes ID, dynamic materials, and spark particles
 void ATransformerBushing::BeginPlay()
 {
 	Super::BeginPlay();
@@ -76,6 +81,7 @@ void ATransformerBushing::BeginPlay()
 	UpdateAppearance();
 }
 
+// Updates electrical sparks and laser connection checks
 void ATransformerBushing::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -88,6 +94,7 @@ void ATransformerBushing::Tick(float DeltaTime)
 	}
 }
 
+// BindTarget: handles bind target
 void ATransformerBushing::BindTarget(ALaserTarget* Target)
 {
 	if (!Target || Target->TargetID != BushingID)
@@ -104,6 +111,7 @@ void ATransformerBushing::BindTarget(ALaserTarget* Target)
 	}
 }
 
+// BindToMatchingTargets: handles bind to matching targets
 void ATransformerBushing::BindToMatchingTargets()
 {
 	if (LinkedLaserTarget)
@@ -126,6 +134,7 @@ void ATransformerBushing::BindToMatchingTargets()
 	}
 }
 
+// OnTargetHitStateChanged: handles on target hit state changed
 void ATransformerBushing::OnTargetHitStateChanged(ALaserTarget* Target, bool bIsHit)
 {
 	if (Target && Target->TargetID == BushingID)
@@ -134,6 +143,7 @@ void ATransformerBushing::OnTargetHitStateChanged(ALaserTarget* Target, bool bIs
 	}
 }
 
+// SetLitUp: handles set lit up
 void ATransformerBushing::SetLitUp(bool bLit)
 {
 	if ((bStayLitOnceActivated && bIsLitUp && !bLit) || bIsLitUp == bLit)
@@ -184,6 +194,7 @@ void ATransformerBushing::SetLitUp(bool bLit)
 	OnTransformerStateChanged.Broadcast(this, bIsLitUp);
 }
 
+// SetMeshEmissive: handles set mesh emissive
 void ATransformerBushing::SetMeshEmissive(const FLinearColor& Color)
 {
 	if (!BushingMesh)
@@ -202,6 +213,7 @@ void ATransformerBushing::SetMeshEmissive(const FLinearColor& Color)
 	}
 }
 
+// StartNeonIgnitionFlicker: handles start neon ignition flicker
 void ATransformerBushing::StartNeonIgnitionFlicker()
 {
 	UWorld* World = GetWorld();
@@ -241,25 +253,30 @@ void ATransformerBushing::StartNeonIgnitionFlicker()
 	}, 0.05f, false);
 }
 
+// SetLaserHit: controls laser trace and hit detection
 void ATransformerBushing::SetLaserHit(bool bHit, AActor* SourceActor)
 {
 	SetLitUp(bHit);
 }
 
+// OnLitStateChanged_Implementation: handles on lit state changed implementation
 void ATransformerBushing::OnLitStateChanged_Implementation(bool bNewLit)
 {
 }
 
+// Returns mapped linear color for bushing 4-digit ID
 FLinearColor ATransformerBushing::GetColorForID(int32 InID) const
 {
 	return LiveWireUtils::GetColorForID(InID);
 }
 
+// GetActiveLitColor: updates dynamic material colors based on ID
 FLinearColor ATransformerBushing::GetActiveLitColor() const
 {
 	return bUseCustomNeonColor ? NeonLitColor : GetColorForID(BushingID);
 }
 
+// UpdateAppearance: handles update appearance
 void ATransformerBushing::UpdateAppearance()
 {
 	const bool bShouldGlow = bIsLitUp || (bPreviewLitInEditor && GetWorld() && !GetWorld()->IsGameWorld());

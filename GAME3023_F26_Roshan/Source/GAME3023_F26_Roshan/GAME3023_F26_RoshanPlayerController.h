@@ -34,10 +34,13 @@ protected:
 	UPROPERTY(EditAnywhere, Config, Category = "Input|Touch Controls")
 	bool bForceTouchControls = false;
 
+ // Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
+ // SetupInputComponent: setup input component
 	virtual void SetupInputComponent() override;
 
+ // ShouldUseTouchControls: should use touch controls
 	bool ShouldUseTouchControls() const;
 
 };

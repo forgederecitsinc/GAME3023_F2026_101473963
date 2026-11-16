@@ -36,6 +36,7 @@
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
+// Sets up player capsule, camera boom, top-down camera, and inventory
 AGAME3023_F26_RoshanCharacter::AGAME3023_F26_RoshanCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -90,6 +91,7 @@ AGAME3023_F26_RoshanCharacter::AGAME3023_F26_RoshanCharacter()
 	bIsDead = false;
 }
 
+// Initializes health HUD, camera framing, and input bindings
 void AGAME3023_F26_RoshanCharacter::BeginPlay()
 {
 	Super::BeginPlay();
@@ -126,6 +128,7 @@ void AGAME3023_F26_RoshanCharacter::BeginPlay()
 	}
 }
 
+// PossessedBy: handles possessed by
 void AGAME3023_F26_RoshanCharacter::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
@@ -148,6 +151,7 @@ void AGAME3023_F26_RoshanCharacter::PossessedBy(AController* NewController)
 	}
 }
 
+// EndPlay: handles cleanup and clears active timers on shutdown
 void AGAME3023_F26_RoshanCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	StopBackgroundMusic();
@@ -188,6 +192,7 @@ void AGAME3023_F26_RoshanCharacter::EndPlay(const EEndPlayReason::Type EndPlayRe
 	Super::EndPlay(EndPlayReason);
 }
 
+// Handles twin-stick aiming, hold interactions, roof cutouts, and HUD updates
 void AGAME3023_F26_RoshanCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -207,6 +212,7 @@ void AGAME3023_F26_RoshanCharacter::Tick(float DeltaTime)
 	bMovedViaEnhancedInputThisFrame = false;
 }
 
+// UpdateDualSenseControls: handles update dual sense controls
 void AGAME3023_F26_RoshanCharacter::UpdateDualSenseControls(float DeltaTime)
 {
 	APlayerController* PC = Cast<APlayerController>(GetController());
@@ -270,6 +276,7 @@ void AGAME3023_F26_RoshanCharacter::UpdateDualSenseControls(float DeltaTime)
 	}
 }
 
+// UpdateCameraOcclusionCutout: handles update camera occlusion cutout
 void AGAME3023_F26_RoshanCharacter::UpdateCameraOcclusionCutout(float DeltaTime)
 {
 	if (!bEnableOcclusionCutout || !FollowCamera || !GetWorld())
@@ -325,6 +332,7 @@ void AGAME3023_F26_RoshanCharacter::UpdateCameraOcclusionCutout(float DeltaTime)
 	FadeOccludingMeshes(DeltaTime, CameraLoc);
 }
 
+// AcquireOccludingMesh: handles acquire occluding mesh
 void AGAME3023_F26_RoshanCharacter::AcquireOccludingMesh(UPrimitiveComponent* Comp)
 {
 	if (FOccludingMeshData* ExistingData = ActiveOccludingMeshes.Find(Comp))
@@ -362,6 +370,7 @@ void AGAME3023_F26_RoshanCharacter::AcquireOccludingMesh(UPrimitiveComponent* Co
 	ActiveOccludingMeshes.Add(Comp, MoveTemp(NewData));
 }
 
+// FadeOccludingMeshes: handles fade occluding meshes
 void AGAME3023_F26_RoshanCharacter::FadeOccludingMeshes(float DeltaTime, const FVector& CameraLoc)
 {
 	const float SafeRadius = FMath::Max(OcclusionCutoutRadius, 20.0f);
@@ -410,6 +419,7 @@ void AGAME3023_F26_RoshanCharacter::FadeOccludingMeshes(float DeltaTime, const F
 	}
 }
 
+// TriggerControllerRumble: handles trigger controller rumble
 void AGAME3023_F26_RoshanCharacter::TriggerControllerRumble(float Intensity, float Duration, bool bHeavyLeft, bool bLightRight)
 {
 	if (!bEnableControllerVibration) return;
@@ -429,6 +439,7 @@ void AGAME3023_F26_RoshanCharacter::TriggerControllerRumble(float Intensity, flo
 	}
 }
 
+// OnConstruction: runs in editor when actor properties change
 void AGAME3023_F26_RoshanCharacter::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
@@ -436,6 +447,8 @@ void AGAME3023_F26_RoshanCharacter::OnConstruction(const FTransform& Transform)
 }
 
 #if WITH_EDITOR
+
+// PostEditChangeProperty: refreshes editor view when properties are modified
 void AGAME3023_F26_RoshanCharacter::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
@@ -466,6 +479,7 @@ void AGAME3023_F26_RoshanCharacter::PostEditChangeProperty(FPropertyChangedEvent
 }
 #endif
 
+// ApplyCinematicCameraSettings: handles apply cinematic camera settings
 void AGAME3023_F26_RoshanCharacter::ApplyCinematicCameraSettings()
 {
 	bUseControllerRotationPitch = false;
@@ -510,18 +524,22 @@ void AGAME3023_F26_RoshanCharacter::ApplyCinematicCameraSettings()
 	}
 }
 
+// AddControllerYawInput: handles add controller yaw input
 void AGAME3023_F26_RoshanCharacter::AddControllerYawInput(float Val)
 {
 }
 
+// AddControllerPitchInput: handles add controller pitch input
 void AGAME3023_F26_RoshanCharacter::AddControllerPitchInput(float Val)
 {
 }
 
+// AddControllerRollInput: handles add controller roll input
 void AGAME3023_F26_RoshanCharacter::AddControllerRollInput(float Val)
 {
 }
 
+// Binds Enhanced Input actions for move, look, interact, and drop
 void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
@@ -563,6 +581,7 @@ void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* P
 	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Right, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
 }
 
+// Handles WASD and left-stick character movement input
 void AGAME3023_F26_RoshanCharacter::Move(const FInputActionValue& Value)
 {
 	FVector2D MovementVector = Value.Get<FVector2D>();
@@ -570,12 +589,14 @@ void AGAME3023_F26_RoshanCharacter::Move(const FInputActionValue& Value)
 	DoMove(MovementVector.X, MovementVector.Y);
 }
 
+// Handles right-stick and mouse aiming rotation
 void AGAME3023_F26_RoshanCharacter::Look(const FInputActionValue& Value)
 {
 	FVector2D LookAxisVector = Value.Get<FVector2D>();
 	DoLook(LookAxisVector.X, LookAxisVector.Y);
 }
 
+// DoMove: updates movement pathfinding and waypoint navigation
 void AGAME3023_F26_RoshanCharacter::DoMove(float Right, float Forward)
 {
 	if (GetController() != nullptr)
@@ -590,31 +611,38 @@ void AGAME3023_F26_RoshanCharacter::DoMove(float Right, float Forward)
 	}
 }
 
+// DoLook: handles do look
 void AGAME3023_F26_RoshanCharacter::DoLook(float Yaw, float Pitch)
 {
 }
 
+// DoJumpStart: handles do jump start
 void AGAME3023_F26_RoshanCharacter::DoJumpStart()
 {
 }
 
+// DoJumpEnd: handles do jump end
 void AGAME3023_F26_RoshanCharacter::DoJumpEnd()
 {
 }
 
+// CanJumpInternal_Implementation: handles can jump internal implementation
 bool AGAME3023_F26_RoshanCharacter::CanJumpInternal_Implementation() const
 {
 	return false;
 }
 
+// Jump: handles jump
 void AGAME3023_F26_RoshanCharacter::Jump()
 {
 }
 
+// StopJumping: handles stop jumping
 void AGAME3023_F26_RoshanCharacter::StopJumping()
 {
 }
 
+// Handles cylinder interaction logic (insert or eject)
 bool AGAME3023_F26_RoshanCharacter::InteractWithCylinder(ARedPowerCylinder* Cylinder)
 {
 	if (!Cylinder || !Cylinder->CanPlayerInteract(this))
@@ -641,6 +669,7 @@ bool AGAME3023_F26_RoshanCharacter::InteractWithCylinder(ARedPowerCylinder* Cyli
 	return true;
 }
 
+// Initiates interact on key press for pickups or cylinder docks
 void AGAME3023_F26_RoshanCharacter::DoInteract()
 {
 	if (bIsDead || LastInteractPressFrame == GFrameCounter)
@@ -712,6 +741,7 @@ void AGAME3023_F26_RoshanCharacter::DoInteract()
 	}
 }
 
+// Handles DoInteractRelease interaction logic
 void AGAME3023_F26_RoshanCharacter::DoInteractRelease()
 {
 	bEnhancedInteractHeld = false;
@@ -720,6 +750,7 @@ void AGAME3023_F26_RoshanCharacter::DoInteractRelease()
 	ResetBatteryAttachHold();
 }
 
+// Handles IsInteractInputHeld interaction logic
 bool AGAME3023_F26_RoshanCharacter::IsInteractInputHeld() const
 {
 	if (const APlayerController* PC = Cast<APlayerController>(GetController()))
@@ -737,6 +768,7 @@ bool AGAME3023_F26_RoshanCharacter::IsInteractInputHeld() const
 	return bEnhancedInteractHeld || bRawInteractKeyHeld;
 }
 
+// GetBatteryAttachHoldProgress: manages battery attachment and state
 float AGAME3023_F26_RoshanCharacter::GetBatteryAttachHoldProgress() const
 {
 	if (!bIsHoldingToAttach || BatteryAttachHoldDuration <= 0.0f)
@@ -746,6 +778,7 @@ float AGAME3023_F26_RoshanCharacter::GetBatteryAttachHoldProgress() const
 	return FMath::Clamp(CurrentAttachHoldTime / BatteryAttachHoldDuration, 0.0f, 1.0f);
 }
 
+// Clears hold interaction timer and hides progress ring
 void AGAME3023_F26_RoshanCharacter::ResetBatteryAttachHold()
 {
 	bIsHoldingToAttach = false;
@@ -759,6 +792,7 @@ void AGAME3023_F26_RoshanCharacter::ResetBatteryAttachHold()
 	}
 }
 
+// TakeCarriedBattery: manages battery attachment and state
 ABatteryCapsule* AGAME3023_F26_RoshanCharacter::TakeCarriedBattery()
 {
 	if (!HasBattery()) return nullptr;
@@ -768,6 +802,7 @@ ABatteryCapsule* AGAME3023_F26_RoshanCharacter::TakeCarriedBattery()
 	return Taken;
 }
 
+// TryPickupBattery: manages battery attachment and state
 bool AGAME3023_F26_RoshanCharacter::TryPickupBattery(ABatteryCapsule* Battery)
 {
 	if (!Battery) return false;
@@ -820,6 +855,7 @@ bool AGAME3023_F26_RoshanCharacter::TryPickupBattery(ABatteryCapsule* Battery)
 	return true;
 }
 
+// DoDropBattery: manages battery attachment and state
 void AGAME3023_F26_RoshanCharacter::DoDropBattery()
 {
 	if (HasBattery())
@@ -840,6 +876,7 @@ void AGAME3023_F26_RoshanCharacter::DoDropBattery()
 	}
 }
 
+// DropCurrentBattery: manages battery attachment and state
 ABatteryCapsule* AGAME3023_F26_RoshanCharacter::DropCurrentBattery()
 {
 	if (!HasBattery()) return nullptr;
@@ -879,6 +916,7 @@ ABatteryCapsule* AGAME3023_F26_RoshanCharacter::DropCurrentBattery()
 	return Dropped;
 }
 
+// Handles InitInteractionPromptWidget interaction logic
 void AGAME3023_F26_RoshanCharacter::InitInteractionPromptWidget()
 {
 	if (InteractionPromptWidget)
@@ -905,6 +943,7 @@ void AGAME3023_F26_RoshanCharacter::InitInteractionPromptWidget()
 	}
 }
 
+// InitHealthHUDWidget: updates health and processes damage
 void AGAME3023_F26_RoshanCharacter::InitHealthHUDWidget()
 {
 	if (!bShowHealthHUD || HealthHUDWidget)
@@ -931,6 +970,7 @@ void AGAME3023_F26_RoshanCharacter::InitHealthHUDWidget()
 	}
 }
 
+// Updates health bar fill and status indicators on screen
 void AGAME3023_F26_RoshanCharacter::UpdateHealthHUD()
 {
 	if (!HealthHUDWidget)
@@ -943,6 +983,7 @@ void AGAME3023_F26_RoshanCharacter::UpdateHealthHUD()
 	}
 }
 
+// Finds closest valid battery or cylinder in interaction range
 AActor* AGAME3023_F26_RoshanCharacter::FindBestInteractable()
 {
 	AActor* BestCandidate = nullptr;
@@ -1023,6 +1064,7 @@ AActor* AGAME3023_F26_RoshanCharacter::FindBestInteractable()
 	return BestCandidate;
 }
 
+// UpdateCylinderHoldPrompt: updates UI display and widget visibility
 void AGAME3023_F26_RoshanCharacter::UpdateCylinderHoldPrompt(ARedPowerCylinder* Cylinder, float DeltaTime, bool bInputHeld, FString& OutAction, FString& OutTarget)
 {
 	if (Cylinder->bHasBattery)
@@ -1089,6 +1131,7 @@ void AGAME3023_F26_RoshanCharacter::UpdateCylinderHoldPrompt(ARedPowerCylinder* 
 	OutTarget = FString::Printf(TEXT("Laser Gun (ID: %d) - Charging"), Cylinder->CellID);
 }
 
+// Handles UpdateInteractionPrompt interaction logic
 void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
 {
 	if (!InteractionPromptWidget)
@@ -1143,6 +1186,7 @@ void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
 	);
 }
 
+// PlayBackgroundMusic: handles play background music
 void AGAME3023_F26_RoshanCharacter::PlayBackgroundMusic()
 {
 	if (BGMAudioComponent && BGMAudioComponent->IsPlaying())
@@ -1192,6 +1236,7 @@ void AGAME3023_F26_RoshanCharacter::PlayBackgroundMusic()
 	}
 }
 
+// StopBackgroundMusic: handles stop background music
 void AGAME3023_F26_RoshanCharacter::StopBackgroundMusic()
 {
 	if (BGMAudioComponent)
@@ -1203,6 +1248,7 @@ void AGAME3023_F26_RoshanCharacter::StopBackgroundMusic()
 	}
 }
 
+// SetBGMVolume: handles set bgm volume
 void AGAME3023_F26_RoshanCharacter::SetBGMVolume(float NewVolume)
 {
 	BGMVolume = FMath::Clamp(NewVolume, 0.0f, 2.0f);
@@ -1212,6 +1258,7 @@ void AGAME3023_F26_RoshanCharacter::SetBGMVolume(float NewVolume)
 	}
 }
 
+// OnBGMAudioFinished: handles on bgm audio finished
 void AGAME3023_F26_RoshanCharacter::OnBGMAudioFinished()
 {
 	if (bAutoPlayBGM && BGMAudioComponent)
@@ -1220,6 +1267,7 @@ void AGAME3023_F26_RoshanCharacter::OnBGMAudioFinished()
 	}
 }
 
+// TakeDamage: updates health and processes damage
 float AGAME3023_F26_RoshanCharacter::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
 	if (bIsDead || DamageAmount <= 0.0f)
@@ -1232,6 +1280,7 @@ float AGAME3023_F26_RoshanCharacter::TakeDamage(float DamageAmount, struct FDama
 	return ActualDamage;
 }
 
+// ApplyDamage: updates health and processes damage
 void AGAME3023_F26_RoshanCharacter::ApplyDamage(float Damage, AActor* DamageCauser, const FVector& DamageLocation, const FVector& DamageImpulse)
 {
 	if (DamageImpulse.SizeSquared() > 0.0f && GetCharacterMovement())
@@ -1241,6 +1290,7 @@ void AGAME3023_F26_RoshanCharacter::ApplyDamage(float Damage, AActor* DamageCaus
 	ApplyDamageToPlayer(Damage, DamageCauser);
 }
 
+// HandleDeath: handles elimination effects and actor cleanup
 void AGAME3023_F26_RoshanCharacter::HandleDeath()
 {
 	bIsDead = true;
@@ -1284,6 +1334,7 @@ void AGAME3023_F26_RoshanCharacter::HandleDeath()
 	}
 }
 
+// RespawnPlayer: handles spawning logic and placement
 void AGAME3023_F26_RoshanCharacter::RespawnPlayer()
 {
 	if (UWorld* World = GetWorld())
@@ -1354,15 +1405,18 @@ void AGAME3023_F26_RoshanCharacter::RespawnPlayer()
 	}
 }
 
+// ApplyHealing: handles apply healing
 void AGAME3023_F26_RoshanCharacter::ApplyHealing(float Healing, AActor* Healer)
 {
 	HealPlayer(Healing);
 }
 
+// NotifyDanger: handles notify danger
 void AGAME3023_F26_RoshanCharacter::NotifyDanger(const FVector& DangerLocation, AActor* DangerSource)
 {
 }
 
+// Updates health value and broadcasts HUD update delegates
 void AGAME3023_F26_RoshanCharacter::ApplyHealthChange(float NewHealth)
 {
 	const float OldHealth = CurrentHealth;
@@ -1373,6 +1427,7 @@ void AGAME3023_F26_RoshanCharacter::ApplyHealthChange(float NewHealth)
 	UpdateHealthHUD();
 }
 
+// Applies damage to player health and triggers death when depleted
 void AGAME3023_F26_RoshanCharacter::ApplyDamageToPlayer(float DamageAmount, AActor* DamageCauser)
 {
 	if (bIsDead || DamageAmount <= 0.0f)
@@ -1395,6 +1450,7 @@ void AGAME3023_F26_RoshanCharacter::ApplyDamageToPlayer(float DamageAmount, AAct
 	}
 }
 
+// HealPlayer: handles heal player
 void AGAME3023_F26_RoshanCharacter::HealPlayer(float HealAmount)
 {
 	if (bIsDead || HealAmount <= 0.0f || CurrentHealth >= MaxHealth)
@@ -1407,6 +1463,7 @@ void AGAME3023_F26_RoshanCharacter::HealPlayer(float HealAmount)
 		HealAmount, CurrentHealth, MaxHealth);
 }
 
+// SetHealth: updates health and processes damage
 void AGAME3023_F26_RoshanCharacter::SetHealth(float NewHealth)
 {
 	const float Clamped = FMath::Clamp(NewHealth, 0.0f, MaxHealth);
@@ -1427,6 +1484,7 @@ void AGAME3023_F26_RoshanCharacter::SetHealth(float NewHealth)
 	}
 }
 
+// ResetHealth: updates health and processes damage
 void AGAME3023_F26_RoshanCharacter::ResetHealth()
 {
 	if (UWorld* World = GetWorld())
@@ -1441,11 +1499,13 @@ void AGAME3023_F26_RoshanCharacter::ResetHealth()
 	SetHealth(MaxHealth);
 }
 
+// TestTakeDamage: updates health and processes damage
 void AGAME3023_F26_RoshanCharacter::TestTakeDamage()
 {
 	ApplyDamageToPlayer(15.0f, nullptr);
 }
 
+// TestHeal: handles test heal
 void AGAME3023_F26_RoshanCharacter::TestHeal()
 {
 	HealPlayer(15.0f);

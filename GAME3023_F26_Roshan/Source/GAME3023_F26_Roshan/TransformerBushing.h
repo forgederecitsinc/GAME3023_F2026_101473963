@@ -20,6 +20,7 @@ class GAME3023_F26_ROSHAN_API ATransformerBushing : public AActor
 public:
 	ATransformerBushing();
 
+ // Called every frame
 	virtual void Tick(float DeltaTime) override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Bushing ID (4-Digit)"))
@@ -83,39 +84,54 @@ public:
 	FOnTransformerBushingStateChanged OnTransformerStateChanged;
 
 	UFUNCTION(BlueprintNativeEvent, Category = "LiveWire|Gameplay")
+ // OnLitStateChanged: on lit state changed
 	void OnLitStateChanged(bool bNewLit);
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Gameplay")
+ // SetLitUp: set lit up
 	void SetLitUp(bool bLit);
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Gameplay")
+ // Laser trace and collision
 	void SetLaserHit(bool bHit, AActor* SourceActor = nullptr);
 
 	UFUNCTION()
+ // OnTargetHitStateChanged: on target hit state changed
 	void OnTargetHitStateChanged(ALaserTarget* Target, bool bIsHit);
 
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
+ // ID color mapping and dynamic materials
 	FLinearColor GetColorForID(int32 InID) const;
 
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
+ // ID color mapping and dynamic materials
 	FLinearColor GetActiveLitColor() const;
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Appearance")
+ // UpdateAppearance: update appearance
 	void UpdateAppearance();
 
 protected:
+ // Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+ // Editor construction script
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 #if WITH_EDITOR
+ // Editor property change callback
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
 private:
+ // ID color mapping and dynamic materials
 	void SyncIDAndColor(int32 NewID);
+ // BindTarget: bind target
 	void BindTarget(ALaserTarget* Target);
+ // BindToMatchingTargets: bind to matching targets
 	void BindToMatchingTargets();
+ // StartNeonIgnitionFlicker: start neon ignition flicker
 	void StartNeonIgnitionFlicker();
+ // SetMeshEmissive: set mesh emissive
 	void SetMeshEmissive(const FLinearColor& Color);
 
 	FTimerHandle FlickerTimerHandle;
