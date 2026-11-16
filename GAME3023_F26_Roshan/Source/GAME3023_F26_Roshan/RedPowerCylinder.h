@@ -82,9 +82,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Laser", meta = (DisplayName = "Laser Stops At Obstacles"))
 	bool bLaserStopsAtObstacles = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Laser", meta = (DisplayName = "Gun Aim Yaw"))
-	float GunYaw = 0.0f;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Laser", meta = (DisplayName = "Preview Laser In Editor"))
 	bool bPreviewLaserInEditor = false;
 

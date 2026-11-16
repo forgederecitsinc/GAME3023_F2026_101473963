@@ -17,7 +17,7 @@ public:
 
  // Called when the game starts or when spawned
 	virtual void BeginPlay() override;
- // EndPlay: end play
+ // end play
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Battery Thief Spawning")
@@ -54,20 +54,20 @@ public:
 	TSubclassOf<AEnemyBatteryThief> BatteryThiefClass;
 
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Battery Thief Spawning")
- // Battery state and handling
-	int32 GetActiveBatteryThiefCount() const;
+ 
+	int32 GetActiveBatteryThiefCount() const; // Battery state and handling
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Battery Thief Spawning")
- // Spawning logic and management
-	AEnemyBatteryThief* TrySpawnBatteryThief();
+ 
+	AEnemyBatteryThief* TrySpawnBatteryThief(); // Spawning logic and management
 
 protected:
 	UFUNCTION()
- // Spawning logic and management
-	void OnSpawnedBatteryThiefKilled(AEnemyBatteryThief* KilledThief);
+ 
+	void OnSpawnedBatteryThiefKilled(AEnemyBatteryThief* KilledThief); // Spawning logic and management
 
- // Called every frame
-	void HandleInitialWaveSpawnTick();
+
+	void HandleInitialWaveSpawnTick();  // Called every frame
 
  // Spawning logic and management
 	void HandleReplacementRespawnForSlot(int32 SlotIndex);
@@ -93,9 +93,9 @@ private:
 	int32 FindNearestSpawnSlotIndex(const FVector& Location) const;
  // Spawning logic and management
 	AEnemyBatteryThief* TrySpawnBatteryThiefAtSlot(int32 SlotIndex);
- // RegisterThief: register thief
+ // register thief
 	void RegisterThief(AEnemyBatteryThief* Thief, int32 SlotIndex, bool bAddToSlotTracking);
- // AreAllSlotsInitialWaveComplete: are all slots initial wave complete
+ // are all slots initial wave complete
 	bool AreAllSlotsInitialWaveComplete() const;
 
 	bool bInitialWaveCompleted = false;

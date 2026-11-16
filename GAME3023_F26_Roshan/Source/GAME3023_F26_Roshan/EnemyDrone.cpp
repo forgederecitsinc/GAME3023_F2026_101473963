@@ -774,19 +774,7 @@ void AEnemyDrone::TickPatrolling(float DeltaTime, APawn* PlayerPawn)
 void AEnemyDrone::UpdateHoverPosition(const FVector& TargetXY, float FallbackZ, float DeltaTime)
 {
 	FVector NewLocation = TargetXY;
-	FVector ClampedGroundPos;
-	float SampledZ = FallbackZ;
-
-	if (ClampLocationToNavMesh(NewLocation, ClampedGroundPos, 500.0f))
-	{
-		NewLocation.X = ClampedGroundPos.X;
-		NewLocation.Y = ClampedGroundPos.Y;
-		SampledZ = ClampedGroundPos.Z;
-	}
-	else
-	{
-		SampledZ = SampleNavMeshGroundZ(FVector(NewLocation.X, NewLocation.Y, FallbackZ));
-	}
+	const float SampledZ = SampleNavMeshGroundZ(FVector(NewLocation.X, NewLocation.Y, FallbackZ));
 
 	CurrentGroundZ = FMath::FInterpTo(CurrentGroundZ, SampledZ, DeltaTime, 10.0f);
 

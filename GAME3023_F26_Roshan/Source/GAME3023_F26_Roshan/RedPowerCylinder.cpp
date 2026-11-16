@@ -49,41 +49,10 @@ ARedPowerCylinder::ARedPowerCylinder()
 	InteractionZone->SetCollisionProfileName(TEXT("Trigger"));
 }
 
-// BuildGunComponents: handles build gun components
-void ARedPowerCylinder::BuildGunComponents()
-{
-	const FRotator AimRot(0.0f, GunYaw, 0.0f);
-
-	if (BatterySocket)
-	{
-		BatterySocket->SetRelativeLocation(AimRot.RotateVector(FVector(-20.0f, 0.0f, 75.0f)) + FVector(0.0f, 0.0f, 286.0f));
-		BatterySocket->SetRelativeRotation(AimRot);
-	}
-
-	if (LaserEmitter)
-	{
-		LaserEmitter->SetRelativeLocation(AimRot.RotateVector(FVector(322.0f, 0.0f, 0.0f)) + FVector(0.0f, 0.0f, 286.0f));
-		LaserEmitter->SetRelativeRotation(AimRot);
-	}
-
-	if (LaserBeamMesh)
-	{
-		LaserBeamMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		LaserBeamMesh->SetCastShadow(false);
-	}
-
-	if (InteractionZone)
-	{
-		InteractionZone->SetRelativeLocation(FVector(0.0f, 0.0f, 220.0f));
-		InteractionZone->SetSphereRadius(240.0f);
-	}
-}
-
 // Updates editor visuals, laser aim yaw, and preview reach
 void ARedPowerCylinder::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
-	BuildGunComponents();
 	ApplyColorFromID();
 	UpdateLaserBeam();
 }
@@ -106,7 +75,6 @@ void ARedPowerCylinder::BeginPlay()
 	InteractionZone->OnComponentBeginOverlap.AddDynamic(this, &ARedPowerCylinder::OnInteractionBeginOverlap);
 	InteractionZone->OnComponentEndOverlap.AddDynamic(this, &ARedPowerCylinder::OnInteractionEndOverlap);
 
-	BuildGunComponents();
 	InitPowerDome();
 	ApplyColorFromID();
 	UpdateLaserBeam();
@@ -296,8 +264,10 @@ bool ARedPowerCylinder::CheckActorTargetIDMatch(AActor* ActorToCheck, int32& Out
 // Rotates laser nozzle yaw by specified angle
 void ARedPowerCylinder::RotateGun(float AngleDegrees)
 {
-	GunYaw = FMath::Fmod(GunYaw + AngleDegrees, 360.0f);
-	BuildGunComponents();
+	if (LaserEmitter)
+	{
+		LaserEmitter->AddRelativeRotation(FRotator(0.0f, AngleDegrees, 0.0f));
+	}
 	UpdateLaserBeam();
 }
 
