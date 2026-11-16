@@ -47,10 +47,10 @@ public:
 	float HealthPercent = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player Health HUD")
-	float HealthBarWidth = 340.0f;
+	float HealthBarWidth = 260.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player Health HUD")
-	float HealthBarHeight = 24.0f;
+	float HealthBarHeight = 8.0f;
 
 protected:
  // NativeConstruct: native construct
@@ -81,6 +81,4 @@ private:
 	TSharedPtr<SBorder> HealthBarFillBorder;
 	TSharedPtr<STextBlock> HealthValueTextBlock;
 	TSharedPtr<STextBlock> HealthLabelTextBlock;
-	TSharedPtr<SBorder> HealthIconBorder;
-	TSharedPtr<STextBlock> HealthIconTextBlock;
 };

@@ -30,7 +30,7 @@ void UPlayerHealthHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDel
 	DisplayedPercent = FMath::FInterpTo(DisplayedPercent, HealthPercent, InDeltaTime, 14.0f);
 	LaggedPercent = FMath::FInterpTo(LaggedPercent, HealthPercent, InDeltaTime, 3.5f);
 
-	const float UsableWidth = FMath::Max(10.0f, HealthBarWidth - 5.0f);
+	const float UsableWidth = FMath::Max(10.0f, HealthBarWidth - 3.0f);
 	if (HealthBarFillBox.IsValid())
 	{
 		HealthBarFillBox->SetWidthOverride(FMath::Clamp(DisplayedPercent, 0.0f, 1.0f) * UsableWidth);
@@ -40,12 +40,12 @@ void UPlayerHealthHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDel
 		HealthBarLagBox->SetWidthOverride(FMath::Clamp(LaggedPercent, 0.0f, 1.0f) * UsableWidth);
 	}
 
-	FLinearColor BarColor(1.0f, 0.46f, 0.04f, 1.0f);
+	FLinearColor BarColor = FLinearColor::White;
 	if (HealthPercent <= 0.25f)
 	{
 		PulseTimer += InDeltaTime * 6.0f;
-		const float Pulse = 0.65f + 0.35f * FMath::Sin(PulseTimer);
-		BarColor = FLinearColor(1.0f, 0.38f, 0.02f, Pulse);
+		const float Pulse = 0.55f + 0.45f * FMath::Sin(PulseTimer);
+		BarColor = FLinearColor(1.0f, 1.0f, 1.0f, Pulse);
 	}
 	else
 	{
@@ -55,10 +55,6 @@ void UPlayerHealthHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDel
 	if (HealthBarFillBorder.IsValid())
 	{
 		HealthBarFillBorder->SetBorderBackgroundColor(BarColor);
-	}
-	if (HealthIconTextBlock.IsValid())
-	{
-		HealthIconTextBlock->SetColorAndOpacity(BarColor);
 	}
 }
 
@@ -103,16 +99,21 @@ TSharedRef<SWidget> UPlayerHealthHUDWidget::RebuildWidget()
 		return Super::RebuildWidget();
 	}
 
-	const FSlateFontInfo LabelFont = FCoreStyle::GetDefaultFontStyle("Bold", 12);
-	const FSlateFontInfo ValueFont = FCoreStyle::GetDefaultFontStyle("Bold", 18);
-	const FSlateFontInfo IconFont = FCoreStyle::GetDefaultFontStyle("Bold", 13);
+	FSlateFontInfo LabelFont = FCoreStyle::GetDefaultFontStyle("Bold", 12);
+	LabelFont.OutlineSettings.OutlineSize = 2;
+	LabelFont.OutlineSettings.OutlineColor = FLinearColor::Black;
+
+	FSlateFontInfo ValueFont = FCoreStyle::GetDefaultFontStyle("Bold", 15);
+	ValueFont.OutlineSettings.OutlineSize = 2;
+	ValueFont.OutlineSettings.OutlineColor = FLinearColor::Black;
+
 	const FSlateBrush* WhiteBrush = FCoreStyle::Get().GetBrush("WhiteBrush");
 
-	const float UsableWidth = FMath::Max(10.0f, HealthBarWidth - 5.0f);
-	const FLinearColor MetallicGreyBorder(0.58f, 0.63f, 0.68f, 0.95f);
-	const FLinearColor DarkInteriorTrack(0.06f, 0.08f, 0.10f, 0.88f);
-	const FLinearColor OrangeFillColor(1.0f, 0.46f, 0.04f, 1.0f);
-	const FLinearColor BurntOrangeLagColor(0.55f, 0.22f, 0.04f, 0.90f);
+	const float UsableWidth = FMath::Max(10.0f, HealthBarWidth - 3.0f);
+	const FLinearColor BlackOutlineColor = FLinearColor::Black;
+	const FLinearColor DarkInteriorTrack(0.0f, 0.0f, 0.0f, 0.45f);
+	const FLinearColor WhiteFillColor = FLinearColor::White;
+	const FLinearColor LagFillColor(1.0f, 1.0f, 1.0f, 0.35f);
 
 	return SNew(SOverlay)
 		+ SOverlay::Slot()
@@ -127,43 +128,15 @@ TSharedRef<SWidget> UPlayerHealthHUDWidget::RebuildWidget()
 
 				+ SVerticalBox::Slot()
 				.AutoHeight()
-				.Padding(FMargin(0.0f, 0.0f, 0.0f, 8.0f))
+				.Padding(FMargin(0.0f, 0.0f, 0.0f, 6.0f))
 				[
 					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot()
-					.AutoWidth()
-					.VAlign(VAlign_Center)
-					.Padding(FMargin(0.0f, 0.0f, 8.0f, 0.0f))
-					[
-						SNew(SBox).WidthOverride(22.0f).HeightOverride(22.0f)
-						[
-							SAssignNew(HealthIconBorder, SBorder)
-							.BorderImage(WhiteBrush)
-							.BorderBackgroundColor(MetallicGreyBorder)
-							.HAlign(HAlign_Center).VAlign(VAlign_Center)
-							.Padding(FMargin(1.8f))
-							[
-								SNew(SBorder)
-								.BorderImage(WhiteBrush)
-								.BorderBackgroundColor(DarkInteriorTrack)
-								.HAlign(HAlign_Center).VAlign(VAlign_Center)
-								[
-									SAssignNew(HealthIconTextBlock, STextBlock)
-									.Text(FText::FromString(TEXT("+")))
-									.Font(IconFont)
-									.ColorAndOpacity(OrangeFillColor)
-								]
-							]
-						]
-					]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 					[
 						SAssignNew(HealthLabelTextBlock, STextBlock)
 						.Text(FText::FromString(TEXT("HP")))
 						.Font(LabelFont)
-						.ColorAndOpacity(FLinearColor(0.72f, 0.78f, 0.84f, 0.95f))
-						.ShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 0.95f))
-						.ShadowOffset(FVector2D(1.2f, 1.2f))
+						.ColorAndOpacity(FLinearColor::White)
 					]
 					+ SHorizontalBox::Slot().FillWidth(1.0f)[ SNullWidget::NullWidget ]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
@@ -172,8 +145,6 @@ TSharedRef<SWidget> UPlayerHealthHUDWidget::RebuildWidget()
 						.Text(FText::FromString(FString::Printf(TEXT("%d / %d"), FMath::CeilToInt(CurrentHealth), FMath::CeilToInt(MaxHealth))))
 						.Font(ValueFont)
 						.ColorAndOpacity(FLinearColor::White)
-						.ShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 0.95f))
-						.ShadowOffset(FVector2D(1.5f, 1.5f))
 					]
 				]
 
@@ -184,8 +155,8 @@ TSharedRef<SWidget> UPlayerHealthHUDWidget::RebuildWidget()
 					[
 						SNew(SBorder)
 						.BorderImage(WhiteBrush)
-						.BorderBackgroundColor(MetallicGreyBorder)
-						.Padding(FMargin(2.5f))
+						.BorderBackgroundColor(BlackOutlineColor)
+						.Padding(FMargin(1.5f))
 						[
 							SNew(SBorder)
 							.BorderImage(WhiteBrush)
@@ -197,14 +168,14 @@ TSharedRef<SWidget> UPlayerHealthHUDWidget::RebuildWidget()
 								[
 									SAssignNew(HealthBarLagBox, SBox).WidthOverride(UsableWidth)
 									[
-										SNew(SBorder).BorderImage(WhiteBrush).BorderBackgroundColor(BurntOrangeLagColor)
+										SNew(SBorder).BorderImage(WhiteBrush).BorderBackgroundColor(LagFillColor)
 									]
 								]
 								+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Fill)
 								[
 									SAssignNew(HealthBarFillBox, SBox).WidthOverride(UsableWidth)
 									[
-										SAssignNew(HealthBarFillBorder, SBorder).BorderImage(WhiteBrush).BorderBackgroundColor(OrangeFillColor)
+										SAssignNew(HealthBarFillBorder, SBorder).BorderImage(WhiteBrush).BorderBackgroundColor(WhiteFillColor)
 									]
 								]
 							]

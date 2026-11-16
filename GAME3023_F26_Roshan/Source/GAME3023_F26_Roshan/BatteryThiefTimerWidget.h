@@ -34,7 +34,7 @@ public:
 	float WidgetWidth = 190.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief Timer")
-	float ProgressBarHeight = 8.0f;
+	float ProgressBarHeight = 6.0f;
 
 protected:
  // NativeConstruct: native construct
@@ -59,6 +59,4 @@ private:
 	TSharedPtr<SBorder> FillBarBorder;
 	TSharedPtr<STextBlock> TimeTextBlock;
 	TSharedPtr<STextBlock> ActionLabelTextBlock;
-	TSharedPtr<SBorder> WarningIconBorder;
-	TSharedPtr<STextBlock> WarningIconTextBlock;
 };

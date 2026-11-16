@@ -7,7 +7,6 @@
 class SWidget;
 class SBox;
 class STextBlock;
-class SCircularHoldBadge;
 
 UCLASS(BlueprintType, Blueprintable)
 class GAME3023_F26_ROSHAN_API UInteractPromptWidget : public UUserWidget
@@ -120,7 +119,6 @@ private:
 	float TargetAlpha = 0.0f;
 
 	TSharedPtr<SBox> PromptContainerBox;
-	TSharedPtr<SCircularHoldBadge> CircularHoldBadge;
 	TSharedPtr<STextBlock> ActionTextBlock;
 	TSharedPtr<STextBlock> TargetTextBlock;
 	TSharedPtr<STextBlock> KeyTextBlock;
