@@ -7,7 +7,9 @@
 class SWidget;
 class SBox;
 class SBorder;
+class SHorizontalBox;
 class STextBlock;
+class SMinimalHeartWidget;
 
 UCLASS(BlueprintType, Blueprintable)
 class GAME3023_F26_ROSHAN_API UPlayerHealthHUDWidget : public UUserWidget
@@ -22,8 +24,11 @@ public:
 	void UpdateHealth(float NewCurrentHealth, float NewMaxHealth);
 
 	UFUNCTION(BlueprintCallable, Category = "Player Health HUD")
- // Health and damage management
+	// Health and damage management
 	void SetHealthPercent(float InPercent);
+
+	UFUNCTION(BlueprintCallable, Category = "Player Health HUD")
+	void UpdateLives(int32 NewCurrentLives, int32 NewMaxLives);
 
 	UFUNCTION(BlueprintPure, Category = "Player Health HUD")
  // Health and damage management
@@ -52,6 +57,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player Health HUD")
 	float HealthBarHeight = 14.0f;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player Health HUD")
+	int32 CurrentLives = 3;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player Health HUD")
+	int32 MaxLives = 3;
+
 protected:
  // NativeConstruct: native construct
 	virtual void NativeConstruct() override;
@@ -65,12 +76,16 @@ protected:
 	void OnHealthUpdated(float NewCurrentHealth, float NewMaxHealth, float NewPercent);
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Player Health HUD")
- // Health and damage management
+	// Health and damage management
 	void OnPlayerDamaged(float DamageAmount);
 
+	UFUNCTION(BlueprintImplementableEvent, Category = "Player Health HUD")
+	void OnLivesUpdated(int32 NewCurrentLives, int32 NewMaxLives);
+
 private:
- // RefreshVisuals: refresh visuals
+	// RefreshVisuals: refresh visuals
 	void RefreshVisuals();
+	void RefreshLivesVisuals();
 
 	float DisplayedPercent = 1.0f;
 	float LaggedPercent = 1.0f;
@@ -81,4 +96,6 @@ private:
 	TSharedPtr<SBorder> HealthBarFillBorder;
 	TSharedPtr<STextBlock> HealthValueTextBlock;
 	TSharedPtr<STextBlock> HealthLabelTextBlock;
+	TSharedPtr<SHorizontalBox> HeartsContainerBox;
+	TArray<TSharedPtr<SMinimalHeartWidget>> HeartWidgets;
 };

@@ -7,6 +7,7 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnPlayerHealthChanged, float, CurrentHealth, float, MaxHealth, float, DeltaHealth);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerDied);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerGameOver);
 
 #include "GAME3023_F26_RoshanCharacter.generated.h"
 
@@ -417,7 +418,35 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (ClampMin = "0.0", ClampMax = "10.0", DisplayName = "Respawn Delay (Seconds)"))
 	float RespawnDelay = 1.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (ClampMin = "1", DisplayName = "Max Lives"))
+	int32 MaxLives = 3;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (DisplayName = "Remaining Lives"))
+	int32 RemainingLives = 3;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "LiveWire|Health", meta = (DisplayName = "Is Game Over"))
+	bool bIsGameOver = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (ClampMin = "0.0", DisplayName = "Game Over Quit Delay (Seconds)"))
+	float GameOverQuitDelay = 2.5f;
+
+	UPROPERTY(BlueprintAssignable, Category = "LiveWire|Health")
+	FOnPlayerGameOver OnGameOver;
+
 	FTimerHandle RespawnTimerHandle;
+	FTimerHandle GameOverTimerHandle;
+
+	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
+	void HandleGameOver();
+
+	UFUNCTION(BlueprintPure, Category = "LiveWire|Health")
+	int32 GetRemainingLives() const { return RemainingLives; }
+
+	UFUNCTION(BlueprintPure, Category = "LiveWire|Health")
+	int32 GetMaxLives() const { return MaxLives; }
+
+	UFUNCTION(BlueprintPure, Category = "LiveWire|Health")
+	bool IsGameOver() const { return bIsGameOver; }
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
  // Spawning logic and management

@@ -1,4 +1,5 @@
 #include "GAME3023_F26_RoshanCharacter.h"
+#include "Kismet/KismetSystemLibrary.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/DamageEvents.h"
 #include "Camera/CameraComponent.h"
@@ -118,7 +119,9 @@ void AGAME3023_F26_RoshanCharacter::BeginPlay()
 	}
 
 	CurrentHealth = MaxHealth;
+	RemainingLives = FMath::Max(1, MaxLives);
 	bIsDead = false;
+	bIsGameOver = false;
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth, 0.0f);
 	UpdateHealthHUD();
 
@@ -970,6 +973,7 @@ void AGAME3023_F26_RoshanCharacter::InitHealthHUDWidget()
 		{
 			HealthHUDWidget->AddToViewport(90);
 			HealthHUDWidget->UpdateHealth(CurrentHealth, MaxHealth);
+			HealthHUDWidget->UpdateLives(RemainingLives, MaxLives);
 			UE_LOG(LogGAME3023_F26_Roshan, Log, TEXT("[Live Wire] Player Health HUD Widget spawned successfully on Viewport (Top-Right)."));
 		}
 	}
@@ -985,6 +989,7 @@ void AGAME3023_F26_RoshanCharacter::UpdateHealthHUD()
 	if (HealthHUDWidget)
 	{
 		HealthHUDWidget->UpdateHealth(CurrentHealth, MaxHealth);
+		HealthHUDWidget->UpdateLives(RemainingLives, MaxLives);
 	}
 }
 
@@ -1307,7 +1312,10 @@ void AGAME3023_F26_RoshanCharacter::HandleDeath()
 {
 	bIsDead = true;
 	ResetBatteryAttachHold();
-	UE_LOG(LogTemplateCharacter, Warning, TEXT("[LiveWire Health] Player '%s' died!"), *GetNameSafe(this));
+	RemainingLives = FMath::Max(0, RemainingLives - 1);
+	UpdateHealthHUD();
+	UE_LOG(LogTemplateCharacter, Warning, TEXT("[LiveWire Health] Player '%s' died! Remaining lives: %d/%d"),
+		*GetNameSafe(this), RemainingLives, MaxLives);
 
 	OnPlayerDied.Broadcast();
 
@@ -1327,6 +1335,25 @@ void AGAME3023_F26_RoshanCharacter::HandleDeath()
 		TriggerControllerRumble(1.0f, 0.5f, true, true);
 	}
 
+	if (RemainingLives <= 0)
+	{
+		HandleGameOver();
+		return;
+	}
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(
+			-1,
+			3.0f,
+			FColor::Yellow,
+			FString::Printf(TEXT("[LIFE LOST] %d %s remaining! Respawning..."),
+				RemainingLives, RemainingLives == 1 ? TEXT("life") : TEXT("lives")),
+			true,
+			FVector2D(1.3f, 1.3f)
+		);
+	}
+
 	if (UWorld* World = GetWorld())
 	{
 		if (RespawnDelay > 0.0f)
@@ -1342,6 +1369,58 @@ void AGAME3023_F26_RoshanCharacter::HandleDeath()
 		else
 		{
 			RespawnPlayer();
+		}
+	}
+}
+
+void AGAME3023_F26_RoshanCharacter::HandleGameOver()
+{
+	if (bIsGameOver)
+	{
+		return;
+	}
+
+	bIsGameOver = true;
+	OnGameOver.Broadcast();
+
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		DisableInput(PC);
+	}
+
+	UE_LOG(LogTemplateCharacter, Error, TEXT("[LiveWire Health] GAME OVER - Player '%s' ran out of lives!"), *GetNameSafe(this));
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(
+			-1,
+			5.0f,
+			FColor::Red,
+			TEXT("[GAME OVER] Out of lives! Ending game..."),
+			true,
+			FVector2D(1.6f, 1.6f)
+		);
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(RespawnTimerHandle);
+		APlayerController* PC = Cast<APlayerController>(GetController());
+		auto QuitAction = [World, PC]()
+		{
+			if (IsValid(World))
+			{
+				UKismetSystemLibrary::QuitGame(World, PC, EQuitPreference::Quit, false);
+			}
+		};
+
+		if (GameOverQuitDelay > 0.0f)
+		{
+			World->GetTimerManager().SetTimer(GameOverTimerHandle, QuitAction, GameOverQuitDelay, false);
+		}
+		else
+		{
+			QuitAction();
 		}
 	}
 }
