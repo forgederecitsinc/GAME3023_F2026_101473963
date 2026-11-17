@@ -40,7 +40,6 @@ void AGridLaser::BeginPlay()
 	}
 
 	RebuildLaserGrid();
-	UpdateLaserVisuals();
 	UpdateLaserState();
 }
 
@@ -49,7 +48,6 @@ void AGridLaser::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	RebuildLaserGrid();
-	UpdateLaserVisuals();
 	UpdateLaserState();
 }
 
@@ -59,7 +57,6 @@ void AGridLaser::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEv
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 	RebuildLaserGrid();
-	UpdateLaserVisuals();
 	UpdateLaserState();
 }
 #endif
@@ -113,11 +110,6 @@ void AGridLaser::RebuildLaserGrid()
 		HazardBox->SetRelativeLocation(FVector(0.0f, 0.0f, ClampedHeight * 0.5f));
 		HazardBox->SetBoxExtent(FVector(BoxThickness * 0.5f, ClampedWidth * 0.5f, ClampedHeight * 0.5f));
 	}
-}
-
-// Adjusts beam mesh scale and particle endpoints
-void AGridLaser::UpdateLaserVisuals()
-{
 }
 
 // ConfigureHazardCollision: handles configure hazard collision

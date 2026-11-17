@@ -118,7 +118,6 @@ void AEnemyBatteryThief::RefreshEnemySettings()
 void AEnemyBatteryThief::MarkAsSpawnedUnit(const FVector& InHomeOrigin)
 {
 	bIsSpawnedChildUnit = true;
-	bActAsSpawner = false;
 	bSnapToSpawnLocationOnStart = false;
 
 	InitialSpawnZ = SampleGroundNavMeshZ(InHomeOrigin);
@@ -186,34 +185,11 @@ void AEnemyBatteryThief::BeginPlay()
 
 	CurrentState = EBatteryThiefState::Patrolling;
 	PickNextNavMeshPatrolDestination();
-
-	if (!bIsSpawnedChildUnit && bActAsSpawner && MaxEnemiesToSpawn > 0)
-	{
-		if (UWorld* World = GetWorld())
-		{
-			const float FirstDelay = FMath::Max(0.05f, InitialSpawnDelay);
-			World->GetTimerManager().SetTimer(
-				SpawnTimerHandle,
-				[this]()
-				{
-					SpawnThiefAtTargetLocation();
-				},
-				SpawnInterval,
-				true,
-				FirstDelay
-			);
-		}
-	}
 }
 
 // EndPlay: handles cleanup and clears active timers on shutdown
 void AEnemyBatteryThief::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().ClearTimer(SpawnTimerHandle);
-	}
-
 	if (IsValid(StolenBattery))
 	{
 		const FVector SafeDropPos(GetActorLocation().X, GetActorLocation().Y, CurrentGroundZ);
@@ -326,68 +302,6 @@ void AEnemyBatteryThief::KillPermanently()
 	OnBatteryThiefKilled.Clear();
 
 	KillBatteryThief();
-}
-
-// SpawnThiefAtTargetLocation: handles spawning logic and placement
-AEnemyBatteryThief* AEnemyBatteryThief::SpawnThiefAtTargetLocation()
-{
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return nullptr;
-	}
-
-	TArray<AActor*> LivingThieves;
-	UGameplayStatics::GetAllActorsOfClass(World, AEnemyBatteryThief::StaticClass(), LivingThieves);
-	int32 ActiveCount = 0;
-	for (AActor* Act : LivingThieves)
-	{
-		AEnemyBatteryThief* Existing = Cast<AEnemyBatteryThief>(Act);
-		if (IsValid(Existing) && !Existing->bIsDead)
-		{
-			++ActiveCount;
-		}
-	}
-
-	if (ActiveCount >= MaxEnemiesToSpawn)
-	{
-		return nullptr;
-	}
-
-	TSubclassOf<AEnemyBatteryThief> ClassToSpawn = EnemyClassToSpawn ? *EnemyClassToSpawn : GetClass();
-	const float GroundZAtSpawn = SampleGroundNavMeshZ(SpawnLocation);
-	const FVector FinalSpawnPos(SpawnLocation.X, SpawnLocation.Y, GroundZAtSpawn + GroundHeightOffset);
-
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = this;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-	AEnemyBatteryThief* NewThief = World->SpawnActor<AEnemyBatteryThief>(ClassToSpawn, FinalSpawnPos, SpawnRotation, SpawnParams);
-	if (NewThief)
-	{
-		++TotalSpawnedCount;
-		NewThief->PatrolSpeed = PatrolSpeed;
-		NewThief->CarrySpeed = CarrySpeed;
-		NewThief->TurnSpeed = TurnSpeed;
-		NewThief->GroundHeightOffset = GroundHeightOffset;
-		NewThief->MaxGroundStepHeight = MaxGroundStepHeight;
-		NewThief->GroundCollisionRadius = GroundCollisionRadius;
-		NewThief->PatrolRadius = PatrolRadius;
-		NewThief->AcceptanceRadius = AcceptanceRadius;
-		NewThief->PatrolPointWaitTime = PatrolPointWaitTime;
-		NewThief->BatteryDetectionRadius = BatteryDetectionRadius;
-		NewThief->RemovalInteractionDistance = RemovalInteractionDistance;
-		NewThief->BatteryRemovalDuration = BatteryRemovalDuration;
-		NewThief->BatteryDropSpotClass = BatteryDropSpotClass;
-		NewThief->DropOffAcceptanceRadius = DropOffAcceptanceRadius;
-		NewThief->CustomPatrolWaypoints = CustomPatrolWaypoints;
-		NewThief->FollowPlayerSpeedBonus = FollowPlayerSpeedBonus;
-		NewThief->RefreshEnemySettings();
-		NewThief->MarkAsSpawnedUnit(FVector(SpawnLocation.X, SpawnLocation.Y, GroundZAtSpawn));
-		NewThief->PickNextNavMeshPatrolDestination();
-	}
-
-	return NewThief;
 }
 
 // IsPointOnWalkableSurface: handles is point on walkable surface

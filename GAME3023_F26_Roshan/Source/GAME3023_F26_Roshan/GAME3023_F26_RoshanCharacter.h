@@ -476,14 +476,6 @@ public:
  // GetMaxHP: get max hp
 	float GetMaxHP() const { return MaxHealth; }
 
-	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
- // Health and damage management
-	void TestTakeDamage();
-
-	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
- // TestHeal: test heal
-	void TestHeal();
-
 public:
 
  // GetCameraBoom: get camera boom

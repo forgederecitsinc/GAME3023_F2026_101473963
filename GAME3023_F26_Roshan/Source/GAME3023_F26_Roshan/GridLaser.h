@@ -50,12 +50,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Beams", meta = (ClampMin = "1.0", UIMin = "1.0"))
 	float BeamThickness = 8.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Visuals")
-	FLinearColor LaserColor = FLinearColor(1.0f, 0.05f, 0.05f, 1.0f);
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Visuals", meta = (ClampMin = "0.0", UIMin = "0.0"))
-	float LaserEmissiveIntensity = 25.0f;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Damage", meta = (ClampMin = "0.0", UIMin = "0.0"))
 	float DamageAmount = 25.0f;
 
@@ -85,10 +79,6 @@ public:
  // Laser trace and collision
 	void UpdateLaserState();
 
-	UFUNCTION(BlueprintCallable, Category = "LiveWire|GridLaser")
- // Laser trace and collision
-	void UpdateLaserVisuals();
-
 protected:
  // Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -110,9 +100,6 @@ protected:
 	TObjectPtr<UBoxComponent> HazardBox;
 
 private:
-	UPROPERTY(Transient)
-	TObjectPtr<UMaterialInstanceDynamic> LaserDynamicMat;
-
 	UPROPERTY(Transient)
 	TObjectPtr<AGAME3023_F26_RoshanCharacter> OverlappingPlayer;
 

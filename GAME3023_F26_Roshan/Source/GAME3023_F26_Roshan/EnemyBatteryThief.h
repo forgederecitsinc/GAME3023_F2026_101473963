@@ -135,24 +135,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Use Target Spawn Location"))
 	bool bSnapToSpawnLocationOnStart = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Enable Periodic Spawning"))
-	bool bActAsSpawner = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Enemy Class To Spawn"))
-	TSubclassOf<AEnemyBatteryThief> EnemyClassToSpawn;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Max Active Enemies In NavMesh", ClampMin = "1", ClampMax = "50"))
-	int32 MaxEnemiesToSpawn = 5;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Spawn Interval (Seconds)", ClampMin = "0.5"))
-	float SpawnInterval = 5.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Replacement Respawn Delay After Death (Seconds)", ClampMin = "1.0"))
-	float RespawnDelayAfterDeath = 60.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Initial Spawn Delay (Seconds)", ClampMin = "0.0"))
-	float InitialSpawnDelay = 0.5f;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Working Battery Detection Radius", ClampMin = "100.0"))
 	float BatteryDetectionRadius = 10000.0f;
 
@@ -252,10 +234,6 @@ public:
  // Battery state and handling
 	void DepositStolenBatteryAtDropOff();
 
-	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Spawning")
- // Spawning logic and management
-	AEnemyBatteryThief* SpawnThiefAtTargetLocation();
-
  // Spawning logic and management
 	void MarkAsSpawnedUnit(const FVector& InHomeOrigin);
 
@@ -285,8 +263,6 @@ private:
 	float WallContactTimer = 0.0f;
 
 	bool bIsSpawnedChildUnit = false;
-	int32 TotalSpawnedCount = 0;
-	FTimerHandle SpawnTimerHandle;
 
  // IsPointOnWalkableSurface: is point on walkable surface
 	bool IsPointOnWalkableSurface(const FVector& Point) const;

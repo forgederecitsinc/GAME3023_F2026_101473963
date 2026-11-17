@@ -10,7 +10,6 @@
 #include "Components/PointLightComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/StaticMesh.h"
-#include "DrawDebugHelpers.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Kismet/KismetSystemLibrary.h"
@@ -261,16 +260,6 @@ bool ARedPowerCylinder::CheckActorTargetIDMatch(AActor* ActorToCheck, int32& Out
 	return false;
 }
 
-// Rotates laser nozzle yaw by specified angle
-void ARedPowerCylinder::RotateGun(float AngleDegrees)
-{
-	if (LaserEmitter)
-	{
-		LaserEmitter->AddRelativeRotation(FRotator(0.0f, AngleDegrees, 0.0f));
-	}
-	UpdateLaserBeam();
-}
-
 // Disconnects laser power from previously hit targets
 void ARedPowerCylinder::ClearDetectedTargets()
 {
@@ -323,17 +312,6 @@ AActor* ARedPowerCylinder::TraceLaserBeam(float& OutDistance, bool& bOutHitObsta
 		{
 			OutDistance = FMath::Max(15.0f, Hit.Distance);
 			bOutHitObstacle = true;
-		}
-	}
-
-	if (!World->IsGameWorld() && bPreviewLaserInEditor)
-	{
-		const FVector EndPoint = Start + Forward * OutDistance;
-		const FColor BeamColor = GetColorForID(CellID).ToFColor(true);
-		DrawDebugLine(World, Start, EndPoint, BeamColor, false, 0.0f, 0, FMath::Max(2.0f, LaserThickness * 0.5f));
-		if (bOutHitObstacle)
-		{
-			DrawDebugSphere(World, EndPoint, FMath::Max(6.0f, LaserThickness * 0.75f), 8, BeamColor, false, 0.0f);
 		}
 	}
 

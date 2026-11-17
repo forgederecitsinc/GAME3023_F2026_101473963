@@ -575,9 +575,6 @@ void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* P
 	PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
 	PlayerInputComponent->BindKey(EKeys::Q, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
 
-	PlayerInputComponent->BindKey(EKeys::K, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::TestTakeDamage);
-	PlayerInputComponent->BindKey(EKeys::H, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::TestHeal);
-
 	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Left, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
 	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Left, IE_Released, this, &AGAME3023_F26_RoshanCharacter::DoInteractRelease);
 
@@ -1189,7 +1186,7 @@ void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
 		ActionStr = HasBattery()
 			? TEXT("Hands Full (Drop Battery First)")
 			: TEXT("Press Square to Collect Battery");
-		TargetStr = FString::Printf(TEXT("Battery Capsule (ID: %d)"), Battery->BatteryID);
+		TargetStr = TEXT("Battery Capsule");
 	}
 	else if (ARedPowerCylinder* Cylinder = Cast<ARedPowerCylinder>(BestCandidate))
 	{
@@ -1588,17 +1585,5 @@ void AGAME3023_F26_RoshanCharacter::ResetHealth()
 		GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 	}
 	SetHealth(MaxHealth);
-}
-
-// TestTakeDamage: updates health and processes damage
-void AGAME3023_F26_RoshanCharacter::TestTakeDamage()
-{
-	ApplyDamageToPlayer(15.0f, nullptr);
-}
-
-// TestHeal: handles test heal
-void AGAME3023_F26_RoshanCharacter::TestHeal()
-{
-	HealPlayer(15.0f);
 }
 

@@ -94,7 +94,7 @@ void ABatteryCapsule::OnInteractionBeginOverlap(UPrimitiveComponent* OverlappedC
 	{
 		Player->SetCurrentInteractable(this);
 		LiveWireUtils::ShowScreenMessage(1001, 2.0f, FColor::Cyan,
-			FString::Printf(TEXT("[Live Wire] Press [Square] to Collect Battery (ID: %d)"), BatteryID));
+			TEXT("[Live Wire] Press [Square] to Collect Battery"));
 	}
 }
 
@@ -187,12 +187,6 @@ void ABatteryCapsule::OnSocketed(AActor* SocketActor, USceneComponent* AttachTar
 void ABatteryCapsule::OnDropped(const FVector& DropLocation)
 {
 	ResetToWorldLocation(DropLocation);
-}
-
-// Teleports battery back to its initial spawn point if lost
-void ABatteryCapsule::RespawnToOrigin()
-{
-	ResetToWorldLocation(SpawnOrigin);
 }
 
 // Toggles collision profiles on/off when socketing or carrying

@@ -32,12 +32,6 @@ public:
 	int32 CellID = 1001;
 
 	UPROPERTY()
-	bool bUseCustomColor = false;
-
-	UPROPERTY()
-	FLinearColor CustomColor = FLinearColor(1.0f, 0.10f, 0.12f);
-
-	UPROPERTY()
 	bool bTintBatteryDock = true;
 
 	UPROPERTY(Transient)
@@ -111,10 +105,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Laser")
  // CheckActorTargetIDMatch: check actor target id match
 	bool CheckActorTargetIDMatch(AActor* ActorToCheck, int32& OutFoundID) const;
-
-	UFUNCTION(BlueprintCallable, Category = "LiveWire|Laser")
- // RotateGun: rotate gun
-	void RotateGun(float AngleDegrees = 90.0f);
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Laser")
  // Laser trace and collision

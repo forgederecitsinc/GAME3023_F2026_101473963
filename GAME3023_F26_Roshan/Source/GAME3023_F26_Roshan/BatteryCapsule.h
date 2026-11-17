@@ -23,12 +23,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Battery ID (4-Digit)"))
 	int32 BatteryID = 1001;
 
-	UPROPERTY()
-	bool bUseCustomColor = false;
-
-	UPROPERTY()
-	FLinearColor CustomColor = FLinearColor(0.0000f, 0.8714f, 1.0000f);
-
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> DynamicMaterial;
 
@@ -85,10 +79,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Battery|Actions")
  // OnDropped: on dropped
 	void OnDropped(const FVector& DropLocation);
-
-	UFUNCTION(BlueprintCallable, Category = "Battery|Actions")
- // Spawning logic and management
-	void RespawnToOrigin();
 
 protected:
  // Called when the game starts or when spawned
