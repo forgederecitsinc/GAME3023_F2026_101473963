@@ -54,10 +54,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction Prompt")
 	FText TargetNameText;
 
-	// Keyboard key displayed as an alternative to the controller button.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction Prompt")
-	FText KeyboardKeyText;
-
 	// Stores how much of the hold interaction is complete, from 0.0 to 1.0.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction Prompt")
 	float HoldProgress = 0.0f;
@@ -92,21 +88,6 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Interaction Prompt")
 	void OnHoldProgressChanged(float NewProgress);
 
-	// Provides the action text to the Slate widget.
-	FText GetActionText() const { return ActionText; }
-
-	// Provides the target name text to the Slate widget.
-	FText GetTargetNameText() const { return TargetNameText; }
-
-	// Provides the keyboard key text to the Slate widget.
-	FText GetKeyboardKeyText() const { return KeyboardKeyText; }
-
-	// Returns whether the Slate prompt should be visible.
-	EVisibility GetPromptSlateVisibility() const;
-
-	// Returns the prompt's current fade opacity.
-	TOptional<float> GetPromptRenderOpacity() const { return CurrentAlpha; }
-
 private:
 	// Updates the Slate text blocks with the latest prompt labels.
 	void UpdatePromptLabels();
@@ -125,5 +106,4 @@ private:
 	TSharedPtr<SBox> PromptContainerBox;
 	TSharedPtr<STextBlock> ActionTextBlock;
 	TSharedPtr<STextBlock> TargetTextBlock;
-	TSharedPtr<STextBlock> KeyTextBlock;
 };

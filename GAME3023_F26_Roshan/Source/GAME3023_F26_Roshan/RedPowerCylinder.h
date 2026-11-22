@@ -33,9 +33,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Cell ID (4-Digit)"))
 	int32 CellID = 1001;
 
-	UPROPERTY()
-	bool bTintBatteryDock = true;
-
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> DynamicMaterial;
 
@@ -153,9 +150,6 @@ protected:
 
 	// Refreshes the cylinder's visual state.
 	void UpdateVisualState();
-
-	// Reserved for creating additional laser gun components.
-	void BuildGunComponents();
 
 	// Finds and prepares the power dome mesh and blinking light.
 	void InitPowerDome();

@@ -14,7 +14,6 @@ UInteractPromptWidget::UInteractPromptWidget(const FObjectInitializer& ObjectIni
 {
 	ActionText = FText::FromString(TEXT("Press Square to Interact"));
 	TargetNameText = FText::FromString(TEXT(""));
-	KeyboardKeyText = FText::FromString(TEXT("E"));
 	HoldProgress = 0.0f;
 	bAnchorToScreenBottom = true;
 	WorldSpaceOffset = FVector(0.0f, 0.0f, 120.0f);
@@ -138,12 +137,6 @@ void UInteractPromptWidget::SetHoldProgress(float InProgress)
 {
 	HoldProgress = FMath::Clamp(InProgress, 0.0f, 1.0f);
 	OnHoldProgressChanged(HoldProgress);
-}
-
-// GetPromptSlateVisibility: hides the Slate widget after it becomes transparent.
-EVisibility UInteractPromptWidget::GetPromptSlateVisibility() const
-{
-	return (CurrentAlpha > 0.001f) ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 }
 
 // RebuildWidget: creates the text and layout controls for the prompt.
