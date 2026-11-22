@@ -9,6 +9,7 @@ class UInstancedStaticMeshComponent;
 class UBoxComponent;
 class UMaterialInstanceDynamic;
 class AGAME3023_F26_RoshanCharacter;
+class AGridLaser;
 
 // This delegate lets Blueprints know when the laser turns on or off.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnGridLaserStateChanged, AGridLaser*, LaserGrid, bool, bIsActive);
