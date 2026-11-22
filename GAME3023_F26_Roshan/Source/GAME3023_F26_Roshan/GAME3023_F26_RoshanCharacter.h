@@ -44,6 +44,7 @@ class UAudioComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
+// Main player character: handles movement, interaction, inventory, health, and camera behavior.
 UCLASS(abstract)
 class AGAME3023_F26_RoshanCharacter : public ACharacter, public ICombatDamageable
 {
@@ -165,15 +166,15 @@ public:
 	AGAME3023_F26_RoshanCharacter();	
 
 protected:
- // Called when the game starts or when spawned
+	// Runs when the player character starts or respawns.
 	virtual void BeginPlay() override;
- // PossessedBy: possessed by
+	// Runs when a player controller takes control of this character.
 	virtual void PossessedBy(AController* NewController) override;
- // EndPlay: end play
+	// Runs when the character leaves the level.
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
- // Called every frame
+	// Runs every frame to update camera, interaction, and HUD behavior.
 	virtual void Tick(float DeltaTime) override;
- // Editor construction script
+	// Updates character settings while it is placed or changed in the editor.
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 #if WITH_EDITOR

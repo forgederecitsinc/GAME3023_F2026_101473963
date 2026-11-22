@@ -6,7 +6,7 @@
 #include "GAME3023_F26_Roshan.h"
 #include "Widgets/Input/SVirtualJoystick.h"
 
-// Sets up Enhanced Input subsystems and applies mapping contexts
+// BeginPlay: adds mobile controls and prepares Enhanced Input when play starts.
 void AGAME3023_F26_RoshanPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
@@ -27,7 +27,7 @@ void AGAME3023_F26_RoshanPlayerController::BeginPlay()
 	}
 }
 
-// Binds player input actions for movement, look, and interactions
+// SetupInputComponent: adds the default and mobile-appropriate input mappings.
 void AGAME3023_F26_RoshanPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
@@ -58,7 +58,7 @@ void AGAME3023_F26_RoshanPlayerController::SetupInputComponent()
 	}
 }
 
-// ShouldUseTouchControls: handles should use touch controls
+// ShouldUseTouchControls: checks for a touch interface or forced touch mode.
 bool AGAME3023_F26_RoshanPlayerController::ShouldUseTouchControls() const
 {
 	return SVirtualJoystick::ShouldDisplayTouchInterface() || bForceTouchControls;

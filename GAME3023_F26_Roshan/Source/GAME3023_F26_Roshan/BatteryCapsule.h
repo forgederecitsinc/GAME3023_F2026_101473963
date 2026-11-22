@@ -9,15 +9,17 @@ class USphereComponent;
 class UMaterialInstanceDynamic;
 class AGAME3023_F26_RoshanCharacter;
 
+// A battery item that can be picked up, carried, dropped, or socketed into a power cylinder.
 UCLASS()
 class GAME3023_F26_ROSHAN_API ABatteryCapsule : public AActor
 {
 	GENERATED_BODY()
 
 public:
+	// Constructor: creates the battery mesh, collision, and interaction components.
 	ABatteryCapsule();
 
- // Called every frame
+	// Runs every frame to animate an idle battery or keep its carried state stable.
 	virtual void Tick(float DeltaTime) override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Battery ID (4-Digit)"))
@@ -56,52 +58,54 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battery|State")
 	FVector SpawnOrigin;
 
+	// Applies the material color associated with this battery's ID.
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Color")
- // ID color mapping and dynamic materials
 	void ApplyColorFromID();
 
+	// Returns the LiveWire color for a specific battery ID.
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
- // ID color mapping and dynamic materials
 	FLinearColor GetColorForID(int32 InID) const;
 
+	// Allows the player to collect this battery.
 	UFUNCTION(BlueprintCallable, Category = "Battery|Actions")
- // Handles Interact interaction
 	bool Interact(AGAME3023_F26_RoshanCharacter* Player);
 
+	// Marks the battery as carried and disables world pickup collision.
 	UFUNCTION(BlueprintCallable, Category = "Battery|Actions")
- // OnCollected: on collected
 	void OnCollected(AGAME3023_F26_RoshanCharacter* Player);
 
+	// Attaches the battery to a power cylinder socket.
 	UFUNCTION(BlueprintCallable, Category = "Battery|Actions")
- // OnSocketed: on socketed
 	void OnSocketed(AActor* SocketActor, USceneComponent* AttachTargetComp);
 
+	// Drops the battery back into the world at a target location.
 	UFUNCTION(BlueprintCallable, Category = "Battery|Actions")
- // OnDropped: on dropped
 	void OnDropped(const FVector& DropLocation);
 
 protected:
- // Called when the game starts or when spawned
+	// Runs when the battery enters the game.
 	virtual void BeginPlay() override;
- // Editor construction script
+
+	// Updates the battery while it is placed or changed in the editor.
 	virtual void OnConstruction(const FTransform& Transform) override;
 #if WITH_EDITOR
- // Editor property change callback
+	// Refreshes the battery after an editor property changes.
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
+	// Runs when the player enters the battery pickup area.
 	UFUNCTION()
- // Handles OnInteractionBeginOverlap interaction
 	void OnInteractionBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
+	// Runs when the player leaves the battery pickup area.
 	UFUNCTION()
- // Handles OnInteractionEndOverlap interaction
 	void OnInteractionEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 private:
- // SetAttachmentCollisionEnabled: set attachment collision enabled
+	// Enables or disables collision while the battery is attached or carried.
 	void SetAttachmentCollisionEnabled(bool bEnabled);
- // ResetToWorldLocation: reset to world location
+
+	// Moves the battery to a world location after it is dropped.
 	void ResetToWorldLocation(const FVector& TargetLocation);
 
 	float RunningTime = 0.0f;

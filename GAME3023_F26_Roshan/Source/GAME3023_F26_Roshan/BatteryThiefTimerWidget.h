@@ -9,16 +9,18 @@ class SBox;
 class SBorder;
 class STextBlock;
 
+// Widget that displays the remaining time while a thief removes a battery.
 UCLASS(BlueprintType, Blueprintable)
 class GAME3023_F26_ROSHAN_API UBatteryThiefTimerWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
 public:
+	// Constructor: initializes the timer widget.
 	UBatteryThiefTimerWidget(const FObjectInitializer& ObjectInitializer);
 
+	// Updates the remaining time and progress percentage.
 	UFUNCTION(BlueprintCallable, Category = "Battery Thief Timer")
- // UpdateTimer: update timer
 	void UpdateTimer(float InRemainingTime, float InTotalDuration);
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battery Thief Timer")
@@ -37,19 +39,21 @@ public:
 	float ProgressBarHeight = 6.0f;
 
 protected:
- // NativeConstruct: native construct
+	// Runs once after the widget is created.
 	virtual void NativeConstruct() override;
- // Called every frame
+
+	// Runs every frame to animate the countdown bar.
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
- // RebuildWidget: rebuild widget
+
+	// Builds the text and progress bar controls.
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 
+	// Blueprint event broadcast after timer values change.
 	UFUNCTION(BlueprintImplementableEvent, Category = "Battery Thief Timer")
- // OnTimerUpdated: on timer updated
 	void OnTimerUpdated(float InRemainingTime, float InProgressPercent);
 
 private:
- // RefreshVisuals: refresh visuals
+	// Updates the displayed countdown text.
 	void RefreshVisuals();
 
 	float DisplayedPercent = 1.0f;

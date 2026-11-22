@@ -8,7 +8,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Blueprint/WidgetTree.h"
 
-// Constructor: sets up component hierarchy and default properties
+// Constructor: sets the starting text and prompt settings.
 UInteractPromptWidget::UInteractPromptWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
@@ -21,27 +21,30 @@ UInteractPromptWidget::UInteractPromptWidget(const FObjectInitializer& ObjectIni
 	bIsVolatile = true;
 }
 
-// Initializes prompt badges, button icon textures, and text elements
+// NativeConstruct: runs after the widget is created and starts it in a hidden state.
 void UInteractPromptWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
+	// Hide the prompt until an object or actor needs to interact with the player.
 	SetVisibility(ESlateVisibility::Collapsed);
 	SetRenderOpacity(0.0f);
 	CurrentAlpha = 0.0f;
 	TargetAlpha = 0.0f;
 }
 
-// Smoothly fades widget in/out and updates hold progress circle
+// NativeTick: fades the widget and moves it near the target actor each frame.
 void UInteractPromptWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
+	// Move the opacity smoothly toward the target opacity.
 	CurrentAlpha = FMath::FInterpTo(CurrentAlpha, TargetAlpha, InDeltaTime, 14.0f);
 	SetRenderOpacity(CurrentAlpha);
 
 	if (!bIsPromptVisible)
 	{
+		// Once the prompt is almost transparent, fully collapse it.
 		if (CurrentAlpha <= 0.01f)
 		{
 			CurrentAlpha = 0.0f;
@@ -53,6 +56,7 @@ void UInteractPromptWidget::NativeTick(const FGeometry& MyGeometry, float InDelt
 
 	SetVisibility(ESlateVisibility::HitTestInvisible);
 
+	// Keep the prompt at the bottom center when it is anchored to the screen.
 	if (bAnchorToScreenBottom || !TargetActor.IsValid())
 	{
 		SetRenderTranslation(FVector2D::ZeroVector);
@@ -65,6 +69,7 @@ void UInteractPromptWidget::NativeTick(const FGeometry& MyGeometry, float InDelt
 		return;
 	}
 
+	// Find the target's position on the screen and move the prompt beside it.
 	const FVector WorldPos = TargetActor->GetActorLocation() + WorldSpaceOffset;
 	FVector2D ScreenPos;
 	if (PC->ProjectWorldLocationToScreen(WorldPos, ScreenPos, false))
@@ -73,7 +78,7 @@ void UInteractPromptWidget::NativeTick(const FGeometry& MyGeometry, float InDelt
 	}
 }
 
-// UpdatePromptLabels: updates UI display and widget visibility
+// UpdatePromptLabels: sends the newest action and target text to the UI blocks.
 void UInteractPromptWidget::UpdatePromptLabels()
 {
 	if (ActionTextBlock.IsValid())
@@ -83,11 +88,13 @@ void UInteractPromptWidget::UpdatePromptLabels()
 	if (TargetTextBlock.IsValid())
 	{
 		TargetTextBlock->SetText(TargetNameText);
+
+		// Hide the target name line when no target name was provided.
 		TargetTextBlock->SetVisibility(TargetNameText.IsEmpty() ? EVisibility::Collapsed : EVisibility::HitTestInvisible);
 	}
 }
 
-// Displays interaction prompt with specified action text and target name
+// ShowPrompt: displays the prompt for the selected target actor.
 void UInteractPromptWidget::ShowPrompt(AActor* InTargetActor, const FText& InActionText, const FText& InTargetName)
 {
 	TargetActor = InTargetActor;
@@ -104,7 +111,7 @@ void UInteractPromptWidget::ShowPrompt(AActor* InTargetActor, const FText& InAct
 	OnShowPrompt(InActionText, InTargetName);
 }
 
-// Fades out and hides interaction prompt widget
+// HidePrompt: hides the prompt and clears the current target.
 void UInteractPromptWidget::HidePrompt()
 {
 	bIsPromptVisible = false;
@@ -118,7 +125,7 @@ void UInteractPromptWidget::HidePrompt()
 	OnHidePrompt();
 }
 
-// UpdatePromptText: updates UI display and widget visibility
+// UpdatePromptText: updates the prompt text without changing its target.
 void UInteractPromptWidget::UpdatePromptText(const FText& InActionText, const FText& InTargetName)
 {
 	ActionText = InActionText;
@@ -126,20 +133,20 @@ void UInteractPromptWidget::UpdatePromptText(const FText& InActionText, const FT
 	UpdatePromptLabels();
 }
 
-// SetHoldProgress: handles set hold progress
+// SetHoldProgress: limits the hold value and sends it to the Blueprint event.
 void UInteractPromptWidget::SetHoldProgress(float InProgress)
 {
 	HoldProgress = FMath::Clamp(InProgress, 0.0f, 1.0f);
 	OnHoldProgressChanged(HoldProgress);
 }
 
-// GetPromptSlateVisibility: updates UI display and widget visibility
+// GetPromptSlateVisibility: hides the Slate widget after it becomes transparent.
 EVisibility UInteractPromptWidget::GetPromptSlateVisibility() const
 {
 	return (CurrentAlpha > 0.001f) ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 }
 
-// RebuildWidget: updates UI display and widget visibility
+// RebuildWidget: creates the text and layout controls for the prompt.
 TSharedRef<SWidget> UInteractPromptWidget::RebuildWidget()
 {
 	if (WidgetTree && WidgetTree->RootWidget)
@@ -147,10 +154,12 @@ TSharedRef<SWidget> UInteractPromptWidget::RebuildWidget()
 		return Super::RebuildWidget();
 	}
 
+	// Create the font style for the main interaction action text.
 	FSlateFontInfo ActionFont = FCoreStyle::GetDefaultFontStyle("Bold", 14);
 	ActionFont.OutlineSettings.OutlineSize = 2;
 	ActionFont.OutlineSettings.OutlineColor = FLinearColor::Black;
 
+	// Create the font style for the smaller target name text.
 	FSlateFontInfo TargetNameFont = FCoreStyle::GetDefaultFontStyle("Regular", 11);
 	TargetNameFont.OutlineSettings.OutlineSize = 2;
 	TargetNameFont.OutlineSettings.OutlineColor = FLinearColor::Black;

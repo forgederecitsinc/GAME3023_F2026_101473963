@@ -7,6 +7,7 @@
 
 class AEnemyBatteryThief;
 
+// Game mode that controls battery-thief wave and replacement spawning.
 UCLASS(abstract)
 class AGAME3023_F26_RoshanGameMode : public AGameModeBase
 {

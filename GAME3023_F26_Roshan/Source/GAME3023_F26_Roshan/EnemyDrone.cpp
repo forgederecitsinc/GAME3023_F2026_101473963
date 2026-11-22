@@ -13,7 +13,7 @@
 #include "GameFramework/Pawn.h"
 #include "Engine/World.h"
 
-// Sets up drone root, visual mesh, scanner light, and collision
+// Constructor: creates the drone root, mesh, scanner light, and movement components.
 AEnemyDrone::AEnemyDrone()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -40,7 +40,7 @@ AEnemyDrone::AEnemyDrone()
 	LaserParticleClass = ADroneLaserParticle::StaticClass();
 }
 
-// Enforces minimum patrol height (Z >= 1000) in editor
+// OnConstruction: prevents the drone from flying below its configured minimum height.
 void AEnemyDrone::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
@@ -56,14 +56,14 @@ void AEnemyDrone::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedE
 }
 #endif
 
-// Calculates drone flight altitude above ground level
+// ComputeHoverAltitudeZ: calculates a safe patrol height above the walkable ground.
 float AEnemyDrone::ComputeHoverAltitudeZ() const
 {
 	const float EnforcedMinZ = FMath::Max(1000.0f, MinimumFlightZ);
 	return FMath::Max(EnforcedMinZ, CurrentGroundZ + FMath::Max(1000.0f, PatrolHeight));
 }
 
-// Updates spotlight and flight settings from properties
+// RefreshDroneSettings: applies spotlight and movement values from the drone properties.
 void AEnemyDrone::RefreshDroneSettings()
 {
 	MinimumFlightZ = FMath::Max(1000.0f, MinimumFlightZ);
@@ -83,7 +83,7 @@ void AEnemyDrone::RefreshDroneSettings()
 	}
 }
 
-// Initializes patrol path, spotlight settings, and player tracking
+// BeginPlay: initializes patrol points and starts the drone in its patrolling state.
 void AEnemyDrone::BeginPlay()
 {
 	Super::BeginPlay();
@@ -247,7 +247,7 @@ bool AEnemyDrone::IsPawnUnderLight(const APawn* TargetPawn) const
 	return true;
 }
 
-// DropLaserParticle: controls laser trace and hit detection
+// DropLaserParticle: spawns a falling laser particle below the target pawn.
 void AEnemyDrone::DropLaserParticle(APawn* TargetPawn)
 {
 	UWorld* World = GetWorld();
@@ -280,7 +280,7 @@ void AEnemyDrone::DropLaserParticle(APawn* TargetPawn)
 	}
 }
 
-// LatchAndKillPlayer: handles latch and kill player
+// LatchAndKillPlayer: starts the diving latch sequence and kills the target player.
 void AEnemyDrone::LatchAndKillPlayer(APawn* TargetPawn)
 {
 	if (!IsValid(TargetPawn))
@@ -556,7 +556,7 @@ void AEnemyDrone::AdvanceToNextPatrolDestination()
 	CurrentPathCornerIndex = 0;
 }
 
-// Runs drone flight movement, spotlight scanning, and dive attacks
+// Tick: updates the drone behavior based on its current patrol, tracking, diving, or latched state.
 void AEnemyDrone::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);

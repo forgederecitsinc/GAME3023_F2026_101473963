@@ -5,6 +5,7 @@
 
 namespace LiveWireUtils
 {
+	// GetColorForID: converts a LiveWire ID into a consistent visual color.
 	FLinearColor GetColorForID(int32 ID)
 	{
 		switch (ID)
@@ -25,6 +26,7 @@ namespace LiveWireUtils
 		}
 	}
 
+	// ShowScreenMessage: prints a debug message to the screen when Unreal's engine UI is available.
 	void ShowScreenMessage(int32 Key, float Duration, const FColor& Color, const FString& Text, float Scale)
 	{
 		if (GEngine)
@@ -33,6 +35,7 @@ namespace LiveWireUtils
 		}
 	}
 
+	// ProjectToNavMesh: moves a world position onto the nearest valid navigation area.
 	bool ProjectToNavMesh(const UWorld* World, const FVector& WorldPos, const FVector& Extent, FVector& OutLocation)
 	{
 		if (!World)
@@ -55,6 +58,7 @@ namespace LiveWireUtils
 		return false;
 	}
 
+	// SampleWalkableGroundZ: finds the ground height for AI or actor placement.
 	float SampleWalkableGroundZ(const UWorld* World, const FVector& WorldPos, const AActor* IgnoreActor, float MinNormalZ)
 	{
 		FVector Projected;

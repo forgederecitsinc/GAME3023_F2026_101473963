@@ -15,6 +15,7 @@ class ABatteryCapsule;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBatteryThiefKilled, class AEnemyBatteryThief*, KilledThief);
 
+// States used by the thief AI while it patrols and steals batteries.
 UENUM(BlueprintType)
 enum class EBatteryThiefState : uint8
 {
@@ -36,26 +37,27 @@ class GAME3023_F26_ROSHAN_API AEnemyBatteryThief : public APawn, public ICombatD
 	GENERATED_BODY()
 
 public:
+	// Constructor: creates the thief pawn and its movement and sensor components.
 	AEnemyBatteryThief();
 
 protected:
- // Called when the game starts or when spawned
+	// Runs when the thief starts in the level.
 	virtual void BeginPlay() override;
- // EndPlay: end play
+	// Runs when the thief is removed from the level.
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
- // Editor construction script
+	// Updates thief visuals and settings in the editor.
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 #if WITH_EDITOR
- // Editor property change callback
+	// Refreshes settings after an editor property changes.
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
 public:	
- // Called every frame
+	// Runs every frame to update the thief's AI state.
 	virtual void Tick(float DeltaTime) override;
 
- // Called to bind functionality to input
+	// Bind point for any input components used by the thief.
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
  // Health and damage management

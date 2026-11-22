@@ -10,6 +10,7 @@ class USpotLightComponent;
 class APawn;
 class ADroneLaserParticle;
 
+// Possible behavior states for an enemy drone.
 UENUM(BlueprintType)
 enum class EEnemyDroneState : uint8
 {
@@ -29,21 +30,23 @@ class GAME3023_F26_ROSHAN_API AEnemyDrone : public AActor
 	GENERATED_BODY()
 	
 public:	
+	// Constructor: creates the drone mesh, light, and base components.
 	AEnemyDrone();
 
 protected:
- // Called when the game starts or when spawned
+	// Runs when the drone first starts in the level.
 	virtual void BeginPlay() override;
- // Editor construction script
+
+	// Updates the drone preview while it is placed or changed in the editor.
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 #if WITH_EDITOR
- // Editor property change callback
+	// Rebuilds the drone settings after an editor property changes.
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
 public:	
- // Called every frame
+	// Runs every frame to update the selected drone behavior state.
 	virtual void Tick(float DeltaTime) override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -125,27 +128,27 @@ public:
 	bool bIsFollowingPlayer = false;
 
 	UFUNCTION(BlueprintCallable, Category = "Drone|Laser Light")
- // Updates spotlight and flight settings from properties
+	// Applies the current spotlight and movement settings.
 	void RefreshDroneSettings();
 
 	UFUNCTION(BlueprintCallable, Category = "Drone|Movement & Patrol")
- // Navigation and pathfinding
+	// Builds coverage points used to plan patrol destinations.
 	void BuildNavMeshCoveragePoints();
 
 	UFUNCTION(BlueprintCallable, Category = "Drone|Movement & Patrol")
- // Navigation and pathfinding
+	// Returns the drone to its starting position and restarts patrol.
 	void ResetToStartAndResumePatrol();
 
 	UFUNCTION(BlueprintPure, Category = "Drone|Player Detection & Latch Kill")
- // Spawning logic and management
+	// Checks whether the player pawn is inside the drone's spotlight.
 	bool IsPawnUnderLight(const APawn* TargetPawn) const;
 
 	UFUNCTION(BlueprintPure, Category = "Drone|Player Detection & Latch Kill")
- // Spawning logic and management
+	// Checks whether nearby cover blocks the drone's line of sight.
 	bool IsPawnHidingUnderCover(const APawn* TargetPawn) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Drone|Laser Bomb Attack")
- // Laser trace and collision
+	// Drops a laser particle toward the target pawn.
 	void DropLaserParticle(APawn* TargetPawn);
 
 private:
@@ -172,34 +175,39 @@ private:
 	float CurrentGroundZ = 0.0f;
 	bool bHasValidGroundZ = false;
 
- // Calculates drone flight altitude above ground level
+	// Calculates the drone's safe hover height above the ground.
 	float ComputeHoverAltitudeZ() const;
 
- // LatchAndKillPlayer: latch and kill player
+	// Starts the diving latch sequence and kills the player.
 	void LatchAndKillPlayer(APawn* TargetPawn);
 
- // Navigation and pathfinding
+	// Chooses the next patrol waypoint.
 	void AdvanceToNextPatrolDestination();
 
- // Navigation and pathfinding
+	// Samples the ground height under a patrol position.
 	float SampleNavMeshGroundZ(const FVector& WorldPos) const;
 
- // Navigation and pathfinding
+	// Keeps a world location inside a valid navigation area.
 	bool ClampLocationToNavMesh(const FVector& WorldPos, FVector& OutNavGroundPos, float HorizontalSearchRadius = 500.0f) const;
 
- // UpdateLightRangeForAltitude: update light range for altitude
+	// Adjusts spotlight distance based on the drone's current height.
 	void UpdateLightRangeForAltitude(float CurrentZ, float GroundZ);
 
- // Called every frame
+	// Handles behavior while latched onto the player.
 	void TickLatched(APawn* PlayerPawn, bool bIsPlayerDead);
- // Called every frame
+
+	// Handles the drone as it dives toward the player.
 	void TickDiving(float DeltaTime, APawn* PlayerPawn, bool bIsPlayerDead);
- // Called every frame
+
+	// Handles the escape countdown while the player is caught.
 	void TickTracking(float DeltaTime, APawn* PlayerPawn, bool bIsPlayerDead);
- // Called every frame
+
+	// Handles normal patrol movement.
 	void TickPatrolling(float DeltaTime, APawn* PlayerPawn);
- // UpdateHoverPosition: update hover position
+
+	// Smoothly moves the drone toward a target hover position.
 	void UpdateHoverPosition(const FVector& TargetXY, float FallbackZ, float DeltaTime);
- // FaceDirection2D: face direction 2 d
+
+	// Rotates the drone toward a horizontal direction.
 	void FaceDirection2D(const FVector& Dir2D, float DeltaTime, float SpeedMultiplier = 1.0f);
 };

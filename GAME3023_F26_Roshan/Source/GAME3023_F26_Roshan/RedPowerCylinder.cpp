@@ -14,7 +14,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Kismet/KismetSystemLibrary.h"
 
-// Sets up cylinder base mesh, battery socket, laser nozzle, and trigger
+// Constructor: creates the cylinder, battery socket, laser emitter, and interaction zone.
 ARedPowerCylinder::ARedPowerCylinder()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -48,7 +48,7 @@ ARedPowerCylinder::ARedPowerCylinder()
 	InteractionZone->SetCollisionProfileName(TEXT("Trigger"));
 }
 
-// Updates editor visuals, laser aim yaw, and preview reach
+// OnConstruction: updates editor preview visuals and the laser beam.
 void ARedPowerCylinder::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
@@ -57,7 +57,7 @@ void ARedPowerCylinder::OnConstruction(const FTransform& Transform)
 }
 
 #if WITH_EDITOR
-// Refreshes laser direction and colors when editing in details panel
+// PostEditChangeProperty: refreshes colors and laser preview after an editor property changes.
 void ARedPowerCylinder::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
@@ -66,7 +66,7 @@ void ARedPowerCylinder::PostEditChangeProperty(FPropertyChangedEvent& PropertyCh
 }
 #endif
 
-// Initializes cylinder ID colors, laser trace settings, and power dome light
+// BeginPlay: connects overlap events and initializes the cylinder visuals.
 void ARedPowerCylinder::BeginPlay()
 {
 	Super::BeginPlay();
@@ -79,7 +79,7 @@ void ARedPowerCylinder::BeginPlay()
 	UpdateLaserBeam();
 }
 
-// InitPowerDome: handles init power dome
+// InitPowerDome: finds the dome mesh and creates its materials and blinking light.
 void ARedPowerCylinder::InitPowerDome()
 {
 	if (!PowerDomeMesh)
@@ -165,7 +165,7 @@ void ARedPowerCylinder::InitPowerDome()
 	ApplyPowerDomeLightState(bPowerDomeLightOn);
 }
 
-// Toggles power dome point light and emissive material on/off
+// ApplyPowerDomeLightState: switches the dome between green, red, and inactive states.
 void ARedPowerCylinder::ApplyPowerDomeLightState(bool bLightOn)
 {
 	const bool bPoweredActive = (bIsPowered && bHasBattery);
@@ -200,18 +200,18 @@ void ARedPowerCylinder::ApplyPowerDomeLightState(bool bLightOn)
 	}
 }
 
-// Returns saturated linear color corresponding to 4-digit ID
+// GetColorForID: returns the LiveWire color mapped to the cylinder ID.
 FLinearColor ARedPowerCylinder::GetColorForID(int32 InID) const
 {
 	return LiveWireUtils::GetColorForID(InID);
 }
 
-// Tints cylinder dynamic materials to match cell ID
+// ApplyColorFromID: placeholder for applying the cylinder ID color to its materials.
 void ARedPowerCylinder::ApplyColorFromID()
 {
 }
 
-// Checks if hit target has a matching 4-digit ID
+// CheckActorTargetIDMatch: checks whether a hit actor has a matching four-digit ID.
 bool ARedPowerCylinder::CheckActorTargetIDMatch(AActor* ActorToCheck, int32& OutFoundID) const
 {
 	if (!ActorToCheck)
@@ -260,7 +260,7 @@ bool ARedPowerCylinder::CheckActorTargetIDMatch(AActor* ActorToCheck, int32& Out
 	return false;
 }
 
-// Disconnects laser power from previously hit targets
+// ClearDetectedTargets: clears target detection and disconnects the previous laser hits.
 void ARedPowerCylinder::ClearDetectedTargets()
 {
 	bIsTargetDetected = false;
@@ -280,7 +280,7 @@ void ARedPowerCylinder::ClearDetectedTargets()
 	}
 }
 
-// Performs forward line trace from laser emitter tip
+// TraceLaserBeam: fires a line trace from the laser emitter and returns the hit actor.
 AActor* ARedPowerCylinder::TraceLaserBeam(float& OutDistance, bool& bOutHitObstacle) const
 {
 	OutDistance = LaserLength;
@@ -318,7 +318,7 @@ AActor* ARedPowerCylinder::TraceLaserBeam(float& OutDistance, bool& bOutHitObsta
 	return HitActor;
 }
 
-// Damages player periodically if they walk into the laser beam
+// ApplyLaserBurnToPlayer: damages the player while they remain in the laser beam.
 void ARedPowerCylinder::ApplyLaserBurnToPlayer(AActor* HitActor)
 {
 	AGAME3023_F26_RoshanCharacter* HitPlayer = LiveWireUtils::ResolveActorOrParent<AGAME3023_F26_RoshanCharacter>(HitActor);
@@ -336,7 +336,7 @@ void ARedPowerCylinder::ApplyLaserBurnToPlayer(AActor* HitActor)
 	}
 }
 
-// Activates hit laser targets or transformer bushings with matching ID
+// UpdateDetectedTargets: activates matching laser targets and transformer bushings.
 void ARedPowerCylinder::UpdateDetectedTargets(AActor* HitActor)
 {
 	int32 FoundTargetID = -1;
@@ -394,7 +394,7 @@ void ARedPowerCylinder::UpdateDetectedTargets(AActor* HitActor)
 	}
 }
 
-// Traces laser line, scales beam mesh to hit point, and powers targets
+// UpdateLaserBeam: scales the beam to the hit distance and updates powered targets.
 void ARedPowerCylinder::UpdateLaserBeam()
 {
 	if (!LaserEmitter)
@@ -435,13 +435,13 @@ void ARedPowerCylinder::UpdateLaserBeam()
 	}
 }
 
-// Enables editor viewport preview of laser reach
+// ShouldTickIfViewportsOnly: allows the laser preview to update outside game mode.
 bool ARedPowerCylinder::ShouldTickIfViewportsOnly() const
 {
 	return bPreviewLaserInEditor;
 }
 
-// Updates laser beam trace, burns player if stepped in, and blinks dome light
+// Tick: updates the laser in preview or gameplay and blinks the dome when powered.
 void ARedPowerCylinder::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -467,7 +467,7 @@ void ARedPowerCylinder::Tick(float DeltaTime)
 	}
 }
 
-// Verifies player is in range, at same floor elevation, and has line of sight
+// CanPlayerInteract: checks height, distance, and line of sight to the player.
 bool ARedPowerCylinder::CanPlayerInteract(const AActor* InPlayerActor) const
 {
 	if (!InPlayerActor)
@@ -512,7 +512,7 @@ bool ARedPowerCylinder::CanPlayerInteract(const AActor* InPlayerActor) const
 	return true;
 }
 
-// Shows hold-to-insert or press-to-eject prompt on player approach
+// OnInteractionBeginOverlap: shows an insert or remove battery prompt near the player.
 void ARedPowerCylinder::OnInteractionBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	AGAME3023_F26_RoshanCharacter* Player = Cast<AGAME3023_F26_RoshanCharacter>(OtherActor);
@@ -540,7 +540,7 @@ void ARedPowerCylinder::OnInteractionBeginOverlap(UPrimitiveComponent* Overlappe
 	}
 }
 
-// Hides interaction prompt when player steps away
+// OnInteractionEndOverlap: removes this cylinder as the player's current interactable.
 void ARedPowerCylinder::OnInteractionEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
 	if (AGAME3023_F26_RoshanCharacter* Player = Cast<AGAME3023_F26_RoshanCharacter>(OtherActor))
@@ -552,7 +552,7 @@ void ARedPowerCylinder::OnInteractionEndOverlap(UPrimitiveComponent* OverlappedC
 	}
 }
 
-// Handles player inserting or ejecting battery capsule
+// Interact: inserts or removes the battery when the player uses the cylinder.
 bool ARedPowerCylinder::Interact(AGAME3023_F26_RoshanCharacter* Player)
 {
 	if (!Player || !CanPlayerInteract(Player))
@@ -591,7 +591,7 @@ bool ARedPowerCylinder::Interact(AGAME3023_F26_RoshanCharacter* Player)
 	return bMatched;
 }
 
-// RemoveBattery: updates movement pathfinding and waypoint navigation
+// RemoveBattery: removes the battery, disconnects the laser, and resets the dome.
 ABatteryCapsule* ARedPowerCylinder::RemoveBattery()
 {
 	if (!bHasBattery || !InsertedBattery)
@@ -615,7 +615,7 @@ ABatteryCapsule* ARedPowerCylinder::RemoveBattery()
 	return Extracted;
 }
 
-// InsertBattery: manages battery attachment and state
+// InsertBattery: installs a battery and enables power only when the IDs match.
 bool ARedPowerCylinder::InsertBattery(ABatteryCapsule* Battery)
 {
 	if (!Battery)
@@ -658,7 +658,7 @@ bool ARedPowerCylinder::InsertBattery(ABatteryCapsule* Battery)
 	return bMatched;
 }
 
-// UpdateVisualState: handles update visual state
+// UpdateVisualState: refreshes the cylinder after a state or battery change.
 void ARedPowerCylinder::UpdateVisualState()
 {
 	ApplyColorFromID();

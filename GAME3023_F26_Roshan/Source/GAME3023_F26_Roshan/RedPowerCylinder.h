@@ -21,11 +21,13 @@ class GAME3023_F26_ROSHAN_API ARedPowerCylinder : public AActor
 	GENERATED_BODY()
 
 public:
+	// Constructor: creates the cylinder, battery socket, laser emitter, and interaction zone.
 	ARedPowerCylinder();
 
- // Called every frame
+	// Runs every frame to update the laser and power dome.
 	virtual void Tick(float DeltaTime) override;
- // Called every frame
+
+	// Allows laser preview updates to run in editor viewports.
 	virtual bool ShouldTickIfViewportsOnly() const override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Cell ID (4-Digit)"))
@@ -94,77 +96,84 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cell|State")
 	TObjectPtr<ABatteryCapsule> InsertedBattery;
 
+	// Applies this cylinder's ID color to the visual materials.
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Color")
- // ID color mapping and dynamic materials
 	void ApplyColorFromID();
 
+	// Returns the mapped color for a four-digit ID.
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
- // ID color mapping and dynamic materials
 	FLinearColor GetColorForID(int32 InID) const;
 
+	// Checks whether an actor has an ID that matches this cylinder.
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Laser")
- // CheckActorTargetIDMatch: check actor target id match
 	bool CheckActorTargetIDMatch(AActor* ActorToCheck, int32& OutFoundID) const;
 
+	// Updates the laser beam, target hit state, and player damage.
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Laser")
- // Laser trace and collision
 	void UpdateLaserBeam();
 
+	// Handles inserting or removing a battery when the player interacts.
 	UFUNCTION(BlueprintCallable, Category = "Cell|Actions")
- // Handles Interact interaction
 	bool Interact(AGAME3023_F26_RoshanCharacter* Player);
 
+	// Checks whether the player is close enough and has line of sight.
 	UFUNCTION(BlueprintPure, Category = "Cell|Actions")
- // Handles CanPlayerInteract interaction
 	bool CanPlayerInteract(const AActor* InPlayerActor) const;
 
+	// Inserts a battery capsule and returns whether its ID matches.
 	UFUNCTION(BlueprintCallable, Category = "Cell|Actions")
- // Battery state and handling
 	bool InsertBattery(ABatteryCapsule* Battery);
 
+	// Removes the inserted battery and returns it to the player.
 	UFUNCTION(BlueprintCallable, Category = "Cell|Actions")
- // Battery state and handling
 	ABatteryCapsule* RemoveBattery();
 
+	// Returns true if the cylinder has a matching powered battery.
 	UFUNCTION(BlueprintPure, Category = "Cell|State")
- // IsPowered: is powered
 	bool IsPowered() const { return bIsPowered; }
 
 protected:
- // Called when the game starts or when spawned
+	// Runs when the game starts or the cylinder is spawned.
 	virtual void BeginPlay() override;
- // Editor construction script
+
+	// Updates cylinder visuals while it is changed in the editor.
 	virtual void OnConstruction(const FTransform& Transform) override;
 #if WITH_EDITOR
- // Editor property change callback
+	// Updates the cylinder after an editor property is changed.
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
+	// Runs when a player enters the interaction zone.
 	UFUNCTION()
- // Handles OnInteractionBeginOverlap interaction
 	void OnInteractionBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
+	// Runs when a player leaves the interaction zone.
 	UFUNCTION()
- // Handles OnInteractionEndOverlap interaction
 	void OnInteractionEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
- // UpdateVisualState: update visual state
+	// Refreshes the cylinder's visual state.
 	void UpdateVisualState();
- // BuildGunComponents: build gun components
+
+	// Reserved for creating additional laser gun components.
 	void BuildGunComponents();
- // InitPowerDome: init power dome
+
+	// Finds and prepares the power dome mesh and blinking light.
 	void InitPowerDome();
- // ApplyPowerDomeLightState: apply power dome light state
+
+	// Applies green, red, or inactive power dome visuals.
 	void ApplyPowerDomeLightState(bool bLightOn);
 
 private:
- // ClearDetectedTargets: clear detected targets
+	// Clears the currently detected target and laser hit state.
 	void ClearDetectedTargets();
- // Laser trace and collision
+
+	// Fires a line trace and returns the first hit actor.
 	AActor* TraceLaserBeam(float& OutDistance, bool& bOutHitObstacle) const;
- // Laser trace and collision
+
+	// Damages the player if the laser beam hits them.
 	void ApplyLaserBurnToPlayer(AActor* HitActor);
- // UpdateDetectedTargets: update detected targets
+
+	// Updates target actors that match the cylinder ID.
 	void UpdateDetectedTargets(AActor* HitActor);
 
 	bool bHasPrintedNoTarget = false;

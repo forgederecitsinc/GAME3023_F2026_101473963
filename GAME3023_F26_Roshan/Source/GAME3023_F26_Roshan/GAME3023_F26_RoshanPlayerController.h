@@ -8,9 +8,8 @@ class UInputMappingContext;
 class UUserWidget;
 
 /**
- * AGAME3023_F26_RoshanPlayerController
- * PlayerController class for our 2.5D / Third-Person game.
- * Sets up Enhanced Input subsystems and applies default Input Mapping Contexts.
+ * Player controller for the 2.5D/third-person game.
+ * It adds the default Enhanced Input mappings and optional mobile controls.
  */
 UCLASS(abstract)
 class AGAME3023_F26_RoshanPlayerController : public APlayerController
@@ -34,13 +33,13 @@ protected:
 	UPROPERTY(EditAnywhere, Config, Category = "Input|Touch Controls")
 	bool bForceTouchControls = false;
 
- // Called when the game starts or when spawned
+	// Applies input mappings and creates the mobile controls after play begins.
 	virtual void BeginPlay() override;
 
- // SetupInputComponent: setup input component
+	// Registers Enhanced Input mappings for this local player.
 	virtual void SetupInputComponent() override;
 
- // ShouldUseTouchControls: should use touch controls
+	// Returns true when mobile touch controls should be shown.
 	bool ShouldUseTouchControls() const;
 
 };

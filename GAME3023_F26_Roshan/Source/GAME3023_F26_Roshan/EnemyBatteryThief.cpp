@@ -19,7 +19,7 @@
 #include "Engine/World.h"
 #include "TimerManager.h"
 
-// Sets up thief movement, scanner light, carried battery socket, and sensors
+// Constructor: creates the thief movement, scanner light, battery socket, and touch sensor.
 AEnemyBatteryThief::AEnemyBatteryThief()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -68,7 +68,7 @@ AEnemyBatteryThief::AEnemyBatteryThief()
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 }
 
-// Validates settings in editor viewport
+// OnConstruction: refreshes thief settings and appearance in the editor.
 void AEnemyBatteryThief::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
@@ -76,7 +76,7 @@ void AEnemyBatteryThief::OnConstruction(const FTransform& Transform)
 }
 
 #if WITH_EDITOR
-// Refreshes movement and scanner settings on editor change
+// PostEditChangeProperty: refreshes thief settings after an editor property changes.
 void AEnemyBatteryThief::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
@@ -114,7 +114,7 @@ void AEnemyBatteryThief::RefreshEnemySettings()
 	}
 }
 
-// Stores initial spawn coordinates and marks thief as active unit
+// BeginPlay: stores the spawn position, health, and starts the AI movement loop.
 void AEnemyBatteryThief::MarkAsSpawnedUnit(const FVector& InHomeOrigin)
 {
 	bIsSpawnedChildUnit = true;
@@ -187,7 +187,7 @@ void AEnemyBatteryThief::BeginPlay()
 	PickNextNavMeshPatrolDestination();
 }
 
-// EndPlay: handles cleanup and clears active timers on shutdown
+// EndPlay: clears timers and removes the thief from active gameplay.
 void AEnemyBatteryThief::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	if (IsValid(StolenBattery))
@@ -206,7 +206,7 @@ void AEnemyBatteryThief::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
-// Applies damage to thief health and triggers death when depleted
+// TakeDamage: reduces thief health and calls the death behavior when health reaches zero.
 float AEnemyBatteryThief::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
 	if (bIsDead || DamageAmount <= 0.0f)
@@ -234,7 +234,7 @@ void AEnemyBatteryThief::ApplyDamage(float Damage, AActor* DamageCauser, const F
 	}
 }
 
-// HandleDeath: handles elimination effects and actor cleanup
+// HandleDeath: starts the thief death sequence and broadcasts the killed event.
 void AEnemyBatteryThief::HandleDeath()
 {
 	KillBatteryThief();
@@ -283,7 +283,7 @@ void AEnemyBatteryThief::KillBatteryThief()
 	Destroy();
 }
 
-// KillPermanently: handles kill permanently
+// KillPermanently: destroys the thief immediately after a fatal effect or laser hit.
 void AEnemyBatteryThief::KillPermanently()
 {
 	if (bIsDead)
@@ -617,7 +617,7 @@ ARedPowerCylinder* AEnemyBatteryThief::FindNearestWorkingBatteryLaser() const
 	return NearestValidLaser;
 }
 
-// Finds nearest drop pad to carry stolen battery to
+// FindNearestDropPad: finds the closest location where the thief can deposit a battery.
 AActor* AEnemyBatteryThief::FindClosestBatteryDropSpot() const
 {
 	UWorld* World = GetWorld();
@@ -1051,7 +1051,7 @@ void AEnemyBatteryThief::MoveWithWallSlide(const FVector& CurrentLocation, const
 	}
 }
 
-// Advances thief movement along current calculated path corners
+// TickMoving: advances the thief along its current navigation path.
 void AEnemyBatteryThief::FollowCurrentNavPath(float DeltaTime, float SpeedToUse)
 {
 	if (!CurrentPathPoints.IsValidIndex(CurrentPathCornerIndex))
@@ -1093,7 +1093,7 @@ void AEnemyBatteryThief::FollowCurrentNavPath(float DeltaTime, float SpeedToUse)
 	MoveWithWallSlide(CurrentLocation, MoveDir2D, StepDist, TargetZ, bHasNextCorner, DeltaTime);
 }
 
-// ReturnToPatrol: updates movement pathfinding and waypoint navigation
+// ReturnToPatrol: clears the current task and sends the thief back to patrol.
 void AEnemyBatteryThief::ReturnToPatrol()
 {
 	TargetLaserCylinder = nullptr;
@@ -1238,7 +1238,7 @@ void AEnemyBatteryThief::CheckPlayerProximityTouch()
 	}
 }
 
-// Handles thief AI state machine (patrol, hunt battery, steal, flee, follow)
+// Tick: runs the thief behavior for its current patrol, removal, carrying, or follow state.
 void AEnemyBatteryThief::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);

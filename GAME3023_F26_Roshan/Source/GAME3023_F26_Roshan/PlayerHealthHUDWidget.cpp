@@ -13,6 +13,7 @@
 class SMinimalHeartWidget : public SLeafWidget
 {
 public:
+	// Draws a small heart icon that can be filled or empty.
 	SLATE_BEGIN_ARGS(SMinimalHeartWidget)
 		: _Size(18.0f)
 		, _bFilled(true)
@@ -116,14 +117,14 @@ private:
 	bool bFilled = true;
 };
 
-// Constructor: sets up component hierarchy and default properties
+// Constructor: initializes the health HUD widget.
 UPlayerHealthHUDWidget::UPlayerHealthHUDWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
 	bIsVolatile = true;
 }
 
-// Binds health bar, damage vignette, and text elements
+// NativeConstruct: runs after construction and refreshes health and life visuals.
 void UPlayerHealthHUDWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
@@ -132,7 +133,7 @@ void UPlayerHealthHUDWidget::NativeConstruct()
 	RefreshLivesVisuals();
 }
 
-// Smoothly interpolates health bar fill and fades damage flashes
+// NativeTick: smoothly animates the health bar and pulses low health.
 void UPlayerHealthHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
@@ -168,7 +169,7 @@ void UPlayerHealthHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDel
 	}
 }
 
-// Updates current health and max health percentages
+// UpdateHealth: updates health values and warns Blueprints when damage was taken.
 void UPlayerHealthHUDWidget::UpdateHealth(float NewCurrentHealth, float NewMaxHealth)
 {
 	const float OldHealth = CurrentHealth;
@@ -185,7 +186,7 @@ void UPlayerHealthHUDWidget::UpdateHealth(float NewCurrentHealth, float NewMaxHe
 	OnHealthUpdated(CurrentHealth, MaxHealth, HealthPercent);
 }
 
-// SetHealthPercent: updates health and processes damage
+// SetHealthPercent: converts a health percentage into a health value.
 void UPlayerHealthHUDWidget::SetHealthPercent(float InPercent)
 {
 	UpdateHealth(InPercent * MaxHealth, MaxHealth);
@@ -199,7 +200,7 @@ void UPlayerHealthHUDWidget::UpdateLives(int32 NewCurrentLives, int32 NewMaxLive
 	OnLivesUpdated(CurrentLives, MaxLives);
 }
 
-// RefreshVisuals: handles refresh visuals
+// RefreshVisuals: updates the displayed health numbers.
 void UPlayerHealthHUDWidget::RefreshVisuals()
 {
 	if (HealthValueTextBlock.IsValid())
@@ -247,7 +248,7 @@ void UPlayerHealthHUDWidget::RefreshLivesVisuals()
 	}
 }
 
-// RebuildWidget: updates UI display and widget visibility
+// RebuildWidget: builds the health bar, labels, and heart container.
 TSharedRef<SWidget> UPlayerHealthHUDWidget::RebuildWidget()
 {
 	if (WidgetTree && WidgetTree->RootWidget)

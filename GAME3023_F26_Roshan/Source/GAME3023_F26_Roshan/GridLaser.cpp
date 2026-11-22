@@ -8,19 +8,22 @@
 #include "Engine/StaticMesh.h"
 #include "Kismet/GameplayStatics.h"
 
-// Sets up beam mesh, box trigger volume, and audio components
+// Constructor: creates the main components used by the laser grid.
 AGridLaser::AGridLaser()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
+	// Create the root component and attach the other components to it.
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	SetRootComponent(SceneRoot);
 
+	// This component stores and draws all of the individual laser beams.
 	LaserBeamInstances = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("LaserBeamInstances"));
 	LaserBeamInstances->SetupAttachment(RootComponent);
 	LaserBeamInstances->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	LaserBeamInstances->SetCastShadow(false);
 
+	// This box is used to check for overlap with the player and other actors.
 	HazardBox = CreateDefaultSubobject<UBoxComponent>(TEXT("HazardBox"));
 	HazardBox->SetupAttachment(RootComponent);
 	HazardBox->SetCollisionProfileName(TEXT("Trigger"));
@@ -28,22 +31,24 @@ AGridLaser::AGridLaser()
 	HazardBox->SetGenerateOverlapEvents(true);
 }
 
-// Initializes laser power state, collision overlaps, and dynamic material
+// BeginPlay: runs once when the game starts and connects the overlap events.
 void AGridLaser::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// Register functions that run when an actor enters or leaves the hazard box.
 	if (HazardBox)
 	{
 		HazardBox->OnComponentBeginOverlap.AddDynamic(this, &AGridLaser::OnHazardBeginOverlap);
 		HazardBox->OnComponentEndOverlap.AddDynamic(this, &AGridLaser::OnHazardEndOverlap);
 	}
 
+	// Build the beams and set the laser's starting state.
 	RebuildLaserGrid();
 	UpdateLaserState();
 }
 
-// Scales laser beam and collision box according to length and width in editor
+// OnConstruction: rebuilds the laser when the actor is changed in the editor.
 void AGridLaser::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
@@ -52,7 +57,7 @@ void AGridLaser::OnConstruction(const FTransform& Transform)
 }
 
 #if WITH_EDITOR
-// Refreshes laser visuals when length or toggle properties change
+// PostEditChangeProperty: updates the laser after an editor property is changed.
 void AGridLaser::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
@@ -61,7 +66,7 @@ void AGridLaser::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEv
 }
 #endif
 
-// RebuildLaserGrid: controls laser trace and hit detection
+// RebuildLaserGrid: creates the beams and sizes the overlap box from the settings.
 void AGridLaser::RebuildLaserGrid()
 {
 	if (!LaserBeamInstances)
@@ -69,6 +74,7 @@ void AGridLaser::RebuildLaserGrid()
 		return;
 	}
 
+	// Use the Unreal engine cube as the beam mesh if no custom mesh is assigned.
 	if (!LaserBeamInstances->GetStaticMesh())
 	{
 		if (UStaticMesh* CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")))
@@ -77,12 +83,14 @@ void AGridLaser::RebuildLaserGrid()
 		}
 	}
 
+	// Start with no beams because the grid will be rebuilt from the current settings.
 	LaserBeamInstances->ClearInstances();
 
 	const float ClampedWidth = FMath::Max(20.0f, GridWidth);
 	const float ClampedHeight = FMath::Max(20.0f, GridHeight);
 	const float ClampedThickness = FMath::Max(1.0f, BeamThickness);
 
+	// Add horizontal beams by spacing them evenly up the height of the grid.
 	if (bEnableHorizontalBeams && NumHorizontalBeams > 0)
 	{
 		const float StepZ = ClampedHeight / (NumHorizontalBeams + 1.0f);
@@ -93,6 +101,7 @@ void AGridLaser::RebuildLaserGrid()
 		}
 	}
 
+	// Add vertical beams by spacing them evenly across the width of the grid.
 	if (bEnableVerticalBeams && NumVerticalBeams > 0)
 	{
 		const float StepY = ClampedWidth / (NumVerticalBeams + 1.0f);
@@ -104,6 +113,7 @@ void AGridLaser::RebuildLaserGrid()
 		}
 	}
 
+	// Resize the collision box to match the size of the complete laser grid.
 	if (HazardBox)
 	{
 		const float BoxThickness = FMath::Max(20.0f, ClampedThickness * 2.0f);
@@ -112,7 +122,7 @@ void AGridLaser::RebuildLaserGrid()
 	}
 }
 
-// ConfigureHazardCollision: handles configure hazard collision
+// ConfigureHazardCollision: turns collision on or off and enables blocking if needed.
 void AGridLaser::ConfigureHazardCollision()
 {
 	if (!HazardBox)
@@ -120,6 +130,7 @@ void AGridLaser::ConfigureHazardCollision()
 		return;
 	}
 
+	// If the laser is off, disable collision and clear the player overlap state.
 	if (!bIsLaserOn)
 	{
 		HazardBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -128,6 +139,7 @@ void AGridLaser::ConfigureHazardCollision()
 		return;
 	}
 
+	// Blocking mode stops the player from passing through the laser.
 	if (bBlockPlayer)
 	{
 		HazardBox->SetCollisionProfileName(TEXT("BlockAllDynamic"));
@@ -135,11 +147,13 @@ void AGridLaser::ConfigureHazardCollision()
 	}
 	else
 	{
+		// Normal mode only detects overlaps and does not physically block movement.
 		HazardBox->SetCollisionProfileName(TEXT("Trigger"));
 		HazardBox->SetCollisionResponseToAllChannels(ECR_Overlap);
 		HazardBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	}
 
+	// Check for actors already inside the box after the game starts.
 	if (GetWorld() && GetWorld()->IsGameWorld())
 	{
 		TArray<AActor*> OverlappingActors;
@@ -154,7 +168,7 @@ void AGridLaser::ConfigureHazardCollision()
 	}
 }
 
-// UpdateLaserState: controls laser trace and hit detection
+// UpdateLaserState: updates the beam visibility and hazard collision settings.
 void AGridLaser::UpdateLaserState()
 {
 	if (LaserBeamInstances)
@@ -164,7 +178,7 @@ void AGridLaser::UpdateLaserState()
 	ConfigureHazardCollision();
 }
 
-// SetLaserState: controls laser trace and hit detection
+// SetLaserState: turns the laser on or off and tells Blueprints about the change.
 void AGridLaser::SetLaserState(bool bNewActive)
 {
 	if (bIsLaserOn != bNewActive)
@@ -175,13 +189,13 @@ void AGridLaser::SetLaserState(bool bNewActive)
 	}
 }
 
-// Inverts current laser active state
+// ToggleLaser: switches the laser to the opposite active state.
 void AGridLaser::ToggleLaser()
 {
 	SetLaserState(!bIsLaserOn);
 }
 
-// DealLaserDamage: updates health and processes damage
+// DealLaserDamage: applies the correct damage or death behavior to an actor.
 void AGridLaser::DealLaserDamage(AActor* TargetActor)
 {
 	if (!TargetActor || !bIsLaserOn)
@@ -189,6 +203,7 @@ void AGridLaser::DealLaserDamage(AActor* TargetActor)
 		return;
 	}
 
+	// If the target is the player, apply the configured laser damage.
 	if (AGAME3023_F26_RoshanCharacter* PlayerChar = LiveWireUtils::ResolveActorOrParent<AGAME3023_F26_RoshanCharacter>(TargetActor))
 	{
 		if (!PlayerChar->IsDead())
@@ -198,6 +213,7 @@ void AGridLaser::DealLaserDamage(AActor* TargetActor)
 		return;
 	}
 
+	// Battery thieves are destroyed immediately when hit by the laser.
 	if (AEnemyBatteryThief* Thief = LiveWireUtils::ResolveActorOrParent<AEnemyBatteryThief>(TargetActor))
 	{
 		if (!Thief->bIsDead)
@@ -207,10 +223,11 @@ void AGridLaser::DealLaserDamage(AActor* TargetActor)
 		return;
 	}
 
+	// Other actors use Unreal's standard damage system.
 	UGameplayStatics::ApplyDamage(TargetActor, DamageAmount, GetInstigatorController(), this, nullptr);
 }
 
-// OnHazardBeginOverlap: trigger zone overlap event
+// OnHazardBeginOverlap: runs when an actor starts overlapping the laser.
 void AGridLaser::OnHazardBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (!bIsLaserOn || !OtherActor || OtherActor == this)
@@ -218,6 +235,7 @@ void AGridLaser::OnHazardBeginOverlap(UPrimitiveComponent* OverlappedComp, AActo
 		return;
 	}
 
+	// Remember the player so it can receive damage again while remaining inside.
 	if (AGAME3023_F26_RoshanCharacter* PlayerChar = LiveWireUtils::ResolveActorOrParent<AGAME3023_F26_RoshanCharacter>(OtherActor))
 	{
 		OverlappingPlayer = PlayerChar;
@@ -226,13 +244,14 @@ void AGridLaser::OnHazardBeginOverlap(UPrimitiveComponent* OverlappedComp, AActo
 		return;
 	}
 
+	// Kill a battery thief when it enters the hazard.
 	if (AEnemyBatteryThief* Thief = LiveWireUtils::ResolveActorOrParent<AEnemyBatteryThief>(OtherActor))
 	{
 		DealLaserDamage(Thief);
 	}
 }
 
-// OnHazardEndOverlap: trigger zone overlap event
+// OnHazardEndOverlap: runs when an actor leaves the laser hazard.
 void AGridLaser::OnHazardEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
 	if (OtherActor && OtherActor == OverlappingPlayer)
@@ -242,7 +261,7 @@ void AGridLaser::OnHazardEndOverlap(UPrimitiveComponent* OverlappedComp, AActor*
 	}
 }
 
-// Updates beam flicker effects or patrol movement if active
+// Tick: applies damage again while the player stays inside the laser.
 void AGridLaser::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -252,6 +271,7 @@ void AGridLaser::Tick(float DeltaTime)
 		return;
 	}
 
+	// Count the time spent overlapping, then use the damage interval to deal damage.
 	OverlapDamageTimer += DeltaTime;
 	if (OverlapDamageTimer >= DamageTickInterval)
 	{

@@ -8,116 +8,120 @@ class SWidget;
 class SBox;
 class STextBlock;
 
+// Widget that displays an interaction prompt for the player.
 UCLASS(BlueprintType, Blueprintable)
 class GAME3023_F26_ROSHAN_API UInteractPromptWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
 public:
+	// Constructor: initializes the widget.
 	UInteractPromptWidget(const FObjectInitializer& ObjectInitializer);
 
-	/** Display the interaction prompt for a target actor with specific action and target name */
+	// Shows the prompt using the target actor and the text for the action and object.
 	UFUNCTION(BlueprintCallable, Category = "Interaction Prompt")
- // ShowPrompt: show prompt
 	void ShowPrompt(AActor* InTargetActor, const FText& InActionText, const FText& InTargetName);
 
-	/** Hide the prompt smoothly */
+	// Starts hiding the prompt with a fade.
 	UFUNCTION(BlueprintCallable, Category = "Interaction Prompt")
- // HidePrompt: hide prompt
 	void HidePrompt();
 
-	/** Update text while already visible */
+	// Changes the action and target text while the prompt is visible.
 	UFUNCTION(BlueprintCallable, Category = "Interaction Prompt")
- // UpdatePromptText: update prompt text
 	void UpdatePromptText(const FText& InActionText, const FText& InTargetName);
 
-	/** Update the 0.0 to 1.0 circular hold progress around the Square button logo */
+	// Updates the hold progress value from 0.0 to 1.0.
 	UFUNCTION(BlueprintCallable, Category = "Interaction Prompt")
- // SetHoldProgress: set hold progress
 	void SetHoldProgress(float InProgress);
 
-	/** Query current 0.0 to 1.0 hold progress */
+	// Returns the current hold progress.
 	UFUNCTION(BlueprintPure, Category = "Interaction Prompt")
- // GetHoldProgress: get hold progress
 	float GetHoldProgress() const { return HoldProgress; }
 
-	/** Query whether the prompt is currently visible */
+	// Returns true while the prompt is visible.
 	UFUNCTION(BlueprintPure, Category = "Interaction Prompt")
- // IsPromptVisible: is prompt visible
 	bool IsPromptVisible() const { return bIsPromptVisible; }
 
-	/** Current target actor */
+	// Returns the actor that the prompt is currently targeting.
 	UFUNCTION(BlueprintPure, Category = "Interaction Prompt")
- // GetTargetActor: get target actor
 	AActor* GetTargetActor() const { return TargetActor.Get(); }
 
-	/** Current action text (e.g. "PRESS SQUARE TO PICK UP") */
+	// Text telling the player what interaction to perform.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction Prompt")
 	FText ActionText;
 
-	/** Current target name text (e.g. "Battery Capsule [ID: 1001]") */
+	// Name of the object or actor the player can interact with.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction Prompt")
 	FText TargetNameText;
 
-	/** Keyboard alternative hint text (e.g. "E") */
+	// Keyboard key displayed as an alternative to the controller button.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction Prompt")
 	FText KeyboardKeyText;
 
-	/** Current 0..1 progress for circular hold indicator (0 = not holding, 1 = 5s complete) */
+	// Stores how much of the hold interaction is complete, from 0.0 to 1.0.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction Prompt")
 	float HoldProgress = 0.0f;
 
-	/** Whether to dock at bottom center of screen (true) or follow target actor in screen space (false) */
+	// When true, the prompt stays at the bottom center of the screen.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction Prompt")
 	bool bAnchorToScreenBottom = true;
 
-	/** Offset above target actor when following in screen space */
+	// Position offset used when the prompt follows the target in the world.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction Prompt")
 	FVector WorldSpaceOffset = FVector(0.0f, 0.0f, 120.0f);
 
 protected:
- // NativeConstruct: native construct
+	// Runs once after the widget is created.
 	virtual void NativeConstruct() override;
- // Called every frame
+
+	// Runs every frame to update fading and target position.
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
- // RebuildWidget: rebuild widget
+
+	// Builds the Slate controls shown by this widget.
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 
-	/** Blueprint hook: override in UMG Widget Blueprint if you want custom animations or styling */
+	// Blueprint event that can be used to add custom show animations or styling.
 	UFUNCTION(BlueprintImplementableEvent, Category = "Interaction Prompt")
- // OnShowPrompt: on show prompt
 	void OnShowPrompt(const FText& InActionText, const FText& InTargetName);
 
+	// Blueprint event called when the prompt starts hiding.
 	UFUNCTION(BlueprintImplementableEvent, Category = "Interaction Prompt")
- // OnHidePrompt: on hide prompt
 	void OnHidePrompt();
 
+	// Blueprint event called whenever the hold progress changes.
 	UFUNCTION(BlueprintImplementableEvent, Category = "Interaction Prompt")
- // OnHoldProgressChanged: on hold progress changed
 	void OnHoldProgressChanged(float NewProgress);
 
-	/** Slate bindings */
- // GetActionText: get action text
+	// Provides the action text to the Slate widget.
 	FText GetActionText() const { return ActionText; }
- // GetTargetNameText: get target name text
+
+	// Provides the target name text to the Slate widget.
 	FText GetTargetNameText() const { return TargetNameText; }
- // GetKeyboardKeyText: get keyboard key text
+
+	// Provides the keyboard key text to the Slate widget.
 	FText GetKeyboardKeyText() const { return KeyboardKeyText; }
- // GetPromptSlateVisibility: get prompt slate visibility
+
+	// Returns whether the Slate prompt should be visible.
 	EVisibility GetPromptSlateVisibility() const;
- // GetPromptRenderOpacity: get prompt render opacity
+
+	// Returns the prompt's current fade opacity.
 	TOptional<float> GetPromptRenderOpacity() const { return CurrentAlpha; }
 
 private:
- // UpdatePromptLabels: update prompt labels
+	// Updates the Slate text blocks with the latest prompt labels.
 	void UpdatePromptLabels();
 
+	// Weak reference to the actor the player can interact with.
 	TWeakObjectPtr<AActor> TargetActor;
 
+	// Tracks whether the prompt is currently visible.
 	bool bIsPromptVisible = false;
+
+	// Stores the current and target opacity used for fading.
 	float CurrentAlpha = 0.0f;
 	float TargetAlpha = 0.0f;
 
+	// Slate controls that make up the interaction prompt.
 	TSharedPtr<SBox> PromptContainerBox;
 	TSharedPtr<STextBlock> ActionTextBlock;
 	TSharedPtr<STextBlock> TargetTextBlock;

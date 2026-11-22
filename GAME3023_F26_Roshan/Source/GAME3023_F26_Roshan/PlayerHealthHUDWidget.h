@@ -17,29 +17,31 @@ class GAME3023_F26_ROSHAN_API UPlayerHealthHUDWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
+	// Constructor: initializes the health HUD widget.
 	UPlayerHealthHUDWidget(const FObjectInitializer& ObjectInitializer);
 
+	// Updates the player's current and maximum health values.
 	UFUNCTION(BlueprintCallable, Category = "Player Health HUD")
- // Health and damage management
 	void UpdateHealth(float NewCurrentHealth, float NewMaxHealth);
 
+	// Sets health using a percentage from 0.0 to 1.0.
 	UFUNCTION(BlueprintCallable, Category = "Player Health HUD")
-	// Health and damage management
 	void SetHealthPercent(float InPercent);
 
+	// Updates the number of lives shown by the heart icons.
 	UFUNCTION(BlueprintCallable, Category = "Player Health HUD")
 	void UpdateLives(int32 NewCurrentLives, int32 NewMaxLives);
 
+	// Returns the player's current health.
 	UFUNCTION(BlueprintPure, Category = "Player Health HUD")
- // Health and damage management
 	float GetCurrentHealth() const { return CurrentHealth; }
 
+	// Returns the player's maximum health.
 	UFUNCTION(BlueprintPure, Category = "Player Health HUD")
- // Health and damage management
 	float GetMaxHealth() const { return MaxHealth; }
 
+	// Returns the player's health as a percentage from 0.0 to 1.0.
 	UFUNCTION(BlueprintPure, Category = "Player Health HUD")
- // Health and damage management
 	float GetHealthPercent() const { return HealthPercent; }
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player Health HUD")
@@ -64,27 +66,32 @@ public:
 	int32 MaxLives = 3;
 
 protected:
- // NativeConstruct: native construct
+	// Runs once after the widget is created.
 	virtual void NativeConstruct() override;
- // Called every frame
+
+	// Runs every frame to animate the health bar.
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
- // RebuildWidget: rebuild widget
+
+	// Creates the health bar, text, and heart layout.
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 
+	// Blueprint event called after health is updated.
 	UFUNCTION(BlueprintImplementableEvent, Category = "Player Health HUD")
- // Health and damage management
 	void OnHealthUpdated(float NewCurrentHealth, float NewMaxHealth, float NewPercent);
 
+	// Blueprint event called when the player takes damage.
 	UFUNCTION(BlueprintImplementableEvent, Category = "Player Health HUD")
-	// Health and damage management
 	void OnPlayerDamaged(float DamageAmount);
 
+	// Blueprint event called after the life count changes.
 	UFUNCTION(BlueprintImplementableEvent, Category = "Player Health HUD")
 	void OnLivesUpdated(int32 NewCurrentLives, int32 NewMaxLives);
 
 private:
-	// RefreshVisuals: refresh visuals
+	// Updates the health value text.
 	void RefreshVisuals();
+
+	// Rebuilds or updates the heart icons.
 	void RefreshLivesVisuals();
 
 	float DisplayedPercent = 1.0f;

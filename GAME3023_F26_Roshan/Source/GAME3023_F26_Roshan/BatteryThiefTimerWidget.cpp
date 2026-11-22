@@ -7,14 +7,14 @@
 #include "Widgets/Text/STextBlock.h"
 #include "Blueprint/WidgetTree.h"
 
-// Constructor: sets up component hierarchy and default properties
+// Constructor: initializes the battery-thief countdown widget.
 UBatteryThiefTimerWidget::UBatteryThiefTimerWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
 	bIsVolatile = true;
 }
 
-// Sets up text blocks and progress circle bindings on widget spawn
+// NativeConstruct: displays the timer and prepares its visual controls.
 void UBatteryThiefTimerWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
@@ -22,7 +22,7 @@ void UBatteryThiefTimerWidget::NativeConstruct()
 	RefreshVisuals();
 }
 
-// Updates countdown text and radial progress fill each frame
+// NativeTick: smoothly updates the bar and pulses the text near the end.
 void UBatteryThiefTimerWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
@@ -57,7 +57,7 @@ void UBatteryThiefTimerWidget::NativeTick(const FGeometry& MyGeometry, float InD
 	}
 }
 
-// UpdateTimer: handles update timer
+// UpdateTimer: converts the remaining time into a progress value.
 void UBatteryThiefTimerWidget::UpdateTimer(float InRemainingTime, float InTotalDuration)
 {
 	RemainingTime = FMath::Max(0.0f, InRemainingTime);
@@ -68,7 +68,7 @@ void UBatteryThiefTimerWidget::UpdateTimer(float InRemainingTime, float InTotalD
 	OnTimerUpdated(RemainingTime, ProgressPercent);
 }
 
-// RefreshVisuals: handles refresh visuals
+// RefreshVisuals: updates the countdown text shown on the widget.
 void UBatteryThiefTimerWidget::RefreshVisuals()
 {
 	if (TimeTextBlock.IsValid())
@@ -77,7 +77,7 @@ void UBatteryThiefTimerWidget::RefreshVisuals()
 	}
 }
 
-// RebuildWidget: updates UI display and widget visibility
+// RebuildWidget: creates the countdown label and progress bar layout.
 TSharedRef<SWidget> UBatteryThiefTimerWidget::RebuildWidget()
 {
 	if (WidgetTree && WidgetTree->RootWidget)

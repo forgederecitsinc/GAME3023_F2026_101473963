@@ -18,14 +18,17 @@ class GAME3023_F26_ROSHAN_API ATransformerBushing : public AActor
 	GENERATED_BODY()
 
 public:
+	// Constructor: creates the bushing mesh and point light.
 	ATransformerBushing();
 
- // Called every frame
+	// Runs every frame and periodically checks for matching targets.
 	virtual void Tick(float DeltaTime) override;
 
+	// ID used to identify this bushing.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Bushing ID (4-Digit)"))
 	int32 BushingID = 1001;
 
+	// Alternate target ID property kept in sync with BushingID.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Target ID (Alias)"))
 	int32 TargetID = 1001;
 
@@ -80,58 +83,64 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Audio", meta = (DisplayName = "Power Down Sound"))
 	TObjectPtr<USoundBase> PowerDownSound;
 
+	// Delegate broadcast when the bushing turns on or off.
 	UPROPERTY(BlueprintAssignable, Category = "LiveWire|Gameplay")
 	FOnTransformerBushingStateChanged OnTransformerStateChanged;
 
+	// Blueprint event called when the lit state changes.
 	UFUNCTION(BlueprintNativeEvent, Category = "LiveWire|Gameplay")
- // OnLitStateChanged: on lit state changed
 	void OnLitStateChanged(bool bNewLit);
 
+	// Turns the neon bushing on or off.
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Gameplay")
- // SetLitUp: set lit up
 	void SetLitUp(bool bLit);
 
+	// Compatibility function that uses the same behavior as SetLitUp.
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Gameplay")
- // Laser trace and collision
 	void SetLaserHit(bool bHit, AActor* SourceActor = nullptr);
 
+	// Runs when a linked laser target changes its hit state.
 	UFUNCTION()
- // OnTargetHitStateChanged: on target hit state changed
 	void OnTargetHitStateChanged(ALaserTarget* Target, bool bIsHit);
 
+	// Returns the LiveWire color for a target ID.
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
- // ID color mapping and dynamic materials
 	FLinearColor GetColorForID(int32 InID) const;
 
+	// Returns the color currently used by the lit bushing.
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
- // ID color mapping and dynamic materials
 	FLinearColor GetActiveLitColor() const;
 
+	// Updates the mesh, light, and emissive appearance.
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Appearance")
- // UpdateAppearance: update appearance
 	void UpdateAppearance();
 
 protected:
- // Called when the game starts or when spawned
+	// Runs when the game starts or the bushing is spawned.
 	virtual void BeginPlay() override;
- // Editor construction script
+
+	// Updates the bushing while it is placed or changed in the editor.
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 #if WITH_EDITOR
- // Editor property change callback
+	// Updates the bushing after an editor property is changed.
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
 private:
- // ID color mapping and dynamic materials
+	// Keeps both ID properties synchronized and updates the neon color.
 	void SyncIDAndColor(int32 NewID);
- // BindTarget: bind target
+
+	// Connects this bushing to one matching laser target.
 	void BindTarget(ALaserTarget* Target);
- // BindToMatchingTargets: bind to matching targets
+
+	// Searches for laser targets that have the same ID.
 	void BindToMatchingTargets();
- // StartNeonIgnitionFlicker: start neon ignition flicker
+
+	// Plays a short flicker effect when the bushing turns on.
 	void StartNeonIgnitionFlicker();
- // SetMeshEmissive: set mesh emissive
+
+	// Changes the emissive color on the bushing mesh material.
 	void SetMeshEmissive(const FLinearColor& Color);
 
 	FTimerHandle FlickerTimerHandle;

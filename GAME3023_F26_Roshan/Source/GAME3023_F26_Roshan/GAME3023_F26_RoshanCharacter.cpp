@@ -37,7 +37,7 @@
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
-// Sets up player capsule, camera boom, top-down camera, and inventory
+// Constructor: creates the player capsule, camera boom, camera, and inventory components.
 AGAME3023_F26_RoshanCharacter::AGAME3023_F26_RoshanCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -92,7 +92,7 @@ AGAME3023_F26_RoshanCharacter::AGAME3023_F26_RoshanCharacter()
 	bIsDead = false;
 }
 
-// Initializes health HUD, camera framing, and input bindings
+// BeginPlay: initializes the HUD, camera settings, input, and background audio.
 void AGAME3023_F26_RoshanCharacter::BeginPlay()
 {
 	Super::BeginPlay();
@@ -131,7 +131,7 @@ void AGAME3023_F26_RoshanCharacter::BeginPlay()
 	}
 }
 
-// PossessedBy: handles possessed by
+// PossessedBy: runs after a controller takes control of the player character.
 void AGAME3023_F26_RoshanCharacter::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
@@ -154,7 +154,7 @@ void AGAME3023_F26_RoshanCharacter::PossessedBy(AController* NewController)
 	}
 }
 
-// EndPlay: handles cleanup and clears active timers on shutdown
+// EndPlay: stops background audio and cleans up timers when play ends.
 void AGAME3023_F26_RoshanCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	StopBackgroundMusic();
@@ -195,7 +195,7 @@ void AGAME3023_F26_RoshanCharacter::EndPlay(const EEndPlayReason::Type EndPlayRe
 	Super::EndPlay(EndPlayReason);
 }
 
-// Handles twin-stick aiming, hold interactions, roof cutouts, and HUD updates
+// Tick: updates camera occlusion, aiming, hold interactions, and controller feedback.
 void AGAME3023_F26_RoshanCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -542,7 +542,7 @@ void AGAME3023_F26_RoshanCharacter::AddControllerRollInput(float Val)
 {
 }
 
-// Binds Enhanced Input actions for move, look, interact, and drop
+// SetupPlayerInputComponent: binds movement, aiming, interaction, and drop actions.
 void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
@@ -581,7 +581,7 @@ void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* P
 	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Right, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
 }
 
-// Handles WASD and left-stick character movement input
+// Move: receives the player's movement input and sends it to the character.
 void AGAME3023_F26_RoshanCharacter::Move(const FInputActionValue& Value)
 {
 	FVector2D MovementVector = Value.Get<FVector2D>();
@@ -589,7 +589,7 @@ void AGAME3023_F26_RoshanCharacter::Move(const FInputActionValue& Value)
 	DoMove(MovementVector.X, MovementVector.Y);
 }
 
-// Handles right-stick and mouse aiming rotation
+// Look: receives the player's aiming input and updates the camera aim.
 void AGAME3023_F26_RoshanCharacter::Look(const FInputActionValue& Value)
 {
 	FVector2D LookAxisVector = Value.Get<FVector2D>();
@@ -642,7 +642,7 @@ void AGAME3023_F26_RoshanCharacter::StopJumping()
 {
 }
 
-// Handles cylinder interaction logic (insert or eject)
+// InteractWithCylinder: inserts or removes a battery at the selected cylinder.
 bool AGAME3023_F26_RoshanCharacter::InteractWithCylinder(ARedPowerCylinder* Cylinder)
 {
 	if (!Cylinder || !Cylinder->CanPlayerInteract(this))
@@ -669,7 +669,7 @@ bool AGAME3023_F26_RoshanCharacter::InteractWithCylinder(ARedPowerCylinder* Cyli
 	return true;
 }
 
-// Initiates interact on key press for pickups or cylinder docks
+// DoInteract: starts an pickup or cylinder interaction when the interact key is pressed.
 void AGAME3023_F26_RoshanCharacter::DoInteract()
 {
 	if (bIsDead || LastInteractPressFrame == GFrameCounter)
@@ -746,7 +746,7 @@ void AGAME3023_F26_RoshanCharacter::DoInteract()
 	}
 }
 
-// Handles DoInteractRelease interaction logic
+// DoInteractRelease: stops the held interaction and resets its progress.
 void AGAME3023_F26_RoshanCharacter::DoInteractRelease()
 {
 	bEnhancedInteractHeld = false;
@@ -797,7 +797,7 @@ void AGAME3023_F26_RoshanCharacter::ResetBatteryAttachHold()
 	}
 }
 
-// TakeCarriedBattery: manages battery attachment and state
+// TakeCarriedBattery: removes the battery from the player's hands and returns it.
 ABatteryCapsule* AGAME3023_F26_RoshanCharacter::TakeCarriedBattery()
 {
 	if (!HasBattery()) return nullptr;
@@ -807,7 +807,7 @@ ABatteryCapsule* AGAME3023_F26_RoshanCharacter::TakeCarriedBattery()
 	return Taken;
 }
 
-// TryPickupBattery: manages battery attachment and state
+// TryPickupBattery: gives the battery to the player if the inventory hand is empty.
 bool AGAME3023_F26_RoshanCharacter::TryPickupBattery(ABatteryCapsule* Battery)
 {
 	if (!Battery) return false;
@@ -990,7 +990,7 @@ void AGAME3023_F26_RoshanCharacter::UpdateHealthHUD()
 	}
 }
 
-// Finds closest valid battery or cylinder in interaction range
+// FindBestInteractable: finds the nearest battery or cylinder the player can use.
 AActor* AGAME3023_F26_RoshanCharacter::FindBestInteractable()
 {
 	AActor* BestCandidate = nullptr;
@@ -1504,7 +1504,7 @@ void AGAME3023_F26_RoshanCharacter::NotifyDanger(const FVector& DangerLocation, 
 {
 }
 
-// Updates health value and broadcasts HUD update delegates
+// UpdateHealthVisuals: refreshes health text and sends the current values to the HUD.
 void AGAME3023_F26_RoshanCharacter::ApplyHealthChange(float NewHealth)
 {
 	const float OldHealth = CurrentHealth;
@@ -1515,7 +1515,7 @@ void AGAME3023_F26_RoshanCharacter::ApplyHealthChange(float NewHealth)
 	UpdateHealthHUD();
 }
 
-// Applies damage to player health and triggers death when depleted
+// ApplyDamageToPlayer: reduces health, updates the HUD, and starts death if health reaches zero.
 void AGAME3023_F26_RoshanCharacter::ApplyDamageToPlayer(float DamageAmount, AActor* DamageCauser)
 {
 	if (bIsDead || DamageAmount <= 0.0f)

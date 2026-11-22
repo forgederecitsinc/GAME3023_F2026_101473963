@@ -6,7 +6,7 @@
 #include "Engine/World.h"
 #include "TimerManager.h"
 
-// Sets up default spawn hatch locations and references enemy classes
+// Constructor: initializes the default thief spawn location and spawn settings.
 AGAME3023_F26_RoshanGameMode::AGAME3023_F26_RoshanGameMode()
 {
 	BatteryThiefSpawnLocations = {
@@ -26,7 +26,7 @@ AGAME3023_F26_RoshanGameMode::AGAME3023_F26_RoshanGameMode()
 	}
 }
 
-// Initializes enemy spawn slots and begins initial wave timers
+// BeginPlay: prepares spawn slots and starts the initial thief wave.
 void AGAME3023_F26_RoshanGameMode::BeginPlay()
 {
 	Super::BeginPlay();
@@ -78,7 +78,7 @@ void AGAME3023_F26_RoshanGameMode::BeginPlay()
 	);
 }
 
-// Cleans up all active spawn and replacement timer handles
+// EndPlay: stops active spawn timers and clears replacement timers.
 void AGAME3023_F26_RoshanGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	if (UWorld* World = GetWorld())
@@ -94,7 +94,7 @@ void AGAME3023_F26_RoshanGameMode::EndPlay(const EEndPlayReason::Type EndPlayRea
 	Super::EndPlay(EndPlayReason);
 }
 
-// Counts total living battery thieves currently active in arena
+// GetActiveBatteryThiefCount: counts living thieves across every spawn slot.
 int32 AGAME3023_F26_RoshanGameMode::GetActiveBatteryThiefCount() const
 {
 	UWorld* World = GetWorld();
@@ -135,7 +135,7 @@ FVector AGAME3023_F26_RoshanGameMode::GetSpawnLocationForSlot(int32 SlotIndex) c
 	return DefaultBatteryThiefSpawnLocation;
 }
 
-// Counts active living thieves spawned by specific slot
+// GetActiveCountForSlot: counts living thieves assigned to one spawn slot.
 int32 AGAME3023_F26_RoshanGameMode::GetActiveCountForSlot(int32 SlotIndex) const
 {
 	if (!SpawnSlotStates.IsValidIndex(SlotIndex))
@@ -189,7 +189,7 @@ bool AGAME3023_F26_RoshanGameMode::AreAllSlotsInitialWaveComplete() const
 	return true;
 }
 
-// Registers thief in slot tracking maps and binds death delegates
+// RegisterThief: records a spawned thief under its hatch slot.
 void AGAME3023_F26_RoshanGameMode::RegisterThief(AEnemyBatteryThief* Thief, int32 SlotIndex, bool bAddToSlotTracking)
 {
 	if (!Thief)
@@ -314,7 +314,7 @@ AEnemyBatteryThief* AGAME3023_F26_RoshanGameMode::TrySpawnBatteryThief()
 	return nullptr;
 }
 
-// Timer callback that deploys thieves during initial wave
+// HandleInitialWaveSpawnTick: continues spawning the first wave until every slot is complete.
 void AGAME3023_F26_RoshanGameMode::HandleInitialWaveSpawnTick()
 {
 	UWorld* World = GetWorld();
@@ -340,7 +340,7 @@ void AGAME3023_F26_RoshanGameMode::HandleInitialWaveSpawnTick()
 	}
 }
 
-// OnSpawnedBatteryThiefKilled: handles spawning logic and placement
+// OnSpawnedBatteryThiefKilled: schedules a replacement thief after a spawned thief dies.
 void AGAME3023_F26_RoshanGameMode::OnSpawnedBatteryThiefKilled(AEnemyBatteryThief* KilledThief)
 {
 	UWorld* World = GetWorld();

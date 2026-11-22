@@ -4,7 +4,7 @@
 #include "Components/PointLightComponent.h"
 #include "Kismet/GameplayStatics.h"
 
-// Initializes bomb collision, particle visuals, and point light
+// Constructor: creates the particle collision, mesh, and point light.
 ADroneLaserParticle::ADroneLaserParticle()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -33,7 +33,7 @@ ADroneLaserParticle::ADroneLaserParticle()
 	InitialLifeSpan = 3.0f;
 }
 
-// Spawns laser bomb drop and starts downward motion timer
+// BeginPlay: connects overlap detection and initializes the falling particle.
 void ADroneLaserParticle::BeginPlay()
 {
 	Super::BeginPlay();
@@ -46,7 +46,7 @@ void ADroneLaserParticle::BeginPlay()
 	InitializeParticle(DamageAmount, FallSpeed, MoveDirection, ParticleColor);
 }
 
-// InitializeParticle: handles initialize particle
+// InitializeParticle: sets this particle's damage, fall speed, direction, and color.
 void ADroneLaserParticle::InitializeParticle(float InDamage, float InSpeed, const FVector& InDirection, const FLinearColor& InColor)
 {
 	DamageAmount = InDamage;
@@ -66,7 +66,7 @@ void ADroneLaserParticle::InitializeParticle(float InDamage, float InSpeed, cons
 	}
 }
 
-// Moves laser projectile downwards towards the ground target
+// Tick: moves the particle toward the ground and checks for a hit.
 void ADroneLaserParticle::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -86,7 +86,7 @@ void ADroneLaserParticle::Tick(float DeltaTime)
 	}
 }
 
-// OnParticleOverlap: trigger zone overlap event
+// OnParticleOverlap: damages the player once or destroys the particle on a surface.
 void ADroneLaserParticle::OnParticleOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (bHasDealtDamage || !IsValid(OtherActor) || OtherActor == this || OtherActor == GetOwner() || OtherActor->IsA<ADroneLaserParticle>())
