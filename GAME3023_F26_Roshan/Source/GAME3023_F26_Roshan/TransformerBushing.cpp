@@ -168,9 +168,6 @@ void ATransformerBushing::SetLitUp(bool bLit)
 		{
 			UGameplayStatics::PlaySoundAtLocation(this, LightUpSound, GetActorLocation());
 		}
-
-		LiveWireUtils::ShowScreenMessage(-1, 4.0f, GetActiveLitColor().ToFColor(true),
-			FString::Printf(TEXT("[TRANSFORMER BUSHING %d] NEON ACTIVATED! (Matching Target Hit)"), BushingID));
 	}
 	else
 	{
@@ -185,9 +182,6 @@ void ATransformerBushing::SetLitUp(bool bLit)
 		{
 			UGameplayStatics::PlaySoundAtLocation(this, PowerDownSound, GetActorLocation());
 		}
-
-		LiveWireUtils::ShowScreenMessage(-1, 2.5f, FColor::Silver,
-			FString::Printf(TEXT("[TRANSFORMER BUSHING %d] NEON OFF (Laser disconnected)"), BushingID));
 	}
 
 	OnLitStateChanged(bIsLitUp);

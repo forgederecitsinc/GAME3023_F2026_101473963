@@ -314,14 +314,6 @@ void AEnemyDrone::LatchAndKillPlayer(APawn* TargetPawn)
 		SetActorRelativeLocation(FVector(0.0f, 0.0f, 80.0f));
 		UGameplayStatics::ApplyDamage(TargetPawn, 9999.0f, GetInstigatorController(), this, UDamageType::StaticClass());
 	}
-
-	LiveWireUtils::ShowScreenMessage(
-		4201,
-		5.0f,
-		FColor::Red,
-		TEXT("[DRONE LATCHED!] Failed to hide in 5 seconds — Enemy Drone latched onto you and killed you!"),
-		1.4f
-	);
 }
 
 // ClampLocationToNavMesh: updates movement pathfinding and waypoint navigation
@@ -642,10 +634,6 @@ void AEnemyDrone::TickTracking(float DeltaTime, APawn* PlayerPawn, bool bIsPlaye
 		EscapeTimerRemaining = 0.0f;
 		RefreshDroneSettings();
 
-		LiveWireUtils::ShowScreenMessage(
-			4201, 3.0f, FColor::Green,
-			TEXT("[ESCAPED DRONE!] You hid under cover and escaped the Enemy Drone!"), 1.3f);
-
 		if (PatrolGroundPoints.IsValidIndex(CurrentPatrolIndex))
 		{
 			CurrentPatrolIndex = FMath::Max(-1, CurrentPatrolIndex - 1);
@@ -667,13 +655,6 @@ void AEnemyDrone::TickTracking(float DeltaTime, APawn* PlayerPawn, bool bIsPlaye
 		DropLaserParticle(PlayerPawn);
 		ParticleDropCooldown = FMath::Max(0.05f, LaserParticleInterval);
 	}
-
-	LiveWireUtils::ShowScreenMessage(
-		4201, 0.15f, FColor::Red,
-		FString::Printf(
-			TEXT("[DRONE LOCKED ON!] Hide under cover in %.1fs or the Drone will dive and latch onto you!"),
-			FMath::Max(0.0f, EscapeTimerRemaining)),
-		1.3f);
 
 	if (EscapeTimerRemaining <= 0.0f)
 	{
@@ -712,11 +693,6 @@ void AEnemyDrone::TickPatrolling(float DeltaTime, APawn* PlayerPawn)
 		bIsFollowingPlayer = true;
 		EscapeTimerRemaining = EscapeTimeLimit;
 		WaitTimer = 0.0f;
-
-		LiveWireUtils::ShowScreenMessage(
-			4201, 2.5f, FColor::Red,
-			FString::Printf(TEXT("[CAUGHT BY DRONE!] Hide under something within %.0f seconds!"), EscapeTimeLimit),
-			1.35f);
 		return;
 	}
 

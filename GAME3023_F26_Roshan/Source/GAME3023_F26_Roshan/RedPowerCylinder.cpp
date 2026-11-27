@@ -52,7 +52,6 @@ ARedPowerCylinder::ARedPowerCylinder()
 void ARedPowerCylinder::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
-	ApplyColorFromID();
 	UpdateLaserBeam();
 }
 
@@ -61,7 +60,6 @@ void ARedPowerCylinder::OnConstruction(const FTransform& Transform)
 void ARedPowerCylinder::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
-	ApplyColorFromID();
 	UpdateLaserBeam();
 }
 #endif
@@ -75,8 +73,30 @@ void ARedPowerCylinder::BeginPlay()
 	InteractionZone->OnComponentEndOverlap.AddDynamic(this, &ARedPowerCylinder::OnInteractionEndOverlap);
 
 	InitPowerDome();
-	ApplyColorFromID();
 	UpdateLaserBeam();
+}
+
+// CreatePowerDomeMaterial: creates a dynamic emissive material for the power dome.
+UMaterialInstanceDynamic* ARedPowerCylinder::CreatePowerDomeMaterial(const FLinearColor& BaseColor)
+{
+	UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	if (!BaseMat)
+	{
+		return nullptr;
+	}
+
+	UMaterialInstanceDynamic* DynMat = UMaterialInstanceDynamic::Create(BaseMat, this);
+	if (DynMat)
+	{
+		const FLinearColor EmissiveColor = BaseColor * PowerDomeGlowIntensity;
+		DynMat->SetVectorParameterValue(TEXT("Color"), BaseColor);
+		DynMat->SetVectorParameterValue(TEXT("BaseColor"), BaseColor);
+		DynMat->SetVectorParameterValue(TEXT("Base Color"), BaseColor);
+		DynMat->SetVectorParameterValue(TEXT("EmissiveColor"), EmissiveColor);
+		DynMat->SetVectorParameterValue(TEXT("Emissive Color"), EmissiveColor);
+		DynMat->SetVectorParameterValue(TEXT("Emissive"), EmissiveColor);
+	}
+	return DynMat;
 }
 
 // InitPowerDome: finds the dome mesh and creates its materials and blinking light.
@@ -109,40 +129,12 @@ void ARedPowerCylinder::InitPowerDome()
 
 	if (!PowerDomeGreenDynMaterial)
 	{
-		if (UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
-		{
-			PowerDomeGreenDynMaterial = UMaterialInstanceDynamic::Create(BaseMat, this);
-			if (PowerDomeGreenDynMaterial)
-			{
-				const FLinearColor GreenBase(0.05f, 1.0f, 0.15f, 1.0f);
-				const FLinearColor GreenEmissive = GreenBase * PowerDomeGlowIntensity;
-				PowerDomeGreenDynMaterial->SetVectorParameterValue(TEXT("Color"), GreenBase);
-				PowerDomeGreenDynMaterial->SetVectorParameterValue(TEXT("BaseColor"), GreenBase);
-				PowerDomeGreenDynMaterial->SetVectorParameterValue(TEXT("Base Color"), GreenBase);
-				PowerDomeGreenDynMaterial->SetVectorParameterValue(TEXT("EmissiveColor"), GreenEmissive);
-				PowerDomeGreenDynMaterial->SetVectorParameterValue(TEXT("Emissive Color"), GreenEmissive);
-				PowerDomeGreenDynMaterial->SetVectorParameterValue(TEXT("Emissive"), GreenEmissive);
-			}
-		}
+		PowerDomeGreenDynMaterial = CreatePowerDomeMaterial(FLinearColor(0.05f, 1.0f, 0.15f, 1.0f));
 	}
 
 	if (!PowerDomeRedDynMaterial)
 	{
-		if (UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
-		{
-			PowerDomeRedDynMaterial = UMaterialInstanceDynamic::Create(BaseMat, this);
-			if (PowerDomeRedDynMaterial)
-			{
-				const FLinearColor RedBase(1.0f, 0.05f, 0.05f, 1.0f);
-				const FLinearColor RedEmissive = RedBase * PowerDomeGlowIntensity;
-				PowerDomeRedDynMaterial->SetVectorParameterValue(TEXT("Color"), RedBase);
-				PowerDomeRedDynMaterial->SetVectorParameterValue(TEXT("BaseColor"), RedBase);
-				PowerDomeRedDynMaterial->SetVectorParameterValue(TEXT("Base Color"), RedBase);
-				PowerDomeRedDynMaterial->SetVectorParameterValue(TEXT("EmissiveColor"), RedEmissive);
-				PowerDomeRedDynMaterial->SetVectorParameterValue(TEXT("Emissive Color"), RedEmissive);
-				PowerDomeRedDynMaterial->SetVectorParameterValue(TEXT("Emissive"), RedEmissive);
-			}
-		}
+		PowerDomeRedDynMaterial = CreatePowerDomeMaterial(FLinearColor(1.0f, 0.05f, 0.05f, 1.0f));
 	}
 
 	if (!PowerDomeLight && PowerDomeLightIntensity > 0.0f && GetWorld() && GetWorld()->IsGameWorld())
@@ -206,11 +198,6 @@ FLinearColor ARedPowerCylinder::GetColorForID(int32 InID) const
 	return LiveWireUtils::GetColorForID(InID);
 }
 
-// ApplyColorFromID: placeholder for applying the cylinder ID color to its materials.
-void ARedPowerCylinder::ApplyColorFromID()
-{
-}
-
 // CheckActorTargetIDMatch: checks whether a hit actor has a matching four-digit ID.
 bool ARedPowerCylinder::CheckActorTargetIDMatch(AActor* ActorToCheck, int32& OutFoundID) const
 {
@@ -265,8 +252,6 @@ void ARedPowerCylinder::ClearDetectedTargets()
 {
 	bIsTargetDetected = false;
 	DetectedTarget = nullptr;
-	bHasPrintedNoTarget = false;
-	bHasPrintedTargetDetected = false;
 
 	if (LastHitLaserTarget)
 	{
@@ -369,27 +354,6 @@ void ARedPowerCylinder::UpdateDetectedTargets(AActor* HitActor)
 		{
 			CurrentHitBushing->SetLaserHit(true, this);
 			LastHitBushing = CurrentHitBushing;
-		}
-
-		bHasPrintedNoTarget = false;
-		if (!bHasPrintedTargetDetected)
-		{
-			bHasPrintedTargetDetected = true;
-			const FString TargetName = HitActor ? HitActor->GetActorNameOrLabel() : TEXT("Target");
-			UKismetSystemLibrary::PrintString(this,
-				FString::Printf(TEXT("[TARGET MATCH: %d] Laser hit matching target object: %s"), CellID, *TargetName),
-				true, true, FLinearColor(0.1f, 1.0f, 0.2f), 3.0f);
-		}
-	}
-	else
-	{
-		bHasPrintedTargetDetected = false;
-		if (!bHasPrintedNoTarget)
-		{
-			bHasPrintedNoTarget = true;
-			UKismetSystemLibrary::PrintString(this,
-				FString::Printf(TEXT("[LASER EMITTING] Laser beam emitted (ID: %d) - No matching target detected"), CellID),
-				true, true, FLinearColor(1.0f, 0.85f, 0.1f), 2.5f);
 		}
 	}
 }
@@ -522,22 +486,6 @@ void ARedPowerCylinder::OnInteractionBeginOverlap(UPrimitiveComponent* Overlappe
 	}
 
 	Player->SetCurrentInteractable(this);
-
-	if (bHasBattery)
-	{
-		LiveWireUtils::ShowScreenMessage(2001, 2.5f, FColor::Cyan,
-			FString::Printf(TEXT("[Laser Gun] Press [Square] to Remove Battery (ID: %d)"), CellID));
-	}
-	else if (Player->HasBattery())
-	{
-		LiveWireUtils::ShowScreenMessage(2001, 2.5f, FColor::Green,
-			FString::Printf(TEXT("[Laser Gun] Press [Square] to Attach Battery into Laser Gun (ID: %d)"), CellID));
-	}
-	else
-	{
-		LiveWireUtils::ShowScreenMessage(2001, 2.5f, FColor::Orange,
-			FString::Printf(TEXT("[Laser Gun] Laser Gun (ID: %d): OFFLINE (Requires Matching Battery)"), CellID));
-	}
 }
 
 // OnInteractionEndOverlap: removes this cylinder as the player's current interactable.
@@ -564,16 +512,12 @@ bool ARedPowerCylinder::Interact(AGAME3023_F26_RoshanCharacter* Player)
 	{
 		if (Player->HasBattery())
 		{
-			LiveWireUtils::ShowScreenMessage(-1, 3.5f, FColor::Red,
-				TEXT("[INVENTORY FULL] Hands full! Press [R] / [Circle] to drop your current battery first."), 1.3f);
 			return false;
 		}
 
 		if (ABatteryCapsule* Extracted = RemoveBattery())
 		{
 			Player->TryPickupBattery(Extracted);
-			LiveWireUtils::ShowScreenMessage(-1, 4.0f, FColor::Yellow,
-				FString::Printf(TEXT("[BATTERY REMOVED] Battery removed! Laser Gun (ID: %d) is now OFFLINE."), CellID), 1.3f);
 			return true;
 		}
 		return false;
@@ -581,8 +525,6 @@ bool ARedPowerCylinder::Interact(AGAME3023_F26_RoshanCharacter* Player)
 
 	if (!Player->HasBattery())
 	{
-		LiveWireUtils::ShowScreenMessage(-1, 3.5f, FColor::Red,
-			FString::Printf(TEXT("[POWER OFFLINE] Laser Gun (ID: %d) needs a matching Battery!"), CellID), 1.3f);
 		return false;
 	}
 
@@ -605,7 +547,6 @@ ABatteryCapsule* ARedPowerCylinder::RemoveBattery()
 	bIsPowered = false;
 
 	ClearDetectedTargets();
-	UpdateVisualState();
 	UpdateLaserBeam();
 
 	PowerDomeBlinkTimer = 0.0f;
@@ -629,37 +570,13 @@ bool ARedPowerCylinder::InsertBattery(ABatteryCapsule* Battery)
 
 	const bool bMatched = (Battery->BatteryID == CellID);
 	bIsPowered = bMatched;
-	bHasPrintedNoTarget = false;
-	bHasPrintedTargetDetected = false;
 	bIsTargetDetected = false;
 
-	UpdateVisualState();
 	UpdateLaserBeam();
 
-	if (bMatched)
-	{
-		PowerDomeBlinkTimer = 0.0f;
-		bPowerDomeLightOn = true;
-		ApplyPowerDomeLightState(true);
-
-		LiveWireUtils::ShowScreenMessage(-1, 4.5f, FColor::Green,
-			FString::Printf(TEXT("[ID MATCH: %d] Battery attached & Laser Gun ONLINE! Laser beam active!"), CellID), 1.4f);
-	}
-	else
-	{
-		PowerDomeBlinkTimer = 0.0f;
-		bPowerDomeLightOn = true;
-		ApplyPowerDomeLightState(true);
-
-		LiveWireUtils::ShowScreenMessage(-1, 5.0f, FColor::Orange,
-			FString::Printf(TEXT("[ID MISMATCH] Battery (ID: %d) attached, but Laser Gun (ID: %d) WON'T POWER ON!"), Battery->BatteryID, CellID), 1.4f);
-	}
+	PowerDomeBlinkTimer = 0.0f;
+	bPowerDomeLightOn = true;
+	ApplyPowerDomeLightState(true);
 
 	return bMatched;
-}
-
-// UpdateVisualState: refreshes the cylinder after a state or battery change.
-void ARedPowerCylinder::UpdateVisualState()
-{
-	ApplyColorFromID();
 }

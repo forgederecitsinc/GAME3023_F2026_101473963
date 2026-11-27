@@ -178,23 +178,6 @@ void AGridLaser::UpdateLaserState()
 	ConfigureHazardCollision();
 }
 
-// SetLaserState: turns the laser on or off and tells Blueprints about the change.
-void AGridLaser::SetLaserState(bool bNewActive)
-{
-	if (bIsLaserOn != bNewActive)
-	{
-		bIsLaserOn = bNewActive;
-		UpdateLaserState();
-		OnLaserStateChanged.Broadcast(this, bIsLaserOn);
-	}
-}
-
-// ToggleLaser: switches the laser to the opposite active state.
-void AGridLaser::ToggleLaser()
-{
-	SetLaserState(!bIsLaserOn);
-}
-
 // DealLaserDamage: applies the correct damage or death behavior to an actor.
 void AGridLaser::DealLaserDamage(AActor* TargetActor)
 {

@@ -94,31 +94,6 @@ void AGAME3023_F26_RoshanGameMode::EndPlay(const EEndPlayReason::Type EndPlayRea
 	Super::EndPlay(EndPlayReason);
 }
 
-// GetActiveBatteryThiefCount: counts living thieves across every spawn slot.
-int32 AGAME3023_F26_RoshanGameMode::GetActiveBatteryThiefCount() const
-{
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return 0;
-	}
-
-	TArray<AActor*> FoundThieves;
-	UGameplayStatics::GetAllActorsOfClass(World, AEnemyBatteryThief::StaticClass(), FoundThieves);
-
-	int32 AliveCount = 0;
-	for (AActor* Act : FoundThieves)
-	{
-		const AEnemyBatteryThief* Thief = Cast<AEnemyBatteryThief>(Act);
-		if (IsValid(Thief) && !Thief->bIsDead)
-		{
-			++AliveCount;
-		}
-	}
-
-	return AliveCount;
-}
-
 // Returns total number of available enemy spawn hatch locations
 int32 AGAME3023_F26_RoshanGameMode::GetSpawnSlotCount() const
 {
@@ -292,28 +267,6 @@ AEnemyBatteryThief* AGAME3023_F26_RoshanGameMode::TrySpawnBatteryThiefAtSlot(int
 	return SpawnedThief;
 }
 
-// TrySpawnBatteryThief: handles spawning logic and placement
-AEnemyBatteryThief* AGAME3023_F26_RoshanGameMode::TrySpawnBatteryThief()
-{
-	const int32 SlotCount = SpawnSlotStates.Num();
-	if (SlotCount <= 0)
-	{
-		return nullptr;
-	}
-
-	for (int32 Attempt = 0; Attempt < SlotCount; ++Attempt)
-	{
-		const int32 SlotIndex = (NextSpawnLocationIndex + Attempt) % SlotCount;
-		if (AEnemyBatteryThief* Spawned = TrySpawnBatteryThiefAtSlot(SlotIndex))
-		{
-			NextSpawnLocationIndex = (SlotIndex + 1) % SlotCount;
-			return Spawned;
-		}
-	}
-
-	return nullptr;
-}
-
 // HandleInitialWaveSpawnTick: continues spawning the first wave until every slot is complete.
 void AGAME3023_F26_RoshanGameMode::HandleInitialWaveSpawnTick()
 {
@@ -384,19 +337,6 @@ void AGAME3023_F26_RoshanGameMode::OnSpawnedBatteryThiefKilled(AEnemyBatteryThie
 	}
 
 	++SlotState.PendingReplacements;
-
-	LiveWireUtils::ShowScreenMessage(
-		-1,
-		4.0f,
-		FColor::Cyan,
-		FString::Printf(
-			TEXT("[BATTERY THIEF DESTROYED] Hatch %d replacement (%d/%d) will spawn in %.0f seconds."),
-			SlotIndex + 1,
-			SlotState.TotalSpawned + SlotState.PendingReplacements,
-			MaxTotalSpawnsPerLocation,
-			ReplacementRespawnDelay
-		)
-	);
 
 	FTimerHandle NewReplacementTimer;
 	FTimerDelegate RespawnDelegate = FTimerDelegate::CreateUObject(

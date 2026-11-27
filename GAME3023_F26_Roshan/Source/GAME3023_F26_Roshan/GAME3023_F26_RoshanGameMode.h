@@ -54,14 +54,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Battery Thief Spawning")
 	TSubclassOf<AEnemyBatteryThief> BatteryThiefClass;
 
-	UFUNCTION(BlueprintPure, Category = "LiveWire|Battery Thief Spawning")
-
-	int32 GetActiveBatteryThiefCount() const; // Battery state and handling
-
-	UFUNCTION(BlueprintCallable, Category = "LiveWire|Battery Thief Spawning")
-
-	AEnemyBatteryThief *TrySpawnBatteryThief(); // Spawning logic and management
-
 protected:
 	UFUNCTION()
 

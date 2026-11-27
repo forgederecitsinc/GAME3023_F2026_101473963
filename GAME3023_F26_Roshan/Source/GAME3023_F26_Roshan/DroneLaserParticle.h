@@ -51,9 +51,6 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
-	UPROPERTY(Transient)
-	TObjectPtr<UMaterialInstanceDynamic> DynamicMat;
-
 	bool bHasDealtDamage = false; // Flag to ensure damage is applied only once
 
 	UFUNCTION()

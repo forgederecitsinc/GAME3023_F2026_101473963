@@ -33,15 +33,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Cell ID (4-Digit)"))
 	int32 CellID = 1001;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UMaterialInstanceDynamic> DynamicMaterial;
-
-	UPROPERTY(Transient)
-	TObjectPtr<UMaterialInstanceDynamic> BarrelDynamicMaterial;
-
-	UPROPERTY(Transient)
-	TObjectPtr<UMaterialInstanceDynamic> LaserDynamicMaterial;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USceneComponent> SceneRoot;
 
@@ -92,10 +83,6 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cell|State")
 	TObjectPtr<ABatteryCapsule> InsertedBattery;
-
-	// Applies this cylinder's ID color to the visual materials.
-	UFUNCTION(BlueprintCallable, Category = "LiveWire|Color")
-	void ApplyColorFromID();
 
 	// Returns the mapped color for a four-digit ID.
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
@@ -148,9 +135,6 @@ protected:
 	UFUNCTION()
 	void OnInteractionEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
-	// Refreshes the cylinder's visual state.
-	void UpdateVisualState();
-
 	// Finds and prepares the power dome mesh and blinking light.
 	void InitPowerDome();
 
@@ -158,6 +142,9 @@ protected:
 	void ApplyPowerDomeLightState(bool bLightOn);
 
 private:
+	// Creates a dynamic emissive material for the power dome.
+	UMaterialInstanceDynamic* CreatePowerDomeMaterial(const FLinearColor& BaseColor);
+
 	// Clears the currently detected target and laser hit state.
 	void ClearDetectedTargets();
 
@@ -169,9 +156,6 @@ private:
 
 	// Updates target actors that match the cylinder ID.
 	void UpdateDetectedTargets(AActor* HitActor);
-
-	bool bHasPrintedNoTarget = false;
-	bool bHasPrintedTargetDetected = false;
 
 	UPROPERTY(Transient)
 	TObjectPtr<ALaserTarget> LastHitLaserTarget;

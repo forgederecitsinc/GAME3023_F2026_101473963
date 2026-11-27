@@ -39,10 +39,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Gameplay")
 	void SetLaserHit(bool bHit, AActor* SourceActor = nullptr);
 
-	// Applies the colors associated with this target's ID.
-	UFUNCTION(BlueprintCallable, Category = "LiveWire|Color")
-	void ApplyColors();
-
 	// Returns the color that should be used for a specific target ID.
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
 	FLinearColor GetColorForID(int32 InID) const;

@@ -1262,16 +1262,6 @@ void AGAME3023_F26_RoshanCharacter::StopBackgroundMusic()
 	}
 }
 
-// SetBGMVolume: handles set bgm volume
-void AGAME3023_F26_RoshanCharacter::SetBGMVolume(float NewVolume)
-{
-	BGMVolume = FMath::Clamp(NewVolume, 0.0f, 2.0f);
-	if (BGMAudioComponent)
-	{
-		BGMAudioComponent->SetVolumeMultiplier(BGMVolume);
-	}
-}
-
 // OnBGMAudioFinished: handles on bgm audio finished
 void AGAME3023_F26_RoshanCharacter::OnBGMAudioFinished()
 {
@@ -1496,7 +1486,6 @@ void AGAME3023_F26_RoshanCharacter::RespawnPlayer()
 // ApplyHealing: handles apply healing
 void AGAME3023_F26_RoshanCharacter::ApplyHealing(float Healing, AActor* Healer)
 {
-	HealPlayer(Healing);
 }
 
 // NotifyDanger: handles notify danger
@@ -1536,54 +1525,5 @@ void AGAME3023_F26_RoshanCharacter::ApplyDamageToPlayer(float DamageAmount, AAct
 	{
 		HandleDeath();
 	}
-}
-
-// HealPlayer: handles heal player
-void AGAME3023_F26_RoshanCharacter::HealPlayer(float HealAmount)
-{
-	if (bIsDead || HealAmount <= 0.0f || CurrentHealth >= MaxHealth)
-	{
-		return;
-	}
-
-	ApplyHealthChange(CurrentHealth + HealAmount);
-	UE_LOG(LogTemplateCharacter, Log, TEXT("[LiveWire Health] Player healed for %.1f. Health: %.1f / %.1f"),
-		HealAmount, CurrentHealth, MaxHealth);
-}
-
-// SetHealth: updates health and processes damage
-void AGAME3023_F26_RoshanCharacter::SetHealth(float NewHealth)
-{
-	const float Clamped = FMath::Clamp(NewHealth, 0.0f, MaxHealth);
-	if (bIsDead && Clamped > 0.0f)
-	{
-		bIsDead = false;
-		if (GetCharacterMovement())
-		{
-			GetCharacterMovement()->SetMovementMode(MOVE_Walking);
-		}
-	}
-
-	ApplyHealthChange(Clamped);
-
-	if (CurrentHealth <= 0.0f && !bIsDead)
-	{
-		HandleDeath();
-	}
-}
-
-// ResetHealth: updates health and processes damage
-void AGAME3023_F26_RoshanCharacter::ResetHealth()
-{
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().ClearTimer(RespawnTimerHandle);
-	}
-	bIsDead = false;
-	if (GetCharacterMovement())
-	{
-		GetCharacterMovement()->SetMovementMode(MOVE_Walking);
-	}
-	SetHealth(MaxHealth);
 }
 

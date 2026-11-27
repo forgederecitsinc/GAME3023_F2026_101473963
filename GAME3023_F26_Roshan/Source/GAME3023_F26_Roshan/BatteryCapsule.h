@@ -25,9 +25,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Battery ID (4-Digit)"))
 	int32 BatteryID = 1001;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UMaterialInstanceDynamic> DynamicMaterial;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UCapsuleComponent> CapsuleComponent;
 
@@ -57,10 +54,6 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battery|State")
 	FVector SpawnOrigin;
-
-	// Applies the material color associated with this battery's ID.
-	UFUNCTION(BlueprintCallable, Category = "LiveWire|Color")
-	void ApplyColorFromID();
 
 	// Returns the LiveWire color for a specific battery ID.
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")

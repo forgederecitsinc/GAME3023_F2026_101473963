@@ -186,12 +186,6 @@ void UPlayerHealthHUDWidget::UpdateHealth(float NewCurrentHealth, float NewMaxHe
 	OnHealthUpdated(CurrentHealth, MaxHealth, HealthPercent);
 }
 
-// SetHealthPercent: converts a health percentage into a health value.
-void UPlayerHealthHUDWidget::SetHealthPercent(float InPercent)
-{
-	UpdateHealth(InPercent * MaxHealth, MaxHealth);
-}
-
 void UPlayerHealthHUDWidget::UpdateLives(int32 NewCurrentLives, int32 NewMaxLives)
 {
 	MaxLives = FMath::Max(1, NewMaxLives);

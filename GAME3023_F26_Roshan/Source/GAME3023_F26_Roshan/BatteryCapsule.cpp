@@ -29,7 +29,6 @@ void ABatteryCapsule::OnConstruction(const FTransform& Transform)
 	{
 		InteractionZone->SetSphereRadius(BatteryPickupRadius);
 	}
-	ApplyColorFromID();
 }
 
 #if WITH_EDITOR
@@ -37,7 +36,6 @@ void ABatteryCapsule::OnConstruction(const FTransform& Transform)
 void ABatteryCapsule::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
-	ApplyColorFromID();
 }
 #endif
 
@@ -51,19 +49,12 @@ void ABatteryCapsule::BeginPlay()
 
 	InteractionZone->OnComponentBeginOverlap.AddDynamic(this, &ABatteryCapsule::OnInteractionBeginOverlap);
 	InteractionZone->OnComponentEndOverlap.AddDynamic(this, &ABatteryCapsule::OnInteractionEndOverlap);
-
-	ApplyColorFromID();
 }
 
 // Returns the matching linear color mapped to the 4-digit ID
 FLinearColor ABatteryCapsule::GetColorForID(int32 InID) const
 {
 	return LiveWireUtils::GetColorForID(InID);
-}
-
-// Applies dynamic material colors to the battery body based on ID
-void ABatteryCapsule::ApplyColorFromID()
-{
 }
 
 // Updates battery floating animation or state while dropped
@@ -93,8 +84,6 @@ void ABatteryCapsule::OnInteractionBeginOverlap(UPrimitiveComponent* OverlappedC
 	if (AGAME3023_F26_RoshanCharacter* Player = Cast<AGAME3023_F26_RoshanCharacter>(OtherActor))
 	{
 		Player->SetCurrentInteractable(this);
-		LiveWireUtils::ShowScreenMessage(1001, 2.0f, FColor::Cyan,
-			TEXT("[Live Wire] Press [Square] to Collect Battery"));
 	}
 }
 

@@ -24,25 +24,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Player Health HUD")
 	void UpdateHealth(float NewCurrentHealth, float NewMaxHealth);
 
-	// Sets health using a percentage from 0.0 to 1.0.
-	UFUNCTION(BlueprintCallable, Category = "Player Health HUD")
-	void SetHealthPercent(float InPercent);
-
 	// Updates the number of lives shown by the heart icons.
 	UFUNCTION(BlueprintCallable, Category = "Player Health HUD")
 	void UpdateLives(int32 NewCurrentLives, int32 NewMaxLives);
-
-	// Returns the player's current health.
-	UFUNCTION(BlueprintPure, Category = "Player Health HUD")
-	float GetCurrentHealth() const { return CurrentHealth; }
-
-	// Returns the player's maximum health.
-	UFUNCTION(BlueprintPure, Category = "Player Health HUD")
-	float GetMaxHealth() const { return MaxHealth; }
-
-	// Returns the player's health as a percentage from 0.0 to 1.0.
-	UFUNCTION(BlueprintPure, Category = "Player Health HUD")
-	float GetHealthPercent() const { return HealthPercent; }
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player Health HUD")
 	float CurrentHealth = 100.0f;

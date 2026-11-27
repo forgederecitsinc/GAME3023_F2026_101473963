@@ -20,11 +20,6 @@ FLinearColor ALaserTarget::GetColorForID(int32 InID) const
 	return LiveWireUtils::GetColorForID(InID);
 }
 
-// ApplyColors: placeholder for adding visual color changes to the target.
-void ALaserTarget::ApplyColors()
-{
-}
-
 // SetLaserHit: changes the hit state and updates matching transformer bushings.
 void ALaserTarget::SetLaserHit(bool bHit, AActor* SourceActor)
 {

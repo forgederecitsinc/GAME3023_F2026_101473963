@@ -11,9 +11,6 @@ class UMaterialInstanceDynamic;
 class AGAME3023_F26_RoshanCharacter;
 class AGridLaser;
 
-// This delegate lets Blueprints know when the laser turns on or off.
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnGridLaserStateChanged, AGridLaser*, LaserGrid, bool, bIsActive);
-
 // Grid laser hazard that creates a grid of beams and damages the player.
 UCLASS()
 class GAME3023_F26_ROSHAN_API AGridLaser : public AActor
@@ -71,21 +68,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Damage", meta = (ClampMin = "0.1", UIMin = "0.1"))
 	float DamageTickInterval = 0.5f;
 
-	// Changes the laser state and rebuilds or updates the hazard.
-	UFUNCTION(BlueprintCallable, Category = "LiveWire|GridLaser")
-	void SetLaserState(bool bNewActive);
-
-	// Turns the laser on if it is off, or off if it is on.
-	UFUNCTION(BlueprintCallable, Category = "LiveWire|GridLaser")
-	void ToggleLaser();
-
 	// Returns true while the laser is active.
 	UFUNCTION(BlueprintPure, Category = "LiveWire|GridLaser")
 	bool IsLaserOn() const { return bIsLaserOn; }
-
-	// Blueprint event that is triggered when the laser state changes.
-	UPROPERTY(BlueprintAssignable, Category = "LiveWire|GridLaser")
-	FOnGridLaserStateChanged OnLaserStateChanged;
 
 	// Rebuilds all of the laser beams using the current grid settings.
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|GridLaser")

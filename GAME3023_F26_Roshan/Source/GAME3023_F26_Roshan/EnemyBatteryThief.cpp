@@ -1293,10 +1293,6 @@ void AEnemyBatteryThief::TickPatrolling(float DeltaTime)
 			PathRepathTimer = 0.5f;
 			RefreshEnemySettings();
 			BuildPathToWorldLocation(CurrentLaserGroundApproachPoint);
-
-			LiveWireUtils::ShowScreenMessage(
-				3101, 3.0f, FColor::Orange,
-				FString::Printf(TEXT("[SABOTEUR ALERT] Nearest Battery Thief detected active Laser (ID: %d) and is routing along the ground to steal its battery!"), TargetLaserCylinder->CellID));
 			return;
 		}
 	}
@@ -1397,12 +1393,6 @@ void AEnemyBatteryThief::TickApproaching(float DeltaTime)
 		RemovalTimerRemaining = BatteryRemovalDuration;
 		CurrentPathPoints.Reset();
 		RefreshEnemySettings();
-
-		LiveWireUtils::ShowScreenMessage(
-			3102, 2.0f, FColor::Red,
-			FString::Printf(TEXT("[BATTERY REMOVAL STARTED] Removing working battery from Laser (ID: %d) from ground level... %.0f seconds remaining!"),
-				TargetLaserCylinder->CellID, RemovalTimerRemaining),
-			1.25f);
 		return;
 	}
 
@@ -1421,9 +1411,6 @@ void AEnemyBatteryThief::TickRemoving(float DeltaTime)
 {
 	if (!DoesLaserHaveWorkingBattery(TargetLaserCylinder))
 	{
-		LiveWireUtils::ShowScreenMessage(
-			3102, 2.5f, FColor::Green,
-			TEXT("[SABOTAGE INTERRUPTED] Battery no longer on laser — Battery Thief returning to patrol."));
 		ReturnToPatrol();
 		return;
 	}
@@ -1446,12 +1433,6 @@ void AEnemyBatteryThief::TickRemoving(float DeltaTime)
 
 	RemovalTimerRemaining -= DeltaTime;
 
-	LiveWireUtils::ShowScreenMessage(
-		3102, 0.15f, FColor::Red,
-		FString::Printf(TEXT("[SABOTAGING LASER %d] Removing Battery... %.1fs remaining"),
-			TargetLaserCylinder->CellID, FMath::Max(0.0f, RemovalTimerRemaining)),
-		1.25f);
-
 	if (RemovalTimerRemaining <= 0.0f)
 	{
 		CompleteBatteryRemoval();
@@ -1469,7 +1450,6 @@ void AEnemyBatteryThief::TickFollowingPlayer(float DeltaTime)
 	}
 
 	const FVector PlayerLoc = TargetPlayerPawn->GetActorLocation();
-	const float Dist2DToPlayer = FVector::Dist2D(GetActorLocation(), PlayerLoc);
 	const float Dist3DToPlayer = FVector::Dist(GetActorLocation(), PlayerLoc);
 
 	PathRepathTimer -= DeltaTime;
@@ -1493,12 +1473,6 @@ void AEnemyBatteryThief::TickFollowingPlayer(float DeltaTime)
 	{
 		FollowCurrentNavPath(DeltaTime, FollowSpeed);
 	}
-
-	LiveWireUtils::ShowScreenMessage(
-		3107, 0.15f, FColor::Red,
-		FString::Printf(TEXT("[BATTERY THIEF FOLLOWING PLAYER] Touched by player! Speed: %.0f (Base: %.0f + %.0f) | Dist: %.0f"),
-			FollowSpeed, PatrolSpeed, FollowPlayerSpeedBonus, Dist2DToPlayer),
-		1.2f);
 }
 
 // StartFollowingPlayer: handles start following player

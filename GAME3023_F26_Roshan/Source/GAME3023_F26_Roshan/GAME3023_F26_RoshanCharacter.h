@@ -359,10 +359,6 @@ public:
  // StopBackgroundMusic: stop background music
 	void StopBackgroundMusic();
 
-	UFUNCTION(BlueprintCallable, Category = "LiveWire|Audio")
- // SetBGMVolume: set bgm volume
-	void SetBGMVolume(float NewVolume);
-
 	UFUNCTION()
  // OnBGMAudioFinished: on bgm audio finished
 	void OnBGMAudioFinished();
@@ -400,18 +396,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
  // Health and damage management
 	void ApplyDamageToPlayer(float DamageAmount, AActor* DamageCauser = nullptr);
-
-	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
- // HealPlayer: heal player
-	void HealPlayer(float HealAmount);
-
-	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
- // Health and damage management
-	void SetHealth(float NewHealth);
-
-	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health")
- // Health and damage management
-	void ResetHealth();
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (DisplayName = "Respawn Location"))
 	FVector RespawnLocation = FVector(56.0f, 0.0f, 745.0f);
@@ -468,14 +452,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Health")
  // IsDead: is dead
 	bool IsDead() const { return bIsDead; }
-
-	UFUNCTION(BlueprintPure, Category = "LiveWire|Health", meta = (DisplayName = "Get Current HP"))
- // GetCurrentHP: get current hp
-	float GetCurrentHP() const { return CurrentHealth; }
-
-	UFUNCTION(BlueprintPure, Category = "LiveWire|Health", meta = (DisplayName = "Get Max HP"))
- // GetMaxHP: get max hp
-	float GetMaxHP() const { return MaxHealth; }
 
 public:
 

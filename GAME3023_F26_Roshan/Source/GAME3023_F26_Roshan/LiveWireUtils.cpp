@@ -1,5 +1,4 @@
 #include "LiveWireUtils.h"
-#include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "NavigationSystem.h"
 
@@ -23,15 +22,6 @@ namespace LiveWireUtils
 				const uint8 HueByte = static_cast<uint8>(FMath::Abs(ID * 53) % 256);
 				return FLinearColor::MakeFromHSV8(HueByte, 240, 255);
 			}
-		}
-	}
-
-	// ShowScreenMessage: prints a debug message to the screen when Unreal's engine UI is available.
-	void ShowScreenMessage(int32 Key, float Duration, const FColor& Color, const FString& Text, float Scale)
-	{
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(Key, Duration, Color, Text, true, FVector2D(Scale, Scale));
 		}
 	}
 
