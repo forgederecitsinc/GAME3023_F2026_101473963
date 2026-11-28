@@ -5,11 +5,12 @@
 #include "LaserTarget.generated.h"
 
 class USceneComponent;
+class ATransformerBushing;
 
 // Delegate that lets Blueprints know when this target is hit or stops being hit.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnLaserTargetHitStateChanged, ALaserTarget*, Target, bool, bIsHit);
 
-// Actor used as a laser target and identified by a four-digit ID.
+// Actor used as a laser target.
 UCLASS()
 class GAME3023_F26_ROSHAN_API ALaserTarget : public AActor
 {
@@ -19,9 +20,9 @@ public:
 	// Constructor: creates the target and its root component.
 	ALaserTarget();
 
-	// Four-digit ID used to identify this target and choose its color.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Target ID (4-Digit)"))
-	int32 TargetID = 1001;
+	// Optional bushing to light up when this target is hit by a laser.
+	UPROPERTY(EditInstanceOnly, BlueprintReadWrite, Category = "LiveWire|Gameplay", meta = (DisplayName = "Linked Bushing (Optional)"))
+	TObjectPtr<ATransformerBushing> LinkedBushing;
 
 	// Root component used as the base transform of the target.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -38,8 +39,4 @@ public:
 	// Changes whether this target is currently hit and broadcasts the result.
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Gameplay")
 	void SetLaserHit(bool bHit, AActor* SourceActor = nullptr);
-
-	// Returns the color that should be used for a specific target ID.
-	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
-	FLinearColor GetColorForID(int32 InID) const;
 };
