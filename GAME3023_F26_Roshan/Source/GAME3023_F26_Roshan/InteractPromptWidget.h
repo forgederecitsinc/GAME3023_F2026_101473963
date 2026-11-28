@@ -30,14 +30,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Interaction Prompt")
 	void UpdatePromptText(const FText& InActionText, const FText& InTargetName);
 
-	// Updates the hold progress value from 0.0 to 1.0.
-	UFUNCTION(BlueprintCallable, Category = "Interaction Prompt")
-	void SetHoldProgress(float InProgress);
-
-	// Returns the current hold progress.
-	UFUNCTION(BlueprintPure, Category = "Interaction Prompt")
-	float GetHoldProgress() const { return HoldProgress; }
-
 	// Returns true while the prompt is visible.
 	UFUNCTION(BlueprintPure, Category = "Interaction Prompt")
 	bool IsPromptVisible() const { return bIsPromptVisible; }
@@ -53,10 +45,6 @@ public:
 	// Name of the object or actor the player can interact with.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction Prompt")
 	FText TargetNameText;
-
-	// Stores how much of the hold interaction is complete, from 0.0 to 1.0.
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction Prompt")
-	float HoldProgress = 0.0f;
 
 	// When true, the prompt stays at the bottom center of the screen.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction Prompt")
@@ -83,10 +71,6 @@ protected:
 	// Blueprint event called when the prompt starts hiding.
 	UFUNCTION(BlueprintImplementableEvent, Category = "Interaction Prompt")
 	void OnHidePrompt();
-
-	// Blueprint event called whenever the hold progress changes.
-	UFUNCTION(BlueprintImplementableEvent, Category = "Interaction Prompt")
-	void OnHoldProgressChanged(float NewProgress);
 
 private:
 	// Updates the Slate text blocks with the latest prompt labels.

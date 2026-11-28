@@ -14,7 +14,6 @@ UInteractPromptWidget::UInteractPromptWidget(const FObjectInitializer& ObjectIni
 {
 	ActionText = FText::FromString(TEXT("Press Square to Interact"));
 	TargetNameText = FText::FromString(TEXT(""));
-	HoldProgress = 0.0f;
 	bAnchorToScreenBottom = true;
 	WorldSpaceOffset = FVector(0.0f, 0.0f, 120.0f);
 	bIsVolatile = true;
@@ -116,7 +115,6 @@ void UInteractPromptWidget::HidePrompt()
 	bIsPromptVisible = false;
 	TargetAlpha = 0.0f;
 	CurrentAlpha = 0.0f;
-	HoldProgress = 0.0f;
 	SetRenderOpacity(0.0f);
 	SetVisibility(ESlateVisibility::Collapsed);
 	TargetActor.Reset();
@@ -130,13 +128,6 @@ void UInteractPromptWidget::UpdatePromptText(const FText& InActionText, const FT
 	ActionText = InActionText;
 	TargetNameText = InTargetName;
 	UpdatePromptLabels();
-}
-
-// SetHoldProgress: limits the hold value and sends it to the Blueprint event.
-void UInteractPromptWidget::SetHoldProgress(float InProgress)
-{
-	HoldProgress = FMath::Clamp(InProgress, 0.0f, 1.0f);
-	OnHoldProgressChanged(HoldProgress);
 }
 
 // RebuildWidget: creates the text and layout controls for the prompt.
