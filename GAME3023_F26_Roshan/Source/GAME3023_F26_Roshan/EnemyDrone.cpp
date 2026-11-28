@@ -405,16 +405,27 @@ void AEnemyDrone::AdvanceToNextPatrolDestination()
 	if (!bHasTarget && NavSys)
 	{
 		FNavLocation RandomNavLoc;
-		for (int32 Attempt = 0; Attempt < 8; ++Attempt)
+		for (int32 Attempt = 0; Attempt < 12; ++Attempt)
 		{
-			if (NavSys->GetRandomReachablePointInRadius(PatrolOrigin, PatrolRadius, RandomNavLoc))
+			bool bFound = false;
+			if (Attempt < 4)
 			{
-				if (FVector::DistSquared2D(CurrentLocation, RandomNavLoc.Location) >= FMath::Square(150.0f))
-				{
-					TargetGroundPos = RandomNavLoc.Location;
-					bHasTarget = true;
-					break;
-				}
+				bFound = NavSys->GetRandomReachablePointInRadius(GroundStart, PatrolRadius, RandomNavLoc);
+			}
+			else if (Attempt < 8)
+			{
+				bFound = NavSys->GetRandomPointInNavigableRadius(PatrolOrigin, PatrolRadius, RandomNavLoc);
+			}
+			else
+			{
+				bFound = NavSys->GetRandomPoint(RandomNavLoc);
+			}
+
+			if (bFound && FVector::DistSquared2D(CurrentLocation, RandomNavLoc.Location) >= FMath::Square(150.0f))
+			{
+				TargetGroundPos = RandomNavLoc.Location;
+				bHasTarget = true;
+				break;
 			}
 		}
 	}
