@@ -21,17 +21,6 @@ public:
 	// Constructor: creates the bushing mesh and point light.
 	ATransformerBushing();
 
-	// Runs every frame and periodically checks for matching targets.
-	virtual void Tick(float DeltaTime) override;
-
-	// ID used to identify this bushing.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Bushing ID (4-Digit)"))
-	int32 BushingID = 1001;
-
-	// Alternate target ID property kept in sync with BushingID.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Target ID (Alias)"))
-	int32 TargetID = 1001;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USceneComponent> SceneRoot;
 
@@ -40,9 +29,6 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components", meta = (DisplayName = "Bushing Light"))
 	TObjectPtr<UPointLightComponent> BushingLight;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Neon Appearance", meta = (DisplayName = "Use Custom Neon Color"))
-	bool bUseCustomNeonColor = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Neon Appearance", meta = (DisplayName = "Neon Lit Color"))
 	FLinearColor NeonLitColor = FLinearColor(0.00f, 0.95f, 1.00f);
@@ -103,10 +89,6 @@ public:
 	UFUNCTION()
 	void OnTargetHitStateChanged(ALaserTarget* Target, bool bIsHit);
 
-	// Returns the LiveWire color for a target ID.
-	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
-	FLinearColor GetColorForID(int32 InID) const;
-
 	// Returns the color currently used by the lit bushing.
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
 	FLinearColor GetActiveLitColor() const;
@@ -128,15 +110,6 @@ protected:
 #endif
 
 private:
-	// Keeps both ID properties synchronized and updates the neon color.
-	void SyncIDAndColor(int32 NewID);
-
-	// Connects this bushing to one matching laser target.
-	void BindTarget(ALaserTarget* Target);
-
-	// Searches for laser targets that have the same ID.
-	void BindToMatchingTargets();
-
 	// Plays a short flicker effect when the bushing turns on.
 	void StartNeonIgnitionFlicker();
 
@@ -144,5 +117,4 @@ private:
 	void SetMeshEmissive(const FLinearColor& Color);
 
 	FTimerHandle FlickerTimerHandle;
-	float TargetCheckTimer = 0.0f;
 };

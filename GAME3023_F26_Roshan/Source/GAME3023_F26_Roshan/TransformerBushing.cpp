@@ -11,7 +11,7 @@
 // Constructor: creates the bushing mesh and point light.
 ATransformerBushing::ATransformerBushing()
 {
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	RootComponent = SceneRoot;
@@ -31,22 +31,10 @@ ATransformerBushing::ATransformerBushing()
 	BushingLight->SetVisibility(false);
 }
 
-// SyncIDAndColor: keeps the bushing IDs synchronized and updates the default neon color.
-void ATransformerBushing::SyncIDAndColor(int32 NewID)
-{
-	BushingID = NewID;
-	TargetID = NewID;
-	if (!bUseCustomNeonColor)
-	{
-		NeonLitColor = GetColorForID(BushingID);
-	}
-}
-
 // OnConstruction: rebuilds the bushing appearance in the editor.
 void ATransformerBushing::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
-	SyncIDAndColor(BushingID);
 	UpdateAppearance();
 }
 
@@ -55,92 +43,33 @@ void ATransformerBushing::OnConstruction(const FTransform& Transform)
 void ATransformerBushing::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
-
-	const FName PropName = PropertyChangedEvent.Property ? PropertyChangedEvent.Property->GetFName() : NAME_None;
-	if (PropName == GET_MEMBER_NAME_CHECKED(ATransformerBushing, TargetID))
-	{
-		SyncIDAndColor(TargetID);
-	}
-	else if (PropName == GET_MEMBER_NAME_CHECKED(ATransformerBushing, BushingID) ||
-			 PropName == GET_MEMBER_NAME_CHECKED(ATransformerBushing, bUseCustomNeonColor))
-	{
-		SyncIDAndColor(BushingID);
-	}
-
 	UpdateAppearance();
 }
 #endif
 
-// BeginPlay: synchronizes the ID, finds matching targets, and updates appearance.
+// BeginPlay: binds to any linked laser target and updates appearance.
 void ATransformerBushing::BeginPlay()
 {
 	Super::BeginPlay();
 
-	SyncIDAndColor(BushingID);
-	BindToMatchingTargets();
+	if (LinkedLaserTarget)
+	{
+		LinkedLaserTarget->OnLaserHitStateChanged.RemoveDynamic(this, &ATransformerBushing::OnTargetHitStateChanged);
+		LinkedLaserTarget->OnLaserHitStateChanged.AddDynamic(this, &ATransformerBushing::OnTargetHitStateChanged);
+
+		if (LinkedLaserTarget->bIsHitByLaser)
+		{
+			SetLitUp(true);
+		}
+	}
+
 	UpdateAppearance();
 }
 
-// Tick: searches for newly spawned matching targets every two seconds.
-void ATransformerBushing::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-	TargetCheckTimer += DeltaTime;
-	if (TargetCheckTimer >= 2.0f)
-	{
-		TargetCheckTimer = 0.0f;
-		BindToMatchingTargets();
-	}
-}
-
-// BindTarget: connects this bushing to a matching laser target.
-void ATransformerBushing::BindTarget(ALaserTarget* Target)
-{
-	if (!Target || Target->TargetID != BushingID)
-	{
-		return;
-	}
-
-	Target->OnLaserHitStateChanged.RemoveDynamic(this, &ATransformerBushing::OnTargetHitStateChanged);
-	Target->OnLaserHitStateChanged.AddDynamic(this, &ATransformerBushing::OnTargetHitStateChanged);
-
-	if (Target->bIsHitByLaser)
-	{
-		SetLitUp(true);
-	}
-}
-
-// BindToMatchingTargets: searches for matching targets in the level.
-void ATransformerBushing::BindToMatchingTargets()
-{
-	if (LinkedLaserTarget)
-	{
-		BindTarget(LinkedLaserTarget);
-		return;
-	}
-
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
-
-	TArray<AActor*> FoundTargets;
-	UGameplayStatics::GetAllActorsOfClass(World, ALaserTarget::StaticClass(), FoundTargets);
-	for (AActor* Actor : FoundTargets)
-	{
-		BindTarget(Cast<ALaserTarget>(Actor));
-	}
-}
-
-// OnTargetHitStateChanged: turns the bushing on or off when a matching target changes.
+// OnTargetHitStateChanged: turns the bushing on or off when the linked target changes.
 void ATransformerBushing::OnTargetHitStateChanged(ALaserTarget* Target, bool bIsHit)
 {
-	if (Target && Target->TargetID == BushingID)
-	{
-		SetLitUp(bIsHit);
-	}
+	SetLitUp(bIsHit);
 }
 
 // SetLitUp: changes the lit state, appearance, sound, and Blueprint events.
@@ -258,16 +187,10 @@ void ATransformerBushing::OnLitStateChanged_Implementation(bool bNewLit)
 {
 }
 
-// GetColorForID: returns the LiveWire color mapped to the bushing ID.
-FLinearColor ATransformerBushing::GetColorForID(int32 InID) const
-{
-	return LiveWireUtils::GetColorForID(InID);
-}
-
-// GetActiveLitColor: returns a custom lit color or the ID-based color.
+// GetActiveLitColor: returns the lit neon color.
 FLinearColor ATransformerBushing::GetActiveLitColor() const
 {
-	return bUseCustomNeonColor ? NeonLitColor : GetColorForID(BushingID);
+	return NeonLitColor;
 }
 
 // UpdateAppearance: updates the bushing light and glowing state.
