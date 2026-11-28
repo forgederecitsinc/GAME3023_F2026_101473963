@@ -85,10 +85,6 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cell|State")
 	TObjectPtr<ABatteryCapsule> InsertedBattery;
 
-	// Checks whether an actor has an ID that matches this cylinder.
-	UFUNCTION(BlueprintPure, Category = "LiveWire|Laser")
-	bool CheckActorTargetIDMatch(AActor* ActorToCheck, int32& OutFoundID) const;
-
 	// Updates the laser beam, target hit state, and player damage.
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Laser")
 	void UpdateLaserBeam();

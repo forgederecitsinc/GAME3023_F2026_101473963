@@ -192,45 +192,6 @@ void ARedPowerCylinder::ApplyPowerDomeLightState(bool bLightOn)
 	}
 }
 
-// CheckActorTargetIDMatch: checks whether a hit actor is a valid laser target.
-bool ARedPowerCylinder::CheckActorTargetIDMatch(AActor* ActorToCheck, int32& OutFoundID) const
-{
-	if (!ActorToCheck)
-	{
-		return false;
-	}
-
-	if (ALaserTarget* LaserTarget = Cast<ALaserTarget>(ActorToCheck))
-	{
-		OutFoundID = LaserTarget->TargetID;
-		return true;
-	}
-
-	if (ATransformerBushing* Bushing = Cast<ATransformerBushing>(ActorToCheck))
-	{
-		OutFoundID = Bushing->BushingID;
-		return true;
-	}
-
-	if (ARedPowerCylinder* OtherCyl = Cast<ARedPowerCylinder>(ActorToCheck))
-	{
-		if (OtherCyl != this)
-		{
-			return OtherCyl->RequiredShape == RequiredShape;
-		}
-	}
-
-	if (AActor* ParentActor = ActorToCheck->GetAttachParentActor())
-	{
-		if (ParentActor != ActorToCheck && CheckActorTargetIDMatch(ParentActor, OutFoundID))
-		{
-			return true;
-		}
-	}
-
-	return false;
-}
-
 // ClearDetectedTargets: clears target detection and disconnects the previous laser hits.
 void ARedPowerCylinder::ClearDetectedTargets()
 {
@@ -305,16 +266,15 @@ void ARedPowerCylinder::ApplyLaserBurnToPlayer(AActor* HitActor)
 	}
 }
 
-// UpdateDetectedTargets: activates matching laser targets and transformer bushings.
+// UpdateDetectedTargets: activates directly hit laser targets and transformer bushings.
 void ARedPowerCylinder::UpdateDetectedTargets(AActor* HitActor)
 {
-	int32 FoundTargetID = -1;
-	const bool bHitMatchingTarget = CheckActorTargetIDMatch(HitActor, FoundTargetID);
-	bIsTargetDetected = bHitMatchingTarget;
-	DetectedTarget = bHitMatchingTarget ? HitActor : nullptr;
-
 	ALaserTarget* CurrentHitLaserTarget = LiveWireUtils::ResolveActorOrParent<ALaserTarget>(HitActor);
 	ATransformerBushing* CurrentHitBushing = LiveWireUtils::ResolveActorOrParent<ATransformerBushing>(HitActor);
+
+	const bool bHitTarget = (CurrentHitLaserTarget != nullptr || CurrentHitBushing != nullptr);
+	bIsTargetDetected = bHitTarget;
+	DetectedTarget = bHitTarget ? HitActor : nullptr;
 
 	if (LastHitLaserTarget && LastHitLaserTarget != CurrentHitLaserTarget)
 	{
@@ -327,18 +287,15 @@ void ARedPowerCylinder::UpdateDetectedTargets(AActor* HitActor)
 		LastHitBushing = nullptr;
 	}
 
-	if (bHitMatchingTarget)
+	if (CurrentHitLaserTarget)
 	{
-		if (CurrentHitLaserTarget)
-		{
-			CurrentHitLaserTarget->SetLaserHit(true, this);
-			LastHitLaserTarget = CurrentHitLaserTarget;
-		}
-		if (CurrentHitBushing)
-		{
-			CurrentHitBushing->SetLaserHit(true, this);
-			LastHitBushing = CurrentHitBushing;
-		}
+		CurrentHitLaserTarget->SetLaserHit(true, this);
+		LastHitLaserTarget = CurrentHitLaserTarget;
+	}
+	if (CurrentHitBushing)
+	{
+		CurrentHitBushing->SetLaserHit(true, this);
+		LastHitBushing = CurrentHitBushing;
 	}
 }
 
