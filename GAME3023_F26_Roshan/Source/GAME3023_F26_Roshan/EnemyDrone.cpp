@@ -118,7 +118,6 @@ void AEnemyDrone::BeginPlay()
 	UpdateLightRangeForAltitude(InitialSpawnLocation.Z, CurrentGroundZ);
 
 	DroneState = EEnemyDroneState::Patrolling;
-	BuildNavMeshCoveragePoints();
 	AdvanceToNextPatrolDestination();
 }
 
@@ -366,108 +365,7 @@ float AEnemyDrone::SampleNavMeshGroundZ(const FVector& WorldPos) const
 	return (TracedZ != 0.0f || !bHasValidGroundZ) ? TracedZ : CurrentGroundZ;
 }
 
-// BuildNavMeshCoveragePoints: updates movement pathfinding and waypoint navigation
-void AEnemyDrone::BuildNavMeshCoveragePoints()
-{
-	PatrolGroundPoints.Reset();
-
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
-
-	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
-
-	for (AActor* WaypointActor : CustomPatrolWaypoints)
-	{
-		if (IsValid(WaypointActor))
-		{
-			FVector WaypointLoc = WaypointActor->GetActorLocation();
-			if (NavSys)
-			{
-				FNavLocation ProjectedNav;
-				if (NavSys->ProjectPointToNavigation(WaypointLoc, ProjectedNav, FVector(500.0f, 500.0f, 4000.0f)))
-				{
-					PatrolGroundPoints.Add(ProjectedNav.Location);
-				}
-			}
-			else
-			{
-				PatrolGroundPoints.Add(WaypointLoc);
-			}
-		}
-	}
-
-	if (PatrolGroundPoints.Num() > 0)
-	{
-		return;
-	}
-
-	if (!NavSys)
-	{
-		return;
-	}
-
-	const float Step = FMath::Max(150.0f, CoverageGridSpacing);
-	const int32 HalfSteps = FMath::Clamp(FMath::CeilToInt(PatrolRadius / Step), 1, 25);
-	const float MinDistSq = FMath::Square(Step * 0.45f);
-	const FVector ProjectionExtent(Step * 0.45f, Step * 0.45f, 3000.0f);
-
-	bool bReverseRow = false;
-	for (int32 XIdx = -HalfSteps; XIdx <= HalfSteps; ++XIdx)
-	{
-		for (int32 YStep = -HalfSteps; YStep <= HalfSteps; ++YStep)
-		{
-			const int32 YIdx = bReverseRow ? -YStep : YStep;
-			const FVector SampleOffset(XIdx * Step, YIdx * Step, 0.0f);
-
-			if (SampleOffset.SizeSquared2D() > FMath::Square(PatrolRadius))
-			{
-				continue;
-			}
-
-			const FVector CandidateWorld = PatrolOrigin + SampleOffset;
-			FNavLocation ProjectedNav;
-			if (!NavSys->ProjectPointToNavigation(CandidateWorld, ProjectedNav, ProjectionExtent))
-			{
-				continue;
-			}
-
-			const FVector PointToAdd = ProjectedNav.Location;
-
-			bool bTooClose = false;
-			for (const FVector& Existing : PatrolGroundPoints)
-			{
-				if (FVector::DistSquared2D(Existing, PointToAdd) < MinDistSq)
-				{
-					bTooClose = true;
-					break;
-				}
-			}
-
-			if (!bTooClose)
-			{
-				PatrolGroundPoints.Add(PointToAdd);
-			}
-		}
-		bReverseRow = !bReverseRow;
-	}
-
-	if (PatrolGroundPoints.Num() == 0)
-	{
-		for (int32 SampleIdx = 0; SampleIdx < 16; ++SampleIdx)
-		{
-			FNavLocation RandomNav;
-			if (NavSys->GetRandomPointInNavigableRadius(PatrolOrigin, PatrolRadius, RandomNav))
-			{
-				PatrolGroundPoints.Add(RandomNav.Location);
-			}
-		}
-	}
-}
-
-// AdvanceToNextPatrolDestination: updates movement pathfinding and waypoint navigation
+// AdvanceToNextPatrolDestination: picks the next custom waypoint or random NavMesh patrol destination.
 void AEnemyDrone::AdvanceToNextPatrolDestination()
 {
 	CurrentPathPoints.Reset();
@@ -485,66 +383,67 @@ void AEnemyDrone::AdvanceToNextPatrolDestination()
 	FVector GroundStart(CurrentLocation.X, CurrentLocation.Y, CurrentGroundZ);
 	ClampLocationToNavMesh(CurrentLocation, GroundStart, 1000.0f);
 
-	if (PatrolGroundPoints.Num() == 0)
-	{
-		BuildNavMeshCoveragePoints();
-	}
+	FVector TargetGroundPos = GroundStart;
+	bool bHasTarget = false;
 
-	if (PatrolGroundPoints.Num() > 0)
+	if (CustomPatrolWaypoints.Num() > 0)
 	{
-		const int32 NumPoints = PatrolGroundPoints.Num();
-		for (int32 Attempt = 0; Attempt < NumPoints; ++Attempt)
+		const int32 NumWaypoints = CustomPatrolWaypoints.Num();
+		for (int32 Attempt = 0; Attempt < NumWaypoints; ++Attempt)
 		{
-			CurrentPatrolIndex = (CurrentPatrolIndex + 1) % NumPoints;
-			const FVector TargetGroundPos = PatrolGroundPoints[CurrentPatrolIndex];
-
-			if (FVector::DistSquared2D(CurrentLocation, TargetGroundPos) < FMath::Square(80.0f))
+			CurrentPatrolIndex = (CurrentPatrolIndex + 1) % NumWaypoints;
+			if (AActor* Waypoint = CustomPatrolWaypoints[CurrentPatrolIndex])
 			{
-				continue;
+				TargetGroundPos = Waypoint->GetActorLocation();
+				ClampLocationToNavMesh(TargetGroundPos, TargetGroundPos, 1000.0f);
+				bHasTarget = true;
+				break;
 			}
-
-			if (NavSys)
-			{
-				if (UNavigationPath* NavPath = NavSys->FindPathToLocationSynchronously(World, GroundStart, TargetGroundPos, this))
-				{
-					if (NavPath->IsValid() && NavPath->PathPoints.Num() > 0)
-					{
-						for (const FVector& PathPt : NavPath->PathPoints)
-						{
-							if (CurrentPathPoints.Num() == 0 && FVector::DistSquared2D(CurrentLocation, PathPt) < FMath::Square(25.0f))
-							{
-								continue;
-							}
-							CurrentPathPoints.Add(PathPt);
-						}
-
-						if (CurrentPathPoints.Num() > 0)
-						{
-							CurrentPathCornerIndex = 0;
-							return;
-						}
-					}
-				}
-			}
-
-			CurrentPathPoints.Add(TargetGroundPos);
-			CurrentPathCornerIndex = 0;
-			return;
 		}
 	}
 
-	if (NavSys)
+	if (!bHasTarget && NavSys)
 	{
 		FNavLocation RandomNavLoc;
-		if (NavSys->GetRandomPointInNavigableRadius(PatrolOrigin, PatrolRadius, RandomNavLoc))
+		for (int32 Attempt = 0; Attempt < 8; ++Attempt)
 		{
-			CurrentPathPoints.Add(RandomNavLoc.Location);
-			CurrentPathCornerIndex = 0;
-			return;
+			if (NavSys->GetRandomReachablePointInRadius(PatrolOrigin, PatrolRadius, RandomNavLoc))
+			{
+				if (FVector::DistSquared2D(CurrentLocation, RandomNavLoc.Location) >= FMath::Square(150.0f))
+				{
+					TargetGroundPos = RandomNavLoc.Location;
+					bHasTarget = true;
+					break;
+				}
+			}
 		}
 	}
 
-	CurrentPathPoints.Add(GroundStart);
+	if (bHasTarget && NavSys)
+	{
+		if (UNavigationPath* NavPath = NavSys->FindPathToLocationSynchronously(World, GroundStart, TargetGroundPos, this))
+		{
+			if (NavPath->IsValid() && NavPath->PathPoints.Num() > 0)
+			{
+				for (const FVector& PathPt : NavPath->PathPoints)
+				{
+					if (CurrentPathPoints.Num() == 0 && FVector::DistSquared2D(CurrentLocation, PathPt) < FMath::Square(25.0f))
+					{
+						continue;
+					}
+					CurrentPathPoints.Add(PathPt);
+				}
+
+				if (CurrentPathPoints.Num() > 0)
+				{
+					CurrentPathCornerIndex = 0;
+					return;
+				}
+			}
+		}
+	}
+
+	CurrentPathPoints.Add(bHasTarget ? TargetGroundPos : GroundStart);
 	CurrentPathCornerIndex = 0;
 }
 
@@ -633,11 +532,6 @@ void AEnemyDrone::TickTracking(float DeltaTime, APawn* PlayerPawn, bool bIsPlaye
 		bIsFollowingPlayer = false;
 		EscapeTimerRemaining = 0.0f;
 		RefreshDroneSettings();
-
-		if (PatrolGroundPoints.IsValidIndex(CurrentPatrolIndex))
-		{
-			CurrentPatrolIndex = FMath::Max(-1, CurrentPatrolIndex - 1);
-		}
 		AdvanceToNextPatrolDestination();
 		return;
 	}

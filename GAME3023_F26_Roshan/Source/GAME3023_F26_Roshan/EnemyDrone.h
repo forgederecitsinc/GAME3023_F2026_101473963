@@ -76,9 +76,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Drone|Movement & Patrol", meta = (DisplayName = "NavMesh Patrol Radius", ClampMin = "100.0"))
 	float PatrolRadius = 5000.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Drone|Movement & Patrol", meta = (DisplayName = "Coverage Grid Cell Size", ClampMin = "150.0"))
-	float CoverageGridSpacing = 600.0f;
-
 	UPROPERTY(EditInstanceOnly, BlueprintReadWrite, Category = "Drone|Movement & Patrol", meta = (DisplayName = "Custom Patrol Waypoints (Optional)"))
 	TArray<TObjectPtr<AActor>> CustomPatrolWaypoints;
 
@@ -132,10 +129,6 @@ public:
 	void RefreshDroneSettings();
 
 	UFUNCTION(BlueprintCallable, Category = "Drone|Movement & Patrol")
-	// Builds coverage points used to plan patrol destinations.
-	void BuildNavMeshCoveragePoints();
-
-	UFUNCTION(BlueprintCallable, Category = "Drone|Movement & Patrol")
 	// Returns the drone to its starting position and restarts patrol.
 	void ResetToStartAndResumePatrol();
 
@@ -152,9 +145,6 @@ public:
 	void DropLaserParticle(APawn* TargetPawn);
 
 private:
-	UPROPERTY(Transient)
-	TArray<FVector> PatrolGroundPoints;
-
 	UPROPERTY(Transient)
 	TArray<FVector> CurrentPathPoints;
 
