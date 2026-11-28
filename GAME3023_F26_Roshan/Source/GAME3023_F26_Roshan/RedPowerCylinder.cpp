@@ -235,7 +235,8 @@ AActor* ARedPowerCylinder::TraceLaserBeam(float& OutDistance, bool& bOutHitObsta
 
 	FHitResult Hit;
 	AActor* HitActor = nullptr;
-	if (World->LineTraceSingleByChannel(Hit, Start, DesiredEnd, ECC_Visibility, Params))
+	const FCollisionShape BeamSweepShape = FCollisionShape::MakeSphere(FMath::Max(4.0f, LaserThickness * 0.5f));
+	if (World->SweepSingleByChannel(Hit, Start, DesiredEnd, FQuat::Identity, ECC_Visibility, BeamSweepShape, Params))
 	{
 		HitActor = Hit.GetActor();
 		if (bLaserStopsAtObstacles)
