@@ -4,27 +4,6 @@
 
 namespace LiveWireUtils
 {
-	// GetColorForID: converts a LiveWire ID into a consistent visual color.
-	FLinearColor GetColorForID(int32 ID)
-	{
-		switch (ID)
-		{
-			case 1001: return FLinearColor(1.00f, 0.10f, 0.12f);
-			case 1002: return FLinearColor(0.08f, 0.95f, 0.18f);
-			case 1003: return FLinearColor(0.08f, 0.45f, 1.00f);
-			case 1004: return FLinearColor(1.00f, 0.82f, 0.02f);
-			case 1005: return FLinearColor(1.00f, 0.42f, 0.02f);
-			case 1006: return FLinearColor(0.78f, 0.10f, 1.00f);
-			case 1007: return FLinearColor(0.02f, 0.92f, 0.98f);
-			case 1008: return FLinearColor(1.00f, 0.10f, 0.65f);
-			default:
-			{
-				const uint8 HueByte = static_cast<uint8>(FMath::Abs(ID * 53) % 256);
-				return FLinearColor::MakeFromHSV8(HueByte, 240, 255);
-			}
-		}
-	}
-
 	// ProjectToNavMesh: moves a world position onto the nearest valid navigation area.
 	bool ProjectToNavMesh(const UWorld* World, const FVector& WorldPos, const FVector& Extent, FVector& OutLocation)
 	{

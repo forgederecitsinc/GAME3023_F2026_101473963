@@ -18,9 +18,6 @@ enum class ELiveWireShape : uint8
 
 namespace LiveWireUtils
 {
-	// Returns a fixed color for known LiveWire IDs, or a generated color for new IDs.
-	FLinearColor GetColorForID(int32 ID);
-
 	// Finds the nearest valid NavMesh location near a world position.
 	bool ProjectToNavMesh(const UWorld* World, const FVector& WorldPos, const FVector& Extent, FVector& OutLocation);
 
