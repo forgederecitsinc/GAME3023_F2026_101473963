@@ -31,7 +31,8 @@ public:
 	// Allows laser preview updates to run in editor viewports.
 	virtual bool ShouldTickIfViewportsOnly() const override;
 
-	ELiveWireShape RequiredShape = ELiveWireShape::Circle;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Shape", meta = (DisplayName = "Required Battery Shape"))
+	ELiveWireShape RequiredShape = ELiveWireShape::Cube;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USceneComponent> SceneRoot;

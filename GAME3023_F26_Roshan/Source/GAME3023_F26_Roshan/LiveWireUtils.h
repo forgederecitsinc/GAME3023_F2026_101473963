@@ -10,10 +10,10 @@ class UWorld;
 UENUM(BlueprintType)
 enum class ELiveWireShape : uint8
 {
-	Circle		UMETA(DisplayName = "Circle"),
-	Square		UMETA(DisplayName = "Square"),
-	Triangle	UMETA(DisplayName = "Triangle"),
-	Star		UMETA(DisplayName = "Star")
+	Cube		UMETA(DisplayName = "Cube"),
+	Sphere		UMETA(DisplayName = "Sphere"),
+	Cylinder	UMETA(DisplayName = "Cylinder"),
+	Cone		UMETA(DisplayName = "Cone")
 };
 
 namespace LiveWireUtils

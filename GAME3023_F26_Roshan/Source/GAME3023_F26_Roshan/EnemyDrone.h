@@ -75,7 +75,7 @@ public:
 
 	float WaypointWaitTime = 0.15f;
 
-	float LaserLightIntensity = 50000.0f;
+	float LaserLightIntensity = 5000.0f;
 
 	FLinearColor LaserLightColor = FLinearColor(1.0f, 0.08f, 0.08f);
 

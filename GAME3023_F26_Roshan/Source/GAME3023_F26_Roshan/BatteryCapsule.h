@@ -23,7 +23,8 @@ public:
 	// Runs every frame to animate an idle battery or keep its carried state stable.
 	virtual void Tick(float DeltaTime) override;
 
-	ELiveWireShape BatteryShape = ELiveWireShape::Circle;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Shape", meta = (DisplayName = "Battery Shape"))
+	ELiveWireShape BatteryShape = ELiveWireShape::Cube;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UCapsuleComponent> CapsuleComponent;
