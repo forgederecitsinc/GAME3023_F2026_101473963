@@ -79,11 +79,11 @@ public:
 
 	FLinearColor LaserLightColor = FLinearColor(1.0f, 0.08f, 0.08f);
 
-	float LaserInnerConeAngle = 12.0f;
+	float LaserInnerConeAngle = 7.0f;
 
-	float LaserOuterConeAngle = 18.0f;
+	float LaserOuterConeAngle = 10.0f;
 
-	float LaserAttenuationRadius = 3500.0f;
+	float LaserAttenuationRadius = 1000.0f;
 
 	float LaserParticleDamage = 10.0f;
 

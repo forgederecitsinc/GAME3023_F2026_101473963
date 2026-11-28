@@ -97,17 +97,8 @@ void AEnemyDrone::BeginPlay()
 	RefreshDroneSettings();
 
 	const FVector StartLocation = GetActorLocation();
-	FVector ClampedStartGround = StartLocation;
-	if (ClampLocationToNavMesh(StartLocation, ClampedStartGround, 2500.0f))
-	{
-		CurrentGroundZ = ClampedStartGround.Z;
-		PatrolOrigin = ClampedStartGround;
-	}
-	else
-	{
-		CurrentGroundZ = SampleNavMeshGroundZ(StartLocation);
-		PatrolOrigin = FVector(StartLocation.X, StartLocation.Y, CurrentGroundZ);
-	}
+	CurrentGroundZ = SampleNavMeshGroundZ(StartLocation);
+	PatrolOrigin = FVector(StartLocation.X, StartLocation.Y, CurrentGroundZ);
 	InitialGroundZ = CurrentGroundZ;
 	bHasValidGroundZ = true;
 
@@ -365,25 +356,14 @@ float AEnemyDrone::SampleNavMeshGroundZ(const FVector& WorldPos) const
 	return (TracedZ != 0.0f || !bHasValidGroundZ) ? TracedZ : CurrentGroundZ;
 }
 
-// AdvanceToNextPatrolDestination: picks the next custom waypoint or random NavMesh patrol destination.
+// AdvanceToNextPatrolDestination: picks the next custom waypoint or random aerial patrol point around PatrolOrigin.
 void AEnemyDrone::AdvanceToNextPatrolDestination()
 {
 	CurrentPathPoints.Reset();
 	CurrentPathCornerIndex = 0;
 
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
-
 	const FVector CurrentLocation = GetActorLocation();
-	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
-
-	FVector GroundStart(CurrentLocation.X, CurrentLocation.Y, CurrentGroundZ);
-	ClampLocationToNavMesh(CurrentLocation, GroundStart, 1000.0f);
-
-	FVector TargetGroundPos = GroundStart;
+	FVector TargetGroundPos = PatrolOrigin;
 	bool bHasTarget = false;
 
 	if (CustomPatrolWaypoints.Num() > 0)
@@ -395,66 +375,35 @@ void AEnemyDrone::AdvanceToNextPatrolDestination()
 			if (AActor* Waypoint = CustomPatrolWaypoints[CurrentPatrolIndex])
 			{
 				TargetGroundPos = Waypoint->GetActorLocation();
-				ClampLocationToNavMesh(TargetGroundPos, TargetGroundPos, 1000.0f);
 				bHasTarget = true;
 				break;
 			}
 		}
 	}
 
-	if (!bHasTarget && NavSys)
+	if (!bHasTarget)
 	{
-		FNavLocation RandomNavLoc;
-		for (int32 Attempt = 0; Attempt < 12; ++Attempt)
+		const float MinMoveDistSq = FMath::Square(FMath::Min(400.0f, PatrolRadius * 0.5f));
+		for (int32 Attempt = 0; Attempt < 10; ++Attempt)
 		{
-			bool bFound = false;
-			if (Attempt < 4)
-			{
-				bFound = NavSys->GetRandomReachablePointInRadius(GroundStart, PatrolRadius, RandomNavLoc);
-			}
-			else if (Attempt < 8)
-			{
-				bFound = NavSys->GetRandomPointInNavigableRadius(PatrolOrigin, PatrolRadius, RandomNavLoc);
-			}
-			else
-			{
-				bFound = NavSys->GetRandomPoint(RandomNavLoc);
-			}
+			const float Angle = FMath::FRandRange(0.0f, 2.0f * PI);
+			const float Radius = FMath::Sqrt(FMath::FRand()) * PatrolRadius;
+			const FVector CandidateXY(
+				PatrolOrigin.X + FMath::Cos(Angle) * Radius,
+				PatrolOrigin.Y + FMath::Sin(Angle) * Radius,
+				InitialGroundZ);
 
-			if (bFound && FVector::DistSquared2D(CurrentLocation, RandomNavLoc.Location) >= FMath::Square(150.0f))
+			if (FVector::DistSquared2D(CurrentLocation, CandidateXY) >= MinMoveDistSq)
 			{
-				TargetGroundPos = RandomNavLoc.Location;
+				TargetGroundPos = CandidateXY;
+				TargetGroundPos.Z = SampleNavMeshGroundZ(CandidateXY);
 				bHasTarget = true;
 				break;
 			}
 		}
 	}
 
-	if (bHasTarget && NavSys)
-	{
-		if (UNavigationPath* NavPath = NavSys->FindPathToLocationSynchronously(World, GroundStart, TargetGroundPos, this))
-		{
-			if (NavPath->IsValid() && NavPath->PathPoints.Num() > 0)
-			{
-				for (const FVector& PathPt : NavPath->PathPoints)
-				{
-					if (CurrentPathPoints.Num() == 0 && FVector::DistSquared2D(CurrentLocation, PathPt) < FMath::Square(25.0f))
-					{
-						continue;
-					}
-					CurrentPathPoints.Add(PathPt);
-				}
-
-				if (CurrentPathPoints.Num() > 0)
-				{
-					CurrentPathCornerIndex = 0;
-					return;
-				}
-			}
-		}
-	}
-
-	CurrentPathPoints.Add(bHasTarget ? TargetGroundPos : GroundStart);
+	CurrentPathPoints.Add(bHasTarget ? TargetGroundPos : PatrolOrigin);
 	CurrentPathCornerIndex = 0;
 }
 
