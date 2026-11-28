@@ -114,23 +114,6 @@ void AEnemyBatteryThief::RefreshEnemySettings()
 	}
 }
 
-// BeginPlay: stores the spawn position, health, and starts the AI movement loop.
-void AEnemyBatteryThief::MarkAsSpawnedUnit(const FVector& InHomeOrigin)
-{
-	bIsSpawnedChildUnit = true;
-	bSnapToSpawnLocationOnStart = false;
-
-	InitialSpawnZ = SampleGroundNavMeshZ(InHomeOrigin);
-	CurrentGroundZ = InitialSpawnZ;
-	bHasValidGroundZ = true;
-	PatrolOrigin = FVector(InHomeOrigin.X, InHomeOrigin.Y, InitialSpawnZ);
-	SetActorLocation(FVector(InHomeOrigin.X, InHomeOrigin.Y, InitialSpawnZ + GroundHeightOffset));
-
-	LastStuckCheckPosition = GetActorLocation();
-	StuckWatchdogTimer = 0.0f;
-	WallContactTimer = 0.0f;
-}
-
 // Disables mesh NavMesh carving, sets health, and starts patrol loop
 void AEnemyBatteryThief::BeginPlay()
 {
@@ -162,7 +145,7 @@ void AEnemyBatteryThief::BeginPlay()
 
 	RefreshEnemySettings();
 
-	if (!bIsSpawnedChildUnit && bSnapToSpawnLocationOnStart)
+	if (bSnapToSpawnLocationOnStart)
 	{
 		SetActorLocationAndRotation(SpawnLocation, SpawnRotation);
 	}
@@ -171,17 +154,9 @@ void AEnemyBatteryThief::BeginPlay()
 	InitialSpawnZ = SampleGroundNavMeshZ(StartPos);
 	CurrentGroundZ = InitialSpawnZ;
 	bHasValidGroundZ = true;
-
-	if (!bIsSpawnedChildUnit)
-	{
-		PatrolOrigin = FVector(StartPos.X, StartPos.Y, InitialSpawnZ);
-	}
+	PatrolOrigin = FVector(StartPos.X, StartPos.Y, InitialSpawnZ);
 
 	SetActorLocation(FVector(StartPos.X, StartPos.Y, InitialSpawnZ + GroundHeightOffset));
-
-	LastStuckCheckPosition = GetActorLocation();
-	StuckWatchdogTimer = 0.0f;
-	WallContactTimer = 0.0f;
 
 	CurrentState = EBatteryThiefState::Patrolling;
 	PickNextNavMeshPatrolDestination();
@@ -200,7 +175,6 @@ void AEnemyBatteryThief::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (!bIsDead && EndPlayReason == EEndPlayReason::Destroyed)
 	{
 		bIsDead = true;
-		OnBatteryThiefKilled.Broadcast(this);
 	}
 
 	Super::EndPlay(EndPlayReason);
@@ -278,8 +252,6 @@ void AEnemyBatteryThief::KillBatteryThief()
 	TargetPlayerPawn = nullptr;
 	bIsFollowingPlayer = false;
 
-	OnBatteryThiefKilled.Broadcast(this);
-
 	Destroy();
 }
 
@@ -290,16 +262,6 @@ void AEnemyBatteryThief::KillPermanently()
 	{
 		return;
 	}
-
-	if (UWorld* World = GetWorld())
-	{
-		if (AGAME3023_F26_RoshanGameMode* GM = Cast<AGAME3023_F26_RoshanGameMode>(World->GetAuthGameMode()))
-		{
-			GM->MaxActiveBatteryThieves = FMath::Max(0, GM->MaxActiveBatteryThieves - 1);
-		}
-	}
-
-	OnBatteryThiefKilled.Clear();
 
 	KillBatteryThief();
 }
@@ -900,157 +862,6 @@ void AEnemyBatteryThief::PickNextNavMeshPatrolDestination()
 	}
 }
 
-// Detects if thief is stuck against geometry and reroutes path
-bool AEnemyBatteryThief::HandleStuckWatchdog(float DeltaTime, float SpeedToUse, const FVector& CurrentLocation)
-{
-	const float DistMoved2D = FVector::Dist2D(CurrentLocation, LastStuckCheckPosition);
-	if (DistMoved2D < (SpeedToUse * DeltaTime * 0.20f))
-	{
-		StuckWatchdogTimer += DeltaTime;
-	}
-	else
-	{
-		StuckWatchdogTimer = FMath::Max(0.0f, StuckWatchdogTimer - DeltaTime * 2.0f);
-		LastStuckCheckPosition = CurrentLocation;
-	}
-
-	if (StuckWatchdogTimer < 0.35f)
-	{
-		return false;
-	}
-
-	StuckWatchdogTimer = 0.0f;
-	WallContactTimer = 0.0f;
-	LastStuckCheckPosition = CurrentLocation;
-
-	if (CurrentState == EBatteryThiefState::Patrolling)
-	{
-		CurrentPathPoints.Reset();
-		CurrentPathCornerIndex = 0;
-		WaitTimer = 0.0f;
-		PickNextNavMeshPatrolDestination();
-		return true;
-	}
-
-	if (CurrentPathPoints.IsValidIndex(CurrentPathCornerIndex + 1))
-	{
-		++CurrentPathCornerIndex;
-		return true;
-	}
-
-	PathRepathTimer = 0.0f;
-	if (CurrentState == EBatteryThiefState::Approaching && IsValid(TargetLaserCylinder))
-	{
-		BuildPathToWorldLocation(CurrentLaserGroundApproachPoint);
-	}
-	else if (CurrentState == EBatteryThiefState::Carrying)
-	{
-		TargetDropSpotActor = FindClosestBatteryDropSpot();
-		const FVector DropLoc = IsValid(TargetDropSpotActor) ? TargetDropSpotActor->GetActorLocation() : PatrolOrigin;
-		BuildPathToWorldLocation(DropLoc);
-	}
-	else if (CurrentState == EBatteryThiefState::FollowingPlayer && IsValid(TargetPlayerPawn))
-	{
-		BuildPathToWorldLocation(TargetPlayerPawn->GetActorLocation());
-	}
-
-	return true;
-}
-
-// MoveWithWallSlide: updates movement pathfinding and waypoint navigation
-void AEnemyBatteryThief::MoveWithWallSlide(const FVector& CurrentLocation, const FVector& MoveDir2D, float StepDist, float TargetZ, bool bHasNextCorner, float DeltaTime)
-{
-	FVector DesiredNewXY(
-		CurrentLocation.X + MoveDir2D.X * StepDist,
-		CurrentLocation.Y + MoveDir2D.Y * StepDist,
-		TargetZ
-	);
-
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		WallContactTimer = 0.0f;
-		SetActorLocation(DesiredNewXY);
-		return;
-	}
-
-	const float SweepHeightZ = TargetZ + FMath::Max(24.0f, GroundCollisionRadius + 4.0f);
-	const FVector SweepStart(CurrentLocation.X, CurrentLocation.Y, SweepHeightZ);
-	const FVector SweepEnd(DesiredNewXY.X, DesiredNewXY.Y, SweepHeightZ);
-
-	FCollisionQueryParams SweepParams(SCENE_QUERY_STAT(BatteryThiefWallSweep), false, this);
-	if (IsValid(StolenBattery))
-	{
-		SweepParams.AddIgnoredActor(StolenBattery);
-	}
-
-	FHitResult WallHit;
-	const FCollisionShape SphereShape = FCollisionShape::MakeSphere(GroundCollisionRadius);
-	const bool bHitWall = World->SweepSingleByChannel(WallHit, SweepStart, SweepEnd, FQuat::Identity, ECC_WorldStatic, SphereShape, SweepParams);
-
-	AActor* HitActor = WallHit.GetActor();
-	const bool bIgnoreHit = HitActor && (HitActor->IsA(AEnemyBatteryThief::StaticClass()) || HitActor->IsA(ABatteryCapsule::StaticClass()));
-	if (!bHitWall || bIgnoreHit || !WallHit.bBlockingHit || WallHit.Normal.Z >= 0.6f)
-	{
-		WallContactTimer = 0.0f;
-		SetActorLocation(DesiredNewXY);
-		return;
-	}
-
-	WallContactTimer += DeltaTime;
-	if (bHasNextCorner)
-	{
-		++CurrentPathCornerIndex;
-		WallContactTimer = 0.0f;
-	}
-
-	const float SafeFrac = FMath::Max(0.0f, WallHit.Time - 0.02f);
-	const FVector SafeStopXY(
-		SweepStart.X + (SweepEnd.X - SweepStart.X) * SafeFrac,
-		SweepStart.Y + (SweepEnd.Y - SweepStart.Y) * SafeFrac,
-		TargetZ
-	);
-
-	const FVector WallNormal2D = FVector(WallHit.Normal.X, WallHit.Normal.Y, 0.0f).GetSafeNormal();
-	const FVector SlideDir2D = FVector::VectorPlaneProject(MoveDir2D, WallNormal2D).GetSafeNormal();
-	const float RemainingDist = StepDist * (1.0f - WallHit.Time);
-
-	FVector FinalPos = SafeStopXY;
-	bool bSlideSucceeded = false;
-	if (!SlideDir2D.IsNearlyZero() && RemainingDist > 0.5f)
-	{
-		const FVector SlideStart(SafeStopXY.X, SafeStopXY.Y, SweepHeightZ);
-		const FVector SlideEnd = SlideStart + SlideDir2D * RemainingDist;
-		FHitResult SlideHit;
-		if (!World->SweepSingleByChannel(SlideHit, SlideStart, SlideEnd, FQuat::Identity, ECC_WorldStatic, SphereShape, SweepParams))
-		{
-			FinalPos.X = SlideEnd.X;
-			FinalPos.Y = SlideEnd.Y;
-			bSlideSucceeded = true;
-		}
-	}
-
-	FinalPos.X += WallNormal2D.X * 5.0f;
-	FinalPos.Y += WallNormal2D.Y * 5.0f;
-	FinalPos.Z = TargetZ;
-	SetActorLocation(FinalPos);
-
-	if (!bSlideSucceeded || WallContactTimer > 0.2f)
-	{
-		WallContactTimer = 0.0f;
-		if (CurrentState == EBatteryThiefState::Patrolling)
-		{
-			CurrentPathPoints.Reset();
-			CurrentPathCornerIndex = 0;
-			PickNextNavMeshPatrolDestination();
-		}
-		else
-		{
-			PathRepathTimer = 0.0f;
-		}
-	}
-}
-
 // TickMoving: advances the thief along its current navigation path.
 void AEnemyBatteryThief::FollowCurrentNavPath(float DeltaTime, float SpeedToUse)
 {
@@ -1060,11 +871,6 @@ void AEnemyBatteryThief::FollowCurrentNavPath(float DeltaTime, float SpeedToUse)
 	}
 
 	const FVector CurrentLocation = GetActorLocation();
-	if (HandleStuckWatchdog(DeltaTime, SpeedToUse, CurrentLocation))
-	{
-		return;
-	}
-
 	const FVector TargetCorner = CurrentPathPoints[CurrentPathCornerIndex];
 	const FVector ToTarget2D(TargetCorner.X - CurrentLocation.X, TargetCorner.Y - CurrentLocation.Y, 0.0f);
 	const float Dist2D = ToTarget2D.Size();
@@ -1090,7 +896,10 @@ void AEnemyBatteryThief::FollowCurrentNavPath(float DeltaTime, float SpeedToUse)
 	CurrentGroundZ = FMath::FInterpTo(CurrentGroundZ, SampledSurfaceZ, DeltaTime, 20.0f);
 	const float TargetZ = CurrentGroundZ + GroundHeightOffset;
 
-	MoveWithWallSlide(CurrentLocation, MoveDir2D, StepDist, TargetZ, bHasNextCorner, DeltaTime);
+	SetActorLocation(FVector(
+		CurrentLocation.X + MoveDir2D.X * StepDist,
+		CurrentLocation.Y + MoveDir2D.Y * StepDist,
+		TargetZ));
 }
 
 // ReturnToPatrol: clears the current task and sends the thief back to patrol.

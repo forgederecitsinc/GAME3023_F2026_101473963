@@ -13,8 +13,6 @@ class UFloatingPawnMovement;
 class ARedPowerCylinder;
 class ABatteryCapsule;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBatteryThiefKilled, class AEnemyBatteryThief*, KilledThief);
-
 // States used by the thief AI while it patrols and steals batteries.
 UENUM(BlueprintType)
 enum class EBatteryThiefState : uint8
@@ -71,9 +69,6 @@ public:
 	virtual void ApplyHealing(float Healing, AActor* Healer) override;
  // NotifyDanger: notify danger
 	virtual void NotifyDanger(const FVector& DangerLocation, AActor* DangerSource) override;
-
-	UPROPERTY(BlueprintAssignable, Category = "Battery Thief|Health & Death")
-	FOnBatteryThiefKilled OnBatteryThiefKilled;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USceneComponent> SceneRoot;
@@ -236,9 +231,6 @@ public:
  // Battery state and handling
 	void DepositStolenBatteryAtDropOff();
 
- // Spawning logic and management
-	void MarkAsSpawnedUnit(const FVector& InHomeOrigin);
-
 private:
 	UPROPERTY(Transient)
 	TArray<FVector> CurrentPathPoints;
@@ -259,12 +251,6 @@ private:
 	float WaitTimer = 0.0f;
 
 	float PathRepathTimer = 0.0f;
-
-	FVector LastStuckCheckPosition = FVector::ZeroVector;
-	float StuckWatchdogTimer = 0.0f;
-	float WallContactTimer = 0.0f;
-
-	bool bIsSpawnedChildUnit = false;
 
  // IsPointOnWalkableSurface: is point on walkable surface
 	bool IsPointOnWalkableSurface(const FVector& Point) const;
@@ -300,10 +286,6 @@ private:
  // Collision overlap callback
 	void OnPlayerTouchBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
- // HandleStuckWatchdog: handle stuck watchdog
-	bool HandleStuckWatchdog(float DeltaTime, float SpeedToUse, const FVector& CurrentLocation);
- // MoveWithWallSlide: move with wall slide
-	void MoveWithWallSlide(const FVector& CurrentLocation, const FVector& MoveDir2D, float StepDist, float TargetZ, bool bHasNextCorner, float DeltaTime);
  // PinToGroundSurface: pin to ground surface
 	void PinToGroundSurface();
  // CheckPlayerProximityTouch: check player proximity touch
