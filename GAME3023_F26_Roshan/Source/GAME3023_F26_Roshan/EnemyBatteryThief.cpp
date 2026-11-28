@@ -860,6 +860,14 @@ void AEnemyBatteryThief::PickNextNavMeshPatrolDestination()
 			}
 		}
 	}
+
+	// Fallback if strict path validation rejected partial paths: move directly to a reachable NavMesh point.
+	FNavLocation FallbackNavPoint;
+	if (NavSys->GetRandomReachablePointInRadius(PathStartPos, FMath::Max(PatrolRadius, 2500.0f), FallbackNavPoint))
+	{
+		CurrentPathPoints.Add(FallbackNavPoint.Location);
+		CurrentPathCornerIndex = 0;
+	}
 }
 
 // TickMoving: advances the thief along its current navigation path.

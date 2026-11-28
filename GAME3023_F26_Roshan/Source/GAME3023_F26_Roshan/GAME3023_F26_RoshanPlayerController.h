@@ -18,19 +18,18 @@ class AGAME3023_F26_RoshanPlayerController : public APlayerController
 	
 protected:
 
-	UPROPERTY(EditAnywhere, Category ="Input|Input Mappings")
+	UPROPERTY()
 	TArray<UInputMappingContext*> DefaultMappingContexts;
 
-	UPROPERTY(EditAnywhere, Category="Input|Input Mappings")
+	UPROPERTY()
 	TArray<UInputMappingContext*> MobileExcludedMappingContexts;
 
-	UPROPERTY(EditAnywhere, Category="Input|Touch Controls")
+	UPROPERTY()
 	TSubclassOf<UUserWidget> MobileControlsWidgetClass;
 
 	UPROPERTY()
 	TObjectPtr<UUserWidget> MobileControlsWidget;
 
-	UPROPERTY(EditAnywhere, Config, Category = "Input|Touch Controls")
 	bool bForceTouchControls = false;
 
 	// Applies input mappings and creates the mobile controls after play begins.

@@ -23,19 +23,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Battery Thief Timer")
 	void UpdateTimer(float InRemainingTime, float InTotalDuration);
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battery Thief Timer")
 	float RemainingTime = 10.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief Timer")
 	float TotalDuration = 10.0f;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battery Thief Timer")
 	float ProgressPercent = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief Timer")
 	float WidgetWidth = 190.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief Timer")
 	float ProgressBarHeight = 6.0f;
 
 protected:

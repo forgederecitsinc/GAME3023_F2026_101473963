@@ -39,19 +39,15 @@ public:
 	AActor* GetTargetActor() const { return TargetActor.Get(); }
 
 	// Text telling the player what interaction to perform.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction Prompt")
 	FText ActionText;
 
 	// Name of the object or actor the player can interact with.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction Prompt")
 	FText TargetNameText;
 
 	// When true, the prompt stays at the bottom center of the screen.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction Prompt")
 	bool bAnchorToScreenBottom = true;
 
 	// Position offset used when the prompt follows the target in the world.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction Prompt")
 	FVector WorldSpaceOffset = FVector(0.0f, 0.0f, 120.0f);
 
 protected:

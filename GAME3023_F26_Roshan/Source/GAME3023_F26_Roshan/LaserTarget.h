@@ -21,7 +21,7 @@ public:
 	ALaserTarget();
 
 	// Optional bushing to light up when this target is hit by a laser.
-	UPROPERTY(EditInstanceOnly, BlueprintReadWrite, Category = "LiveWire|Gameplay", meta = (DisplayName = "Linked Bushing (Optional)"))
+	UPROPERTY()
 	TObjectPtr<ATransformerBushing> LinkedBushing;
 
 	// Root component used as the base transform of the target.
@@ -29,7 +29,6 @@ public:
 	TObjectPtr<USceneComponent> SceneRoot;
 
 	// Stores whether the laser is currently hitting this target.
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Gameplay", meta = (DisplayName = "Is Hit By Laser"))
 	bool bIsHitByLaser = false;
 
 	// Blueprint event broadcast after the laser hit state changes.

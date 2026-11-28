@@ -37,50 +37,43 @@ class AGAME3023_F26_RoshanCharacter : public ACharacter, public ICombatDamageabl
 	
 protected:
 
-	UPROPERTY(EditAnywhere, Category="Input")
+	UPROPERTY()
 	UInputAction* JumpAction;
 
-	UPROPERTY(EditAnywhere, Category="Input")
+	UPROPERTY()
 	UInputAction* MoveAction;
 
-	UPROPERTY(EditAnywhere, Category="Input")
+	UPROPERTY()
 	UInputAction* LookAction;
 
-	UPROPERTY(EditAnywhere, Category="Input")
+	UPROPERTY()
 	UInputAction* MouseLookAction;
 
-	UPROPERTY(EditAnywhere, Category="Input")
+	UPROPERTY()
 	UInputAction* InteractAction;
 
-	UPROPERTY(EditAnywhere, Category="Input")
+	UPROPERTY()
 	UInputAction* DropAction;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Inventory")
+	UPROPERTY()
 	TObjectPtr<ABatteryCapsule> CarriedBattery;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Interaction")
+	UPROPERTY()
 	TObjectPtr<AActor> CurrentInteractable;
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
 	float CameraPitch = -60.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
 	float CameraYaw = 0.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera", meta = (ClampMin = "200.0", ClampMax = "4000.0"))
 	float CameraDistance = 1600.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
 	FVector CameraSocketOffset = FVector(0.0f, 0.0f, 100.0f);
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
 	float CameraFOV = 85.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
 	float CameraLagSpeed = 4.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematic Camera")
 	bool bEnableCameraCollision = false;
 
 	UFUNCTION(BlueprintCallable, Category = "Cinematic Camera")
@@ -184,19 +177,16 @@ public:
  // Handles GetCurrentInteractable interaction
 	AActor* GetCurrentInteractable() const { return CurrentInteractable; }
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Interaction UI", meta = (DisplayName = "Interaction Prompt Widget Class"))
+	UPROPERTY()
 	TSubclassOf<UInteractPromptWidget> InteractionPromptWidgetClass;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category = "LiveWire|Interaction UI")
+	UPROPERTY(Transient)
 	TObjectPtr<UInteractPromptWidget> InteractionPromptWidget;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Interaction UI", meta = (DisplayName = "Show Interaction Widget"))
 	bool bShowInteractionWidget = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Interaction UI", meta = (DisplayName = "Interaction Detection Radius"))
 	float InteractionDetectionRadius = 260.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Interaction UI", meta = (DisplayName = "Anchor Prompt To Screen Bottom"))
 	bool bAnchorPromptToScreenBottom = true;
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Interaction UI")
@@ -209,13 +199,12 @@ public:
 
 public:
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health HUD", meta = (DisplayName = "Health HUD Widget Class"))
+	UPROPERTY()
 	TSubclassOf<UPlayerHealthHUDWidget> HealthHUDWidgetClass;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category = "LiveWire|Health HUD")
+	UPROPERTY(Transient)
 	TObjectPtr<UPlayerHealthHUDWidget> HealthHUDWidget;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health HUD", meta = (DisplayName = "Show Health HUD"))
 	bool bShowHealthHUD = true;
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Health HUD")
@@ -226,16 +215,13 @@ public:
  // Health and damage management
 	void UpdateHealthHUD();
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Audio", meta = (DisplayName = "Background Music Track"))
+	UPROPERTY()
 	TObjectPtr<USoundBase> BackgroundMusicTrack;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Audio", meta = (DisplayName = "BGM Volume", ClampMin = "0.0", ClampMax = "2.0", UIMin = "0.0", UIMax = "1.0"))
 	float BGMVolume = 0.65f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Audio", meta = (DisplayName = "BGM Pitch", ClampMin = "0.2", ClampMax = "2.0"))
 	float BGMPitch = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Audio", meta = (DisplayName = "Auto-Play BGM On Start"))
 	bool bAutoPlayBGM = true;
 
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Audio")
@@ -253,13 +239,10 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Audio", meta = (DisplayName = "Active BGM Audio Component"))
 	TObjectPtr<UAudioComponent> BGMAudioComponent;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (ClampMin = "1.0", DisplayName = "Max Health"))
 	float MaxHealth = 100.0f;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (DisplayName = "Current Health"))
 	float CurrentHealth = 100.0f;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Health", meta = (DisplayName = "Is Dead"))
 	bool bIsDead = false;
 
 	UPROPERTY(BlueprintAssignable, Category = "LiveWire|Health")
@@ -284,22 +267,16 @@ public:
  // Health and damage management
 	void ApplyDamageToPlayer(float DamageAmount, AActor* DamageCauser = nullptr);
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (DisplayName = "Respawn Location"))
 	FVector RespawnLocation = FVector(56.0f, 0.0f, 745.0f);
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (ClampMin = "0.0", ClampMax = "10.0", DisplayName = "Respawn Delay (Seconds)"))
 	float RespawnDelay = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (ClampMin = "1", DisplayName = "Max Lives"))
 	int32 MaxLives = 3;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (DisplayName = "Remaining Lives"))
 	int32 RemainingLives = 3;
 
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "LiveWire|Health", meta = (DisplayName = "Is Game Over"))
 	bool bIsGameOver = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Health", meta = (ClampMin = "0.0", DisplayName = "Game Over Quit Delay (Seconds)"))
 	float GameOverQuitDelay = 2.5f;
 
 	UPROPERTY(BlueprintAssignable, Category = "LiveWire|Health")

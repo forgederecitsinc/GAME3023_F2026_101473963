@@ -25,47 +25,36 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 	// Controls whether the laser is currently active.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser", meta = (DisplayName = "Is Laser On"))
 	bool bIsLaserOn = true;
 
 	// Controls whether this hazard blocks the player's movement.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser", meta = (DisplayName = "Block Player Movement"))
 	bool bBlockPlayer = false;
 
 	// Sets the width of the laser grid.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Dimensions", meta = (ClampMin = "50.0", UIMin = "50.0"))
 	float GridWidth = 400.0f;
 
 	// Sets the height of the laser grid.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Dimensions", meta = (ClampMin = "50.0", UIMin = "50.0"))
 	float GridHeight = 300.0f;
 
 	// Sets how many beams are placed across the grid horizontally.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Beams", meta = (ClampMin = "0", UIMin = "0"))
 	int32 NumHorizontalBeams = 5;
 
 	// Sets how many beams are placed across the grid vertically.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Beams", meta = (ClampMin = "0", UIMin = "0"))
 	int32 NumVerticalBeams = 4;
 
 	// Shows or hides the horizontal beams.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Beams")
 	bool bEnableHorizontalBeams = true;
 
 	// Shows or hides the vertical beams.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Beams")
 	bool bEnableVerticalBeams = true;
 
 	// Sets how thick each laser beam appears.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Beams", meta = (ClampMin = "1.0", UIMin = "1.0"))
 	float BeamThickness = 8.0f;
 
 	// Sets how much damage the laser deals on each damage tick.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Damage", meta = (ClampMin = "0.0", UIMin = "0.0"))
 	float DamageAmount = 25.0f;
 
 	// Sets the time between each damage tick while the player overlaps the laser.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|GridLaser|Damage", meta = (ClampMin = "0.1", UIMin = "0.1"))
 	float DamageTickInterval = 0.5f;
 
 	// Returns true while the laser is active.

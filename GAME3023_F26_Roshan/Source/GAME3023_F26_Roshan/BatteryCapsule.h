@@ -23,7 +23,6 @@ public:
 	// Runs every frame to animate an idle battery or keep its carried state stable.
 	virtual void Tick(float DeltaTime) override;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Shape", meta = (DisplayName = "Battery Shape"))
 	ELiveWireShape BatteryShape = ELiveWireShape::Circle;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -32,28 +31,20 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USphereComponent> InteractionZone;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery|Visual")
 	bool bEnableIdleAnimation = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery|Visual")
 	float RotationSpeed = 90.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery|Interaction", meta = (DisplayName = "Pickup Distance (cm)", ClampMin = "50.0"))
 	float BatteryPickupRadius = 115.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery|Visual")
 	float BobFrequency = 2.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery|Visual")
 	float BobAmplitude = 10.0f;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battery|State")
 	bool bIsCarried = false;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battery|State")
 	bool bIsSocketed = false;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battery|State")
 	FVector SpawnOrigin;
 
 	// Allows the player to collect this battery.

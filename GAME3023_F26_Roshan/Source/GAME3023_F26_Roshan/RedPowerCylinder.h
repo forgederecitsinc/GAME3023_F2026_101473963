@@ -31,58 +31,47 @@ public:
 	// Allows laser preview updates to run in editor viewports.
 	virtual bool ShouldTickIfViewportsOnly() const override;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Shape", meta = (DisplayName = "Required Battery Shape"))
 	ELiveWireShape RequiredShape = ELiveWireShape::Circle;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USceneComponent> SceneRoot;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USceneComponent> BatterySocket;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USceneComponent> LaserEmitter;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> LaserBeamMesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USphereComponent> InteractionZone;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Visuals", meta = (DisplayName = "Power Dome Blink Interval", ClampMin = "0.05", UIMin = "0.05"))
 	float PowerDomeBlinkInterval = 0.5f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Visuals", meta = (DisplayName = "Power Dome Glow Intensity", ClampMin = "1.0", UIMin = "1.0"))
 	float PowerDomeGlowIntensity = 15.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Visuals", meta = (DisplayName = "Power Dome Light Intensity", ClampMin = "0.0", UIMin = "0.0"))
 	float PowerDomeLightIntensity = 3000.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Laser", meta = (DisplayName = "Laser Max Length", ClampMin = "50.0", UIMin = "50.0"))
 	float LaserLength = 2500.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Laser", meta = (DisplayName = "Laser Thickness", ClampMin = "1.0", UIMin = "1.0"))
 	float LaserThickness = 14.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Laser", meta = (DisplayName = "Laser Stops At Obstacles"))
 	bool bLaserStopsAtObstacles = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Laser", meta = (DisplayName = "Preview Laser In Editor"))
 	bool bPreviewLaserInEditor = false;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Laser", meta = (DisplayName = "Is Matching Target Detected"))
 	bool bIsTargetDetected = false;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Laser", meta = (DisplayName = "Detected Target"))
+	UPROPERTY()
 	TObjectPtr<AActor> DetectedTarget;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cell|State")
 	bool bIsPowered = false;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cell|State")
 	bool bHasBattery = false;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cell|State")
+	UPROPERTY()
 	TObjectPtr<ABatteryCapsule> InsertedBattery;
 
 	// Updates the laser beam, target hit state, and player damage.

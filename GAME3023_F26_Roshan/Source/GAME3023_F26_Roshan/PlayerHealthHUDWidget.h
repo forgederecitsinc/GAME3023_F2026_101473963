@@ -28,25 +28,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Player Health HUD")
 	void UpdateLives(int32 NewCurrentLives, int32 NewMaxLives);
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player Health HUD")
 	float CurrentHealth = 100.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player Health HUD")
 	float MaxHealth = 100.0f;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player Health HUD")
 	float HealthPercent = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player Health HUD")
 	float HealthBarWidth = 260.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player Health HUD")
 	float HealthBarHeight = 14.0f;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player Health HUD")
 	int32 CurrentLives = 3;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player Health HUD")
 	int32 MaxLives = 3;
 
 protected:

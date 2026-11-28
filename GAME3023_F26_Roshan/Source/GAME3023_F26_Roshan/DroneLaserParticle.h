@@ -31,16 +31,12 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UPointLightComponent> ParticleLight;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Laser Particle", meta = (ExposeOnSpawn = "true"))
 	float DamageAmount = 10.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Laser Particle", meta = (ExposeOnSpawn = "true"))
 	float FallSpeed = 1400.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Laser Particle", meta = (ExposeOnSpawn = "true"))
 	FVector MoveDirection = FVector(0.0f, 0.0f, -1.0f);
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Laser Particle", meta = (ExposeOnSpawn = "true"))
 	FLinearColor ParticleColor = FLinearColor(1.0f, 0.08f, 0.08f);
 
 	// Sets the particle damage, speed, direction, and color.

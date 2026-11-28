@@ -85,13 +85,11 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (DisplayName = "Player Touch Trigger"))
 	TObjectPtr<USphereComponent> PlayerTouchTrigger;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Player Follow", meta = (DisplayName = "Follow Player Speed Bonus", ClampMin = "0.0"))
 	float FollowPlayerSpeedBonus = 70.0f;
 
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Battery Thief|Player Follow", meta = (DisplayName = "Is Following Player"))
 	bool bIsFollowingPlayer = false;
 
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Battery Thief|Player Follow", meta = (DisplayName = "Target Player"))
+	UPROPERTY()
 	TObjectPtr<APawn> TargetPlayerPawn = nullptr;
 
 	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Player Follow")
@@ -106,13 +104,10 @@ public:
  // IsFollowingPlayer: is following player
 	bool IsFollowingPlayer() const { return bIsFollowingPlayer; }
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Health & Death", meta = (DisplayName = "Max Health", ClampMin = "1.0"))
 	float MaxHealth = 50.0f;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Battery Thief|Health & Death", meta = (DisplayName = "Current Health"))
 	float CurrentHealth = 50.0f;
 
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Battery Thief|Health & Death")
 	bool bIsDead = false;
 
 	UFUNCTION(BlueprintCallable, Category = "Battery Thief|Health & Death")
@@ -123,88 +118,61 @@ public:
  // KillPermanently: kill permanently
 	void KillPermanently();
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Spawn Location"))
 	FVector SpawnLocation = FVector(-878.0f, -3679.0f, 10.0f);
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Spawn Rotation"))
 	FRotator SpawnRotation = FRotator::ZeroRotator;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Spawning", meta = (DisplayName = "Use Target Spawn Location"))
 	bool bSnapToSpawnLocationOnStart = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Working Battery Detection Radius", ClampMin = "100.0"))
 	float BatteryDetectionRadius = 10000.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Battery Removal Reach Distance", ClampMin = "50.0"))
 	float RemovalInteractionDistance = 230.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Battery Removal Duration (Seconds)", ClampMin = "0.5"))
 	float BatteryRemovalDuration = 10.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Battery Drop Spot Class"))
+	UPROPERTY()
 	TSubclassOf<AActor> BatteryDropSpotClass;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Drop-Off Reach Distance", ClampMin = "20.0"))
 	float DropOffAcceptanceRadius = 75.0f;
 
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Current Thief State"))
 	EBatteryThiefState CurrentState = EBatteryThiefState::Patrolling;
 
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Target Powered Laser"))
+	UPROPERTY()
 	TObjectPtr<ARedPowerCylinder> TargetLaserCylinder = nullptr;
 
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Target Drop Spot Actor"))
+	UPROPERTY()
 	TObjectPtr<AActor> TargetDropSpotActor = nullptr;
 
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Removal Time Remaining"))
 	float RemovalTimerRemaining = 0.0f;
 
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Battery Thief|Sabotage & Removal", meta = (DisplayName = "Stolen Battery"))
+	UPROPERTY()
 	TObjectPtr<ABatteryCapsule> StolenBattery = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Patrol & Movement", meta = (DisplayName = "Ground Patrol Speed", ClampMin = "10.0"))
 	float PatrolSpeed = 300.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Patrol & Movement", meta = (DisplayName = "Carry Movement Speed", ClampMin = "10.0"))
 	float CarrySpeed = 300.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Patrol & Movement", meta = (DisplayName = "Turn Interpolation Speed", ClampMin = "0.5"))
 	float TurnSpeed = 8.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Patrol & Movement", meta = (DisplayName = "Ground Height Offset"))
 	float GroundHeightOffset = 0.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Patrol & Movement", meta = (DisplayName = "Max Ground Step Height", ClampMin = "5.0", ClampMax = "80.0"))
-	float MaxGroundStepHeight = 40.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Patrol & Movement", meta = (DisplayName = "Ground Obstacle Collision Radius", ClampMin = "8.0", ClampMax = "60.0"))
-	float GroundCollisionRadius = 20.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Patrol & Movement", meta = (DisplayName = "NavMesh Patrol Radius", ClampMin = "100.0"))
 	float PatrolRadius = 4500.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Patrol & Movement", meta = (DisplayName = "Waypoint Acceptance Radius", ClampMin = "10.0"))
 	float AcceptanceRadius = 35.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Patrol & Movement", meta = (DisplayName = "Patrol Point Wait Time (Seconds)", ClampMin = "0.0"))
 	float PatrolPointWaitTime = 0.6f;
 
-	UPROPERTY(EditInstanceOnly, BlueprintReadWrite, Category = "Battery Thief|Patrol & Movement", meta = (DisplayName = "Custom Patrol Waypoints (Optional)"))
+	UPROPERTY()
 	TArray<TObjectPtr<AActor>> CustomPatrolWaypoints;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Scanner Light", meta = (DisplayName = "Patrol Scanner Light Color"))
 	FLinearColor ScannerLightColor = FLinearColor(1.0f, 0.35f, 0.05f);
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Scanner Light", meta = (DisplayName = "Target Locked / Removing Light Color"))
 	FLinearColor AlertLightColor = FLinearColor(1.0f, 0.05f, 0.05f);
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Scanner Light", meta = (DisplayName = "Scanner Light Intensity", ClampMin = "0.0"))
 	float ScannerLightIntensity = 12000.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Scanner Light", meta = (DisplayName = "Scanner Light Range", ClampMin = "50.0"))
 	float ScannerLightRange = 800.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battery Thief|Scanner Light", meta = (DisplayName = "Scanner Outer Cone Angle", ClampMin = "1.0", ClampMax = "80.0"))
 	float ScannerOuterConeAngle = 28.0f;
 
 	UFUNCTION(BlueprintCallable, Category = "Battery Thief")
