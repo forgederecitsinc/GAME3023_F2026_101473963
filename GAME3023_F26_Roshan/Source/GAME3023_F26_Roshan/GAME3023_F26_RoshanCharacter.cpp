@@ -99,8 +99,6 @@ void AGAME3023_F26_RoshanCharacter::BeginPlay()
 
 	ApplyCinematicCameraSettings();
 
-	SmoothedOcclusionTargetPos = GetActorLocation() + FVector(0.0f, 0.0f, 35.0f);
-
 	if (GetMesh())
 	{
 		GetMesh()->SetRenderCustomDepth(true);
@@ -171,22 +169,6 @@ void AGAME3023_F26_RoshanCharacter::EndPlay(const EEndPlayReason::Type EndPlayRe
 		HealthHUDWidget = nullptr;
 	}
 
-	for (auto& Pair : ActiveOccludingMeshes)
-	{
-		if (UPrimitiveComponent* Comp = Pair.Key)
-		{
-			const TArray<TObjectPtr<UMaterialInterface>>& OrigMats = Pair.Value.OriginalMaterials;
-			for (int32 i = 0; i < OrigMats.Num(); ++i)
-			{
-				if (OrigMats[i])
-				{
-					Comp->SetMaterial(i, OrigMats[i]);
-				}
-			}
-		}
-	}
-	ActiveOccludingMeshes.Empty();
-
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(RespawnTimerHandle);
@@ -195,250 +177,14 @@ void AGAME3023_F26_RoshanCharacter::EndPlay(const EEndPlayReason::Type EndPlayRe
 	Super::EndPlay(EndPlayReason);
 }
 
-// Tick: updates camera occlusion, aiming, hold interactions, and controller feedback.
+// Tick: updates interaction prompt each frame.
 void AGAME3023_F26_RoshanCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (bEnableDualSenseController)
-	{
-		UpdateDualSenseControls(DeltaTime);
-	}
-
-	UpdateCameraOcclusionCutout(DeltaTime);
-
 	if (bShowInteractionWidget && IsLocallyControlled())
 	{
 		UpdateInteractionPrompt(DeltaTime);
-	}
-
-	bMovedViaEnhancedInputThisFrame = false;
-}
-
-// UpdateDualSenseControls: handles update dual sense controls
-void AGAME3023_F26_RoshanCharacter::UpdateDualSenseControls(float DeltaTime)
-{
-	APlayerController* PC = Cast<APlayerController>(GetController());
-	if (!PC)
-	{
-		return;
-	}
-
-	if (!bMovedViaEnhancedInputThisFrame)
-	{
-		float StickX = PC->GetInputAnalogKeyState(EKeys::Gamepad_LeftX);
-		float StickY = PC->GetInputAnalogKeyState(EKeys::Gamepad_LeftY);
-
-		if (PC->IsInputKeyDown(EKeys::Gamepad_DPad_Right)) StickX += 1.0f;
-		if (PC->IsInputKeyDown(EKeys::Gamepad_DPad_Left))  StickX -= 1.0f;
-		if (PC->IsInputKeyDown(EKeys::Gamepad_DPad_Up))    StickY += 1.0f;
-		if (PC->IsInputKeyDown(EKeys::Gamepad_DPad_Down))  StickY -= 1.0f;
-
-		FVector2D StickVec(StickX, StickY);
-		if (StickVec.Size() > ControllerStickDeadZone)
-		{
-			if (StickVec.SizeSquared() > 1.0f)
-			{
-				StickVec.Normalize();
-			}
-			DoMove(StickVec.X, StickVec.Y);
-		}
-	}
-
-	if (!bEnableRightStickAiming)
-	{
-		return;
-	}
-
-	const float RightX = PC->GetInputAnalogKeyState(EKeys::Gamepad_RightX);
-	const float RawRightY = PC->GetInputAnalogKeyState(EKeys::Gamepad_RightY);
-	const FVector2D AimVec(RightX, bInvertRightStickAimY ? -RawRightY : RawRightY);
-
-	if (AimVec.Size() <= ControllerStickDeadZone)
-	{
-		if (GetCharacterMovement() && !GetCharacterMovement()->bOrientRotationToMovement)
-		{
-			GetCharacterMovement()->bOrientRotationToMovement = true;
-		}
-		return;
-	}
-
-	const FRotator CamYawRot(0.0f, CameraYaw, 0.0f);
-	const FVector AimWorldDir =
-		FRotationMatrix(CamYawRot).GetUnitAxis(EAxis::X) * AimVec.Y +
-		FRotationMatrix(CamYawRot).GetUnitAxis(EAxis::Y) * AimVec.X;
-
-	if (!AimWorldDir.IsNearlyZero())
-	{
-		if (GetCharacterMovement())
-		{
-			GetCharacterMovement()->bOrientRotationToMovement = false;
-		}
-		const FRotator TargetRot(0.0f, AimWorldDir.Rotation().Yaw, 0.0f);
-		SetActorRotation(FMath::RInterpTo(GetActorRotation(), TargetRot, DeltaTime, 15.0f));
-	}
-}
-
-// UpdateCameraOcclusionCutout: handles update camera occlusion cutout
-void AGAME3023_F26_RoshanCharacter::UpdateCameraOcclusionCutout(float DeltaTime)
-{
-	if (!bEnableOcclusionCutout || !FollowCamera || !GetWorld())
-	{
-		return;
-	}
-
-	const FVector CameraLoc = FollowCamera->GetComponentLocation();
-	const FVector PlayerTargetLoc = GetActorLocation() + FVector(0.0f, 0.0f, 35.0f);
-	SmoothedOcclusionTargetPos = FMath::VInterpTo(SmoothedOcclusionTargetPos, PlayerTargetLoc, DeltaTime, 18.0f);
-
-	for (auto& Pair : ActiveOccludingMeshes)
-	{
-		Pair.Value.bHitThisFrame = false;
-	}
-
-	TArray<FHitResult> Hits;
-	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(CameraOcclusionCutout), false, this);
-	if (CarriedBattery)
-	{
-		QueryParams.AddIgnoredActor(CarriedBattery);
-	}
-
-	FCollisionObjectQueryParams ObjectParams;
-	ObjectParams.AddObjectTypesToQuery(ECC_WorldStatic);
-	ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
-
-	const FCollisionShape SweepSphere = FCollisionShape::MakeSphere(35.0f);
-	GetWorld()->SweepMultiByObjectType(Hits, CameraLoc, PlayerTargetLoc, FQuat::Identity, ObjectParams, SweepSphere, QueryParams);
-
-	const float MinTopZ = GetActorLocation().Z + 40.0f;
-
-	for (const FHitResult& Hit : Hits)
-	{
-		UPrimitiveComponent* HitComp = Hit.GetComponent();
-		AActor* HitActor = Hit.GetActor();
-		if (!HitComp || !HitActor || HitActor == this || HitActor == CarriedBattery)
-		{
-			continue;
-		}
-		if (HitActor->IsA(ABatteryCapsule::StaticClass()) || HitActor->IsA(ARedPowerCylinder::StaticClass()))
-		{
-			continue;
-		}
-		if (HitComp->Bounds.GetBox().Max.Z < MinTopZ)
-		{
-			continue;
-		}
-
-		AcquireOccludingMesh(HitComp);
-	}
-
-	FadeOccludingMeshes(DeltaTime, CameraLoc);
-}
-
-// AcquireOccludingMesh: handles acquire occluding mesh
-void AGAME3023_F26_RoshanCharacter::AcquireOccludingMesh(UPrimitiveComponent* Comp)
-{
-	if (FOccludingMeshData* ExistingData = ActiveOccludingMeshes.Find(Comp))
-	{
-		ExistingData->bHitThisFrame = true;
-		return;
-	}
-
-	FOccludingMeshData NewData;
-	NewData.CurrentAlpha = 0.0f;
-	NewData.bHitThisFrame = true;
-
-	const int32 NumMats = Comp->GetNumMaterials();
-	NewData.OriginalMaterials.Reserve(NumMats);
-	NewData.CutoutMIDs.Reserve(NumMats);
-
-	for (int32 MatIdx = 0; MatIdx < NumMats; ++MatIdx)
-	{
-		UMaterialInterface* OrigMat = Comp->GetMaterial(MatIdx);
-		NewData.OriginalMaterials.Add(OrigMat);
-
-		UMaterialInstanceDynamic* CutoutMID = nullptr;
-		float StrengthCheck = 0.0f;
-		if (OrigMat && OrigMat->GetScalarParameterValue(FMaterialParameterInfo(TEXT("OcclusionStrength")), StrengthCheck))
-		{
-			CutoutMID = UMaterialInstanceDynamic::Create(OrigMat, this);
-			if (CutoutMID)
-			{
-				Comp->SetMaterial(MatIdx, CutoutMID);
-			}
-		}
-		NewData.CutoutMIDs.Add(CutoutMID);
-	}
-
-	ActiveOccludingMeshes.Add(Comp, MoveTemp(NewData));
-}
-
-// FadeOccludingMeshes: handles fade occluding meshes
-void AGAME3023_F26_RoshanCharacter::FadeOccludingMeshes(float DeltaTime, const FVector& CameraLoc)
-{
-	const float SafeRadius = FMath::Max(OcclusionCutoutRadius, 20.0f);
-	const float SafeSoftness = FMath::Clamp(OcclusionEdgeSoftness, 10.0f, SafeRadius * 0.9f);
-
-	for (auto It = ActiveOccludingMeshes.CreateIterator(); It; ++It)
-	{
-		UPrimitiveComponent* Comp = It.Key();
-		FOccludingMeshData& Data = It.Value();
-
-		if (!IsValid(Comp))
-		{
-			It.RemoveCurrent();
-			continue;
-		}
-
-		const float TargetAlpha = Data.bHitThisFrame ? 1.0f : 0.0f;
-		Data.CurrentAlpha = FMath::FInterpTo(Data.CurrentAlpha, TargetAlpha, DeltaTime, OcclusionFadeSpeed);
-
-		for (UMaterialInstanceDynamic* MID : Data.CutoutMIDs)
-		{
-			if (MID)
-			{
-				MID->SetVectorParameterValue(TEXT("OcclusionCameraPos"), FLinearColor(CameraLoc.X, CameraLoc.Y, CameraLoc.Z, 1.0f));
-				MID->SetVectorParameterValue(TEXT("OcclusionPlayerPos"), FLinearColor(SmoothedOcclusionTargetPos.X, SmoothedOcclusionTargetPos.Y, SmoothedOcclusionTargetPos.Z, 1.0f));
-				MID->SetScalarParameterValue(TEXT("OcclusionRadius"), SafeRadius);
-				MID->SetScalarParameterValue(TEXT("OcclusionSoftness"), SafeSoftness);
-				MID->SetScalarParameterValue(TEXT("OcclusionStrength"), Data.CurrentAlpha);
-				MID->SetScalarParameterValue(TEXT("OcclusionCenterOpacity"), OcclusionMinCenterOpacity);
-				MID->SetVectorParameterValue(TEXT("OcclusionRimColor"), OcclusionRimColor);
-				MID->SetScalarParameterValue(TEXT("OcclusionRimIntensity"), OcclusionRimIntensity);
-			}
-		}
-
-		if (!Data.bHitThisFrame && Data.CurrentAlpha <= 0.01f)
-		{
-			for (int32 MatIdx = 0; MatIdx < Data.OriginalMaterials.Num(); ++MatIdx)
-			{
-				if (Data.OriginalMaterials[MatIdx])
-				{
-					Comp->SetMaterial(MatIdx, Data.OriginalMaterials[MatIdx]);
-				}
-			}
-			It.RemoveCurrent();
-		}
-	}
-}
-
-// TriggerControllerRumble: handles trigger controller rumble
-void AGAME3023_F26_RoshanCharacter::TriggerControllerRumble(float Intensity, float Duration, bool bHeavyLeft, bool bLightRight)
-{
-	if (!bEnableControllerVibration) return;
-
-	if (APlayerController* PC = Cast<APlayerController>(GetController()))
-	{
-		const float FinalIntensity = FMath::Clamp(Intensity * VibrationIntensity, 0.0f, 1.0f);
-		PC->PlayDynamicForceFeedback(
-			FinalIntensity,
-			Duration,
-			bHeavyLeft,
-			bLightRight,
-			bHeavyLeft,
-			bLightRight,
-			EDynamicForceFeedbackAction::Start
-		);
 	}
 }
 
@@ -556,8 +302,6 @@ void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* P
 		if (InteractAction)
 		{
 			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
-			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Completed, this, &AGAME3023_F26_RoshanCharacter::DoInteractRelease);
-			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Canceled, this, &AGAME3023_F26_RoshanCharacter::DoInteractRelease);
 		}
 
 		if (DropAction)
@@ -571,12 +315,10 @@ void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* P
 	}
 
 	PlayerInputComponent->BindKey(EKeys::E, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
-	PlayerInputComponent->BindKey(EKeys::E, IE_Released, this, &AGAME3023_F26_RoshanCharacter::DoInteractRelease);
 	PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
 	PlayerInputComponent->BindKey(EKeys::Q, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
 
 	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Left, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoInteract);
-	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Left, IE_Released, this, &AGAME3023_F26_RoshanCharacter::DoInteractRelease);
 
 	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Right, IE_Pressed, this, &AGAME3023_F26_RoshanCharacter::DoDropBattery);
 }
@@ -585,7 +327,6 @@ void AGAME3023_F26_RoshanCharacter::SetupPlayerInputComponent(UInputComponent* P
 void AGAME3023_F26_RoshanCharacter::Move(const FInputActionValue& Value)
 {
 	FVector2D MovementVector = Value.Get<FVector2D>();
-	bMovedViaEnhancedInputThisFrame = true;
 	DoMove(MovementVector.X, MovementVector.Y);
 }
 
@@ -650,37 +391,17 @@ bool AGAME3023_F26_RoshanCharacter::InteractWithCylinder(ARedPowerCylinder* Cyli
 		return false;
 	}
 
-	if (!Cylinder->bHasBattery && HasBattery())
-	{
-		bIsHoldingToAttach = true;
-		HoldingTargetCylinder = Cylinder;
-		CurrentAttachHoldTime = 0.0f;
-		HoldRumblePulseTimer = 0.0f;
-		TriggerControllerRumble(0.25f, 0.08f, false, true);
-		return true;
-	}
-
-	ResetBatteryAttachHold();
-	if (Cylinder->bHasBattery)
-	{
-		bRequireFreshPressForHold = true;
-	}
 	Cylinder->Interact(this);
 	return true;
 }
 
-// DoInteract: starts an pickup or cylinder interaction when the interact key is pressed.
+// DoInteract: starts a pickup or cylinder interaction when the interact key is pressed.
 void AGAME3023_F26_RoshanCharacter::DoInteract()
 {
-	if (bIsDead || LastInteractPressFrame == GFrameCounter)
+	if (bIsDead)
 	{
 		return;
 	}
-	LastInteractPressFrame = GFrameCounter;
-
-	bEnhancedInteractHeld = true;
-	bRawInteractKeyHeld = true;
-	bRequireFreshPressForHold = false;
 
 	if (CurrentInteractable)
 	{
@@ -691,8 +412,6 @@ void AGAME3023_F26_RoshanCharacter::DoInteract()
 		}
 		if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(CurrentInteractable))
 		{
-			ResetBatteryAttachHold();
-			bRequireFreshPressForHold = true;
 			Battery->Interact(this);
 			return;
 		}
@@ -736,64 +455,11 @@ void AGAME3023_F26_RoshanCharacter::DoInteract()
 				if (FVector::DistSquared2D(TraceStart, BatteryLoc) <= FMath::Square(Battery->BatteryPickupRadius) &&
 					FMath::Abs(TraceStart.Z - BatteryLoc.Z) <= 160.0f)
 				{
-					ResetBatteryAttachHold();
-					bRequireFreshPressForHold = true;
 					Battery->Interact(this);
 					return;
 				}
 			}
 		}
-	}
-}
-
-// DoInteractRelease: stops the held interaction and resets its progress.
-void AGAME3023_F26_RoshanCharacter::DoInteractRelease()
-{
-	bEnhancedInteractHeld = false;
-	bRawInteractKeyHeld = false;
-	bRequireFreshPressForHold = false;
-	ResetBatteryAttachHold();
-}
-
-// Handles IsInteractInputHeld interaction logic
-bool AGAME3023_F26_RoshanCharacter::IsInteractInputHeld() const
-{
-	if (const APlayerController* PC = Cast<APlayerController>(GetController()))
-	{
-		const bool bDirectKeyDown =
-			PC->IsInputKeyDown(EKeys::Gamepad_FaceButton_Left) ||
-			PC->IsInputKeyDown(EKeys::E);
-
-		if (bDirectKeyDown)
-		{
-			return true;
-		}
-	}
-
-	return bEnhancedInteractHeld || bRawInteractKeyHeld;
-}
-
-// GetBatteryAttachHoldProgress: manages battery attachment and state
-float AGAME3023_F26_RoshanCharacter::GetBatteryAttachHoldProgress() const
-{
-	if (!bIsHoldingToAttach || BatteryAttachHoldDuration <= 0.0f)
-	{
-		return 0.0f;
-	}
-	return FMath::Clamp(CurrentAttachHoldTime / BatteryAttachHoldDuration, 0.0f, 1.0f);
-}
-
-// Clears hold interaction timer and hides progress ring
-void AGAME3023_F26_RoshanCharacter::ResetBatteryAttachHold()
-{
-	bIsHoldingToAttach = false;
-	CurrentAttachHoldTime = 0.0f;
-	HoldingTargetCylinder = nullptr;
-	HoldRumblePulseTimer = 0.0f;
-
-	if (InteractionPromptWidget)
-	{
-		InteractionPromptWidget->SetHoldProgress(0.0f);
 	}
 }
 
@@ -814,8 +480,6 @@ bool AGAME3023_F26_RoshanCharacter::TryPickupBattery(ABatteryCapsule* Battery)
 
 	if (HasBattery())
 	{
-		TriggerControllerRumble(0.8f, 0.15f, true, false);
-
 		UE_LOG(LogGAME3023_F26_Roshan, Warning, TEXT("[Live Wire] Inventory Full! Player is already carrying a Battery Capsule."));
 
 		if (GEngine)
@@ -835,8 +499,6 @@ bool AGAME3023_F26_RoshanCharacter::TryPickupBattery(ABatteryCapsule* Battery)
 
 	CarriedBattery = Battery;
 	Battery->OnCollected(this);
-
-	TriggerControllerRumble(0.5f, 0.18f, false, true);
 
 	if (CurrentInteractable == Battery)
 	{
@@ -885,8 +547,6 @@ void AGAME3023_F26_RoshanCharacter::DoDropBattery()
 ABatteryCapsule* AGAME3023_F26_RoshanCharacter::DropCurrentBattery()
 {
 	if (!HasBattery()) return nullptr;
-
-	ResetBatteryAttachHold();
 
 	ABatteryCapsule* Dropped = CarriedBattery;
 	CarriedBattery = nullptr;
@@ -1078,73 +738,6 @@ AActor* AGAME3023_F26_RoshanCharacter::FindBestInteractable()
 	return BestCandidate;
 }
 
-// UpdateCylinderHoldPrompt: updates UI display and widget visibility
-void AGAME3023_F26_RoshanCharacter::UpdateCylinderHoldPrompt(ARedPowerCylinder* Cylinder, float DeltaTime, bool bInputHeld, FString& OutAction, FString& OutTarget)
-{
-	if (Cylinder->bHasBattery)
-	{
-		ResetBatteryAttachHold();
-		InteractionPromptWidget->SetHoldProgress(0.0f);
-		OutAction = TEXT("Press Square to Collect Battery");
-		OutTarget = TEXT("Laser Gun - Online");
-		return;
-	}
-
-	if (!HasBattery())
-	{
-		ResetBatteryAttachHold();
-		InteractionPromptWidget->SetHoldProgress(0.0f);
-		OutAction = TEXT("Laser Gun (Requires Battery)");
-		OutTarget = TEXT("Laser Gun - Offline");
-		return;
-	}
-
-	if (!bInputHeld || bRequireFreshPressForHold || bIsDead)
-	{
-		ResetBatteryAttachHold();
-		InteractionPromptWidget->SetHoldProgress(0.0f);
-		OutAction = FString::Printf(TEXT("Hold Square (%.0fs) to Attach Battery"), FMath::Max(BatteryAttachHoldDuration, 0.5f));
-		OutTarget = TEXT("Laser Gun - Ready");
-		return;
-	}
-
-	if (!bIsHoldingToAttach || HoldingTargetCylinder != Cylinder)
-	{
-		bIsHoldingToAttach = true;
-		HoldingTargetCylinder = Cylinder;
-		CurrentAttachHoldTime = 0.0f;
-		HoldRumblePulseTimer = 0.0f;
-	}
-
-	CurrentAttachHoldTime += DeltaTime;
-	HoldRumblePulseTimer += DeltaTime;
-
-	const float SafeHoldDuration = FMath::Max(BatteryAttachHoldDuration, 0.5f);
-	const float Progress = FMath::Clamp(CurrentAttachHoldTime / SafeHoldDuration, 0.0f, 1.0f);
-	InteractionPromptWidget->SetHoldProgress(Progress);
-
-	if (HoldRumblePulseTimer >= 0.25f)
-	{
-		HoldRumblePulseTimer = 0.0f;
-		TriggerControllerRumble(0.15f + 0.35f * Progress, 0.06f, false, true);
-	}
-
-	if (CurrentAttachHoldTime >= SafeHoldDuration)
-	{
-		ResetBatteryAttachHold();
-		bRequireFreshPressForHold = true;
-		TriggerControllerRumble(0.85f, 0.25f, true, true);
-		Cylinder->Interact(this);
-
-		OutAction = TEXT("Press Square to Collect Battery");
-		OutTarget = TEXT("Laser Gun - Online");
-		return;
-	}
-
-	OutAction = FString::Printf(TEXT("Attaching Battery... %.1fs / %.0fs"), CurrentAttachHoldTime, SafeHoldDuration);
-	OutTarget = TEXT("Laser Gun - Charging");
-}
-
 // Handles UpdateInteractionPrompt interaction logic
 void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
 {
@@ -1157,17 +750,9 @@ void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
 		}
 	}
 
-	const bool bInputCurrentlyHeld = IsInteractInputHeld();
-	if (!bInputCurrentlyHeld)
-	{
-		bRequireFreshPressForHold = false;
-		ResetBatteryAttachHold();
-	}
-
 	AActor* BestCandidate = FindBestInteractable();
 	if (!BestCandidate)
 	{
-		ResetBatteryAttachHold();
 		CurrentInteractable = nullptr;
 		InteractionPromptWidget->HidePrompt();
 		return;
@@ -1179,10 +764,8 @@ void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
 	FString ActionStr = TEXT("Press Square to Interact");
 	FString TargetStr;
 
-	if (ABatteryCapsule* Battery = Cast<ABatteryCapsule>(BestCandidate))
+	if (Cast<ABatteryCapsule>(BestCandidate))
 	{
-		ResetBatteryAttachHold();
-		InteractionPromptWidget->SetHoldProgress(0.0f);
 		ActionStr = HasBattery()
 			? TEXT("Hands Full (Drop Battery First)")
 			: TEXT("Press Square to Collect Battery");
@@ -1190,7 +773,21 @@ void AGAME3023_F26_RoshanCharacter::UpdateInteractionPrompt(float DeltaTime)
 	}
 	else if (ARedPowerCylinder* Cylinder = Cast<ARedPowerCylinder>(BestCandidate))
 	{
-		UpdateCylinderHoldPrompt(Cylinder, DeltaTime, bInputCurrentlyHeld, ActionStr, TargetStr);
+		if (Cylinder->bHasBattery)
+		{
+			ActionStr = TEXT("Press Square to Collect Battery");
+			TargetStr = TEXT("Laser Gun - Online");
+		}
+		else if (HasBattery())
+		{
+			ActionStr = TEXT("Press Square to Attach Battery");
+			TargetStr = TEXT("Laser Gun - Ready");
+		}
+		else
+		{
+			ActionStr = TEXT("Laser Gun (Requires Battery)");
+			TargetStr = TEXT("Laser Gun - Offline");
+		}
 	}
 
 	InteractionPromptWidget->ShowPrompt(
@@ -1298,7 +895,6 @@ void AGAME3023_F26_RoshanCharacter::ApplyDamage(float Damage, AActor* DamageCaus
 void AGAME3023_F26_RoshanCharacter::HandleDeath()
 {
 	bIsDead = true;
-	ResetBatteryAttachHold();
 	RemainingLives = FMath::Max(0, RemainingLives - 1);
 	UpdateHealthHUD();
 	UE_LOG(LogTemplateCharacter, Warning, TEXT("[LiveWire Health] Player '%s' died! Remaining lives: %d/%d"),
@@ -1315,11 +911,6 @@ void AGAME3023_F26_RoshanCharacter::HandleDeath()
 	{
 		GetCharacterMovement()->DisableMovement();
 		GetCharacterMovement()->StopMovementImmediately();
-	}
-
-	if (bEnableControllerVibration)
-	{
-		TriggerControllerRumble(1.0f, 0.5f, true, true);
 	}
 
 	if (RemainingLives <= 0)
@@ -1425,8 +1016,6 @@ void AGAME3023_F26_RoshanCharacter::RespawnPlayer()
 	UpdateHealthHUD();
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth, MaxHealth);
 
-	ResetBatteryAttachHold();
-
 	if (UWorld* World = GetWorld())
 	{
 		TArray<AActor*> FoundDrones;
@@ -1463,8 +1052,6 @@ void AGAME3023_F26_RoshanCharacter::RespawnPlayer()
 		MoveComp->Velocity = FVector::ZeroVector;
 		MoveComp->SetMovementMode(MOVE_Walking);
 	}
-
-	SmoothedOcclusionTargetPos = RespawnLocation + FVector(0.0f, 0.0f, 35.0f);
 
 	UE_LOG(LogTemplateCharacter, Log, TEXT("[LiveWire Health] Player '%s' respawned at %s with full health (%.0f HP)!"),
 		*GetNameSafe(this), *RespawnLocation.ToString(), CurrentHealth);
@@ -1515,11 +1102,6 @@ void AGAME3023_F26_RoshanCharacter::ApplyDamageToPlayer(float DamageAmount, AAct
 	ApplyHealthChange(CurrentHealth - DamageAmount);
 	UE_LOG(LogTemplateCharacter, Log, TEXT("[LiveWire Health] Player took %.1f damage from '%s'. Health: %.1f / %.1f"),
 		DamageAmount, *GetNameSafe(DamageCauser), CurrentHealth, MaxHealth);
-
-	if (bEnableControllerVibration)
-	{
-		TriggerControllerRumble(0.75f, 0.2f, true, false);
-	}
 
 	if (CurrentHealth <= 0.0f)
 	{

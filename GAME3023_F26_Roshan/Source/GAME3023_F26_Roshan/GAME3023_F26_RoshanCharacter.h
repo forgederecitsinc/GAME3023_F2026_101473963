@@ -16,27 +16,6 @@ class UCameraComponent;
 class UInputAction;
 struct FInputActionValue;
 class ABatteryCapsule;
-class UMaterialInterface;
-class UMaterialInstanceDynamic;
-class UMaterial;
-class UPrimitiveComponent;
-
-USTRUCT()
-struct FOccludingMeshData
-{
-	GENERATED_BODY()
-
-	UPROPERTY()
-	TArray<TObjectPtr<UMaterialInterface>> OriginalMaterials;
-
-	UPROPERTY()
-	TArray<TObjectPtr<UMaterialInstanceDynamic>> CutoutMIDs;
-
-	float CurrentAlpha = 0.0f;
-
-	bool bHitThisFrame = false;
-};
-
 class UInteractPromptWidget;
 class UPlayerHealthHUDWidget;
 class USoundBase;
@@ -108,52 +87,6 @@ public:
  // ApplyCinematicCameraSettings: apply cinematic camera settings
 	void ApplyCinematicCameraSettings();
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller")
-	bool bEnableDualSenseController = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller", meta = (ClampMin = "0.05", ClampMax = "0.9"))
-	float ControllerStickDeadZone = 0.2f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller")
-	float GamepadLookSensitivity = 1.5f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller")
-	bool bEnableRightStickAiming = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller")
-	bool bInvertRightStickAimY = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller")
-	bool bEnableControllerVibration = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DualSense Controller", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float VibrationIntensity = 0.75f;
-
-	UFUNCTION(BlueprintCallable, Category = "DualSense Controller")
- // TriggerControllerRumble: trigger controller rumble
-	void TriggerControllerRumble(float Intensity = 0.6f, float Duration = 0.2f, bool bHeavyLeft = true, bool bLightRight = true);
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)")
-	bool bEnableOcclusionCutout = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)", meta = (ClampMin = "50.0", ClampMax = "1000.0"))
-	float OcclusionCutoutRadius = 260.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)", meta = (ClampMin = "10.0", ClampMax = "600.0"))
-	float OcclusionEdgeSoftness = 140.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)", meta = (ClampMin = "1.0", ClampMax = "30.0"))
-	float OcclusionFadeSpeed = 6.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)", meta = (ClampMin = "0.0", ClampMax = "0.8"))
-	float OcclusionMinCenterOpacity = 0.05f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)")
-	FLinearColor OcclusionRimColor = FLinearColor(0.0f, 0.75f, 1.0f, 1.0f);
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Occlusion Cutout (See-Through)", meta = (ClampMin = "0.0", ClampMax = "10.0"))
-	float OcclusionRimIntensity = 1.2f;
-
  // AddControllerYawInput: add controller yaw input
 	virtual void AddControllerYawInput(float Val) override;
  // AddControllerPitchInput: add controller pitch input
@@ -181,16 +114,6 @@ protected:
  // Editor property change callback
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
-
-	bool bMovedViaEnhancedInputThisFrame = false;
-
-	FVector SmoothedOcclusionTargetPos = FVector::ZeroVector;
-
-	UPROPERTY(Transient)
-	TMap<TObjectPtr<UPrimitiveComponent>, FOccludingMeshData> ActiveOccludingMeshes;
-
- // UpdateCameraOcclusionCutout: update camera occlusion cutout
-	void UpdateCameraOcclusionCutout(float DeltaTime);
 
  // Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -231,20 +154,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Interaction")
  // Handles DoInteract interaction
 	virtual void DoInteract();
-
-	UFUNCTION(BlueprintCallable, Category="Interaction")
- // Handles DoInteractRelease interaction
-	virtual void DoInteractRelease();
-
-	UFUNCTION(BlueprintPure, Category="Interaction")
- // Battery state and handling
-	float GetBatteryAttachHoldProgress() const;
-
- // Handles IsInteractInputHeld interaction
-	bool IsInteractInputHeld() const;
-
- // Battery state and handling
-	void ResetBatteryAttachHold();
 
 	UFUNCTION(BlueprintCallable, Category="Inventory")
  // Battery state and handling
@@ -297,28 +206,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "LiveWire|Interaction UI")
  // Handles UpdateInteractionPrompt interaction
 	void UpdateInteractionPrompt(float DeltaTime);
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Interaction UI", meta = (ClampMin = "0.5", DisplayName = "Battery Attach Hold Duration (Seconds)"))
-	float BatteryAttachHoldDuration = 5.0f;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Interaction UI", meta = (DisplayName = "Current Attach Hold Time"))
-	float CurrentAttachHoldTime = 0.0f;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LiveWire|Interaction UI", meta = (DisplayName = "Is Holding To Attach Battery"))
-	bool bIsHoldingToAttach = false;
-
-protected:
-	UPROPERTY(Transient)
-	TObjectPtr<class ARedPowerCylinder> HoldingTargetCylinder = nullptr;
-
-	bool bEnhancedInteractHeld = false;
-	bool bRawInteractKeyHeld = false;
-
-	bool bRequireFreshPressForHold = false;
-
-	uint64 LastInteractPressFrame = 0;
-
-	float HoldRumblePulseTimer = 0.0f;
 
 public:
 
@@ -461,18 +348,10 @@ public:
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 
 private:
- // UpdateDualSenseControls: update dual sense controls
-	void UpdateDualSenseControls(float DeltaTime);
- // AcquireOccludingMesh: acquire occluding mesh
-	void AcquireOccludingMesh(class UPrimitiveComponent* Comp);
- // FadeOccludingMeshes: fade occluding meshes
-	void FadeOccludingMeshes(float DeltaTime, const FVector& CameraLoc);
  // Handles InteractWithCylinder interaction
 	bool InteractWithCylinder(class ARedPowerCylinder* Cylinder);
  // Handles FindBestInteractable interaction
 	AActor* FindBestInteractable();
- // UpdateCylinderHoldPrompt: update cylinder hold prompt
-	void UpdateCylinderHoldPrompt(class ARedPowerCylinder* Cylinder, float DeltaTime, bool bInputHeld, FString& OutAction, FString& OutTarget);
  // Health and damage management
 	void ApplyHealthChange(float NewHealth);
 };

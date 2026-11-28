@@ -513,7 +513,6 @@ bool ARedPowerCylinder::Interact(AGAME3023_F26_RoshanCharacter* Player)
 	}
 
 	const bool bMatched = InsertBattery(Player->TakeCarriedBattery());
-	Player->TriggerControllerRumble(bMatched ? 1.0f : 0.6f, bMatched ? 0.35f : 0.15f, true, bMatched);
 	return bMatched;
 }
 
