@@ -552,20 +552,20 @@ ABatteryCapsule* AGAME3023_F26_RoshanCharacter::DropCurrentBattery()
 	ABatteryCapsule* Dropped = CarriedBattery;
 	CarriedBattery = nullptr;
 
-	const FVector ForwardOffset = GetActorForwardVector() * 120.0f;
-	FVector DropLocation = GetActorLocation() + ForwardOffset;
+	const FVector ForwardOffset = GetActorForwardVector() * 120.0f; // Drop the battery a bit in front of the player
+	FVector DropLocation = GetActorLocation() + ForwardOffset; // Initial drop location in front of the player
 
-	FHitResult FloorHit;
-	FCollisionQueryParams TraceParams;
-	TraceParams.AddIgnoredActor(this);
-	TraceParams.AddIgnoredActor(Dropped);
+	FHitResult FloorHit; // Variable to store the result of the line trace
+	FCollisionQueryParams TraceParams; // Set up collision query parameters
+	TraceParams.AddIgnoredActor(this); // Ignore the player character in the trace
+	TraceParams.AddIgnoredActor(Dropped); // Ignore the battery being dropped in the trace
 
-	if (GetWorld()->LineTraceSingleByChannel(FloorHit, DropLocation + FVector(0.f, 0.f, 50.f), DropLocation - FVector(0.f, 0.f, 300.f), ECC_WorldStatic, TraceParams))
+	if (GetWorld()->LineTraceSingleByChannel(FloorHit, DropLocation + FVector(0.f, 0.f, 50.f), DropLocation - FVector(0.f, 0.f, 300.f), ECC_WorldStatic, TraceParams)) //drop the battery onto the ground if there is a floor below the player
 	{
-		DropLocation.Z = FloorHit.ImpactPoint.Z + 45.0f;
+		DropLocation.Z = FloorHit.ImpactPoint.Z + 45.0f; // Adjust the drop location to be slightly above the floor to avoid clipping
 	}
 
-	Dropped->OnDropped(DropLocation);
+	Dropped->OnDropped(DropLocation); // Call the OnDropped function of the battery to handle its drop logic
 
 	if (GEngine)
 	{

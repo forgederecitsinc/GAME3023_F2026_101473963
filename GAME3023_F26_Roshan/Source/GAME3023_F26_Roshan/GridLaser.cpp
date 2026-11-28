@@ -189,9 +189,9 @@ void AGridLaser::DealLaserDamage(AActor* TargetActor)
 	// If the target is the player, apply the configured laser damage.
 	if (AGAME3023_F26_RoshanCharacter* PlayerChar = LiveWireUtils::ResolveActorOrParent<AGAME3023_F26_RoshanCharacter>(TargetActor))
 	{
-		if (!PlayerChar->IsDead())
+		if (!PlayerChar->IsDead())//if the player is not dead, apply damage
 		{
-			PlayerChar->ApplyDamageToPlayer(DamageAmount, this);
+			PlayerChar->ApplyDamageToPlayer(DamageAmount, this); //this is the laser grid that is dealing damage
 		}
 		return;
 	}
@@ -199,7 +199,7 @@ void AGridLaser::DealLaserDamage(AActor* TargetActor)
 	// Battery thieves are destroyed immediately when hit by the laser.
 	if (AEnemyBatteryThief* Thief = LiveWireUtils::ResolveActorOrParent<AEnemyBatteryThief>(TargetActor))
 	{
-		if (!Thief->bIsDead)
+		if (!Thief->bIsDead) //if the thief is not dead, kill it permanently
 		{
 			Thief->KillPermanently();
 		}

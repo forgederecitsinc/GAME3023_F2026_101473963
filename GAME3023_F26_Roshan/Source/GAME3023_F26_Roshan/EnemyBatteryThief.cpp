@@ -255,7 +255,7 @@ void AEnemyBatteryThief::KillBatteryThief()
 	Destroy();
 }
 
-// KillPermanently: destroys the thief immediately after a fatal effect or laser hit.
+// KillPermanently: destroys the thief immediately.
 void AEnemyBatteryThief::KillPermanently()
 {
 	if (bIsDead)

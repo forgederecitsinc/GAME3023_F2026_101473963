@@ -52,10 +52,10 @@ public:
 	float BeamThickness = 8.0f;
 
 	// Sets how much damage the laser deals on each damage tick.
-	float DamageAmount = 25.0f;
+	float DamageAmount = 5.0f;
 
 	// Sets the time between each damage tick while the player overlaps the laser.
-	float DamageTickInterval = 0.5f;
+	float DamageTickInterval = 1.0f;
 
 	// Returns true while the laser is active.
 	UFUNCTION(BlueprintPure, Category = "LiveWire|GridLaser")

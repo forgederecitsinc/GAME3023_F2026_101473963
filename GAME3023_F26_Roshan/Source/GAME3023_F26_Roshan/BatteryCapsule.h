@@ -34,7 +34,7 @@ public:
 
 	bool bEnableIdleAnimation = true;
 
-	float RotationSpeed = 90.0f;
+	float RotationSpeed = 120.0f;
 
 	float BatteryPickupRadius = 115.0f;
 
@@ -84,7 +84,7 @@ protected:
 	void OnInteractionEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 private:
-	// Enables or disables collision while the battery is attached or carried.
+	// Enables or disables collision while the battery is carried.
 	void SetAttachmentCollisionEnabled(bool bEnabled);
 
 	// Moves the battery to a world location after it is dropped.

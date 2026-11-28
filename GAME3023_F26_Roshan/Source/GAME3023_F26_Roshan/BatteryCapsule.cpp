@@ -163,7 +163,7 @@ void ABatteryCapsule::OnSocketed(AActor* SocketActor, USceneComponent* AttachTar
 	SetActorRelativeLocation(FVector::ZeroVector);
 	SetActorRelativeRotation(FRotator::ZeroRotator);
 	SetActorRelativeScale3D(FVector(0.45f));
-	SetAttachmentCollisionEnabled(false);
+	SetAttachmentCollisionEnabled(false); // Disable collision while socketed to prevent physics issues
 }
 
 // Drops battery onto ground and re-enables collision and prompt triggers
@@ -177,13 +177,13 @@ void ABatteryCapsule::SetAttachmentCollisionEnabled(bool bEnabled)
 {
 	SetActorEnableCollision(bEnabled);
 
-	if (bEnabled)
+	if (bEnabled) // Re-enable collision and interaction triggers when dropped or socketed
 	{
 		CapsuleComponent->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 		CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 		InteractionZone->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	}
-	else
+	else // Disable collision and interaction triggers when carried or socketed
 	{
 		CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		InteractionZone->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -196,13 +196,13 @@ void ABatteryCapsule::ResetToWorldLocation(const FVector& TargetLocation)
 	bIsCarried = false;
 	bIsSocketed = false;
 
-	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-	SetActorLocation(TargetLocation);
-	SetActorRotation(FRotator::ZeroRotator);
-	SetActorRelativeScale3D(FVector::OneVector);
+	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform); // Detach from any parent actor or component
+	SetActorLocation(TargetLocation); // Move battery to the specified world location
+	SetActorRotation(FRotator::ZeroRotator); // Reset rotation to default orientation
+	SetActorRelativeScale3D(FVector::OneVector); // Reset scale to default size
 
 	BaseLocation = TargetLocation;
 	RunningTime = 0.0f;
 
-	SetAttachmentCollisionEnabled(true);
+	SetAttachmentCollisionEnabled(true); // Re-enable collision and interaction triggers for pickup again
 }
