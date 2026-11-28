@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "LiveWireUtils.h"
 #include "RedPowerCylinder.generated.h"
 
 class USphereComponent;
@@ -30,8 +31,8 @@ public:
 	// Allows laser preview updates to run in editor viewports.
 	virtual bool ShouldTickIfViewportsOnly() const override;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Cell ID (4-Digit)"))
-	int32 CellID = 1001;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Shape", meta = (DisplayName = "Required Battery Shape"))
+	ELiveWireShape RequiredShape = ELiveWireShape::Circle;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USceneComponent> SceneRoot;
@@ -83,10 +84,6 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cell|State")
 	TObjectPtr<ABatteryCapsule> InsertedBattery;
-
-	// Returns the mapped color for a four-digit ID.
-	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
-	FLinearColor GetColorForID(int32 InID) const;
 
 	// Checks whether an actor has an ID that matches this cylinder.
 	UFUNCTION(BlueprintPure, Category = "LiveWire|Laser")

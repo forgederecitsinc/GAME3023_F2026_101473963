@@ -119,7 +119,7 @@ public:
 	float EscapeTimerRemaining = 0.0f;
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Drone|Player Detection & Latch Kill", meta = (DisplayName = "Current Drone State"))
-	EEnemyDroneState DroneState = EEnemyDroneState::Patrolling;
+	EEnemyDroneState DroneState = EEnemyDroneState::DivingToLatch;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Drone|Player Detection & Latch Kill", meta = (DisplayName = "Detection Capsule Padding", ClampMin = "0.0"))
 	float DetectionRadiusPadding = 55.0f;

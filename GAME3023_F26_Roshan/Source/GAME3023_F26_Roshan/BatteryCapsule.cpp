@@ -51,12 +51,6 @@ void ABatteryCapsule::BeginPlay()
 	InteractionZone->OnComponentEndOverlap.AddDynamic(this, &ABatteryCapsule::OnInteractionEndOverlap);
 }
 
-// Returns the matching linear color mapped to the 4-digit ID
-FLinearColor ABatteryCapsule::GetColorForID(int32 InID) const
-{
-	return LiveWireUtils::GetColorForID(InID);
-}
-
 // Updates battery floating animation or state while dropped
 void ABatteryCapsule::Tick(float DeltaTime)
 {

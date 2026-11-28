@@ -192,13 +192,7 @@ void ARedPowerCylinder::ApplyPowerDomeLightState(bool bLightOn)
 	}
 }
 
-// GetColorForID: returns the LiveWire color mapped to the cylinder ID.
-FLinearColor ARedPowerCylinder::GetColorForID(int32 InID) const
-{
-	return LiveWireUtils::GetColorForID(InID);
-}
-
-// CheckActorTargetIDMatch: checks whether a hit actor has a matching four-digit ID.
+// CheckActorTargetIDMatch: checks whether a hit actor is a valid laser target.
 bool ARedPowerCylinder::CheckActorTargetIDMatch(AActor* ActorToCheck, int32& OutFoundID) const
 {
 	if (!ActorToCheck)
@@ -209,21 +203,20 @@ bool ARedPowerCylinder::CheckActorTargetIDMatch(AActor* ActorToCheck, int32& Out
 	if (ALaserTarget* LaserTarget = Cast<ALaserTarget>(ActorToCheck))
 	{
 		OutFoundID = LaserTarget->TargetID;
-		return OutFoundID == CellID;
+		return true;
 	}
 
 	if (ATransformerBushing* Bushing = Cast<ATransformerBushing>(ActorToCheck))
 	{
 		OutFoundID = Bushing->BushingID;
-		return OutFoundID == CellID;
+		return true;
 	}
 
 	if (ARedPowerCylinder* OtherCyl = Cast<ARedPowerCylinder>(ActorToCheck))
 	{
 		if (OtherCyl != this)
 		{
-			OutFoundID = OtherCyl->CellID;
-			return OutFoundID == CellID;
+			return OtherCyl->RequiredShape == RequiredShape;
 		}
 	}
 
@@ -232,15 +225,6 @@ bool ARedPowerCylinder::CheckActorTargetIDMatch(AActor* ActorToCheck, int32& Out
 		if (ParentActor != ActorToCheck && CheckActorTargetIDMatch(ParentActor, OutFoundID))
 		{
 			return true;
-		}
-	}
-
-	for (const TCHAR* PropName : { TEXT("TargetID"), TEXT("CellID") })
-	{
-		if (FIntProperty* IntProp = CastField<FIntProperty>(ActorToCheck->GetClass()->FindPropertyByName(PropName)))
-		{
-			OutFoundID = IntProp->GetPropertyValue_InContainer(ActorToCheck);
-			return OutFoundID == CellID;
 		}
 	}
 
@@ -568,7 +552,7 @@ bool ARedPowerCylinder::InsertBattery(ABatteryCapsule* Battery)
 	bHasBattery = true;
 	Battery->OnSocketed(this, BatterySocket);
 
-	const bool bMatched = (Battery->BatteryID == CellID);
+	const bool bMatched = (Battery->BatteryShape == RequiredShape);
 	bIsPowered = bMatched;
 	bIsTargetDetected = false;
 

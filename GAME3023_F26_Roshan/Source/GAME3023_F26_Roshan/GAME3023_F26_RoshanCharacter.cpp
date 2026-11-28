@@ -1086,7 +1086,7 @@ void AGAME3023_F26_RoshanCharacter::UpdateCylinderHoldPrompt(ARedPowerCylinder* 
 		ResetBatteryAttachHold();
 		InteractionPromptWidget->SetHoldProgress(0.0f);
 		OutAction = TEXT("Press Square to Collect Battery");
-		OutTarget = FString::Printf(TEXT("Laser Gun (ID: %d) - Online"), Cylinder->CellID);
+		OutTarget = TEXT("Laser Gun - Online");
 		return;
 	}
 
@@ -1095,7 +1095,7 @@ void AGAME3023_F26_RoshanCharacter::UpdateCylinderHoldPrompt(ARedPowerCylinder* 
 		ResetBatteryAttachHold();
 		InteractionPromptWidget->SetHoldProgress(0.0f);
 		OutAction = TEXT("Laser Gun (Requires Battery)");
-		OutTarget = FString::Printf(TEXT("Laser Gun (ID: %d) - Offline"), Cylinder->CellID);
+		OutTarget = TEXT("Laser Gun - Offline");
 		return;
 	}
 
@@ -1104,7 +1104,7 @@ void AGAME3023_F26_RoshanCharacter::UpdateCylinderHoldPrompt(ARedPowerCylinder* 
 		ResetBatteryAttachHold();
 		InteractionPromptWidget->SetHoldProgress(0.0f);
 		OutAction = FString::Printf(TEXT("Hold Square (%.0fs) to Attach Battery"), FMath::Max(BatteryAttachHoldDuration, 0.5f));
-		OutTarget = FString::Printf(TEXT("Laser Gun (ID: %d) - Ready"), Cylinder->CellID);
+		OutTarget = TEXT("Laser Gun - Ready");
 		return;
 	}
 
@@ -1137,12 +1137,12 @@ void AGAME3023_F26_RoshanCharacter::UpdateCylinderHoldPrompt(ARedPowerCylinder* 
 		Cylinder->Interact(this);
 
 		OutAction = TEXT("Press Square to Collect Battery");
-		OutTarget = FString::Printf(TEXT("Laser Gun (ID: %d) - Online"), Cylinder->CellID);
+		OutTarget = TEXT("Laser Gun - Online");
 		return;
 	}
 
 	OutAction = FString::Printf(TEXT("Attaching Battery... %.1fs / %.0fs"), CurrentAttachHoldTime, SafeHoldDuration);
-	OutTarget = FString::Printf(TEXT("Laser Gun (ID: %d) - Charging"), Cylinder->CellID);
+	OutTarget = TEXT("Laser Gun - Charging");
 }
 
 // Handles UpdateInteractionPrompt interaction logic

@@ -162,7 +162,7 @@ bool AEnemyDrone::IsPawnHidingUnderCover(const APawn* TargetPawn) const
 
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(DroneCoverCheck), false, this);
 	QueryParams.AddIgnoredActor(TargetPawn);
-
+ 
 	if (const AGAME3023_F26_RoshanCharacter* PlayerChar = Cast<AGAME3023_F26_RoshanCharacter>(TargetPawn))
 	{
 		if (PlayerChar->GetCarriedBattery())

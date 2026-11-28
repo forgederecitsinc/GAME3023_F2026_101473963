@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "LiveWireUtils.h"
 #include "BatteryCapsule.generated.h"
 
 class UCapsuleComponent;
@@ -22,8 +23,8 @@ public:
 	// Runs every frame to animate an idle battery or keep its carried state stable.
 	virtual void Tick(float DeltaTime) override;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|ID", meta = (DisplayName = "Battery ID (4-Digit)"))
-	int32 BatteryID = 1001;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LiveWire|Shape", meta = (DisplayName = "Battery Shape"))
+	ELiveWireShape BatteryShape = ELiveWireShape::Circle;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UCapsuleComponent> CapsuleComponent;
@@ -54,10 +55,6 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battery|State")
 	FVector SpawnOrigin;
-
-	// Returns the LiveWire color for a specific battery ID.
-	UFUNCTION(BlueprintPure, Category = "LiveWire|Color")
-	FLinearColor GetColorForID(int32 InID) const;
 
 	// Allows the player to collect this battery.
 	UFUNCTION(BlueprintCallable, Category = "Battery|Actions")

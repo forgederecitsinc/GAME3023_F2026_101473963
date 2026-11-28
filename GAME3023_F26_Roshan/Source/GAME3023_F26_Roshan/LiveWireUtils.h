@@ -2,8 +2,19 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "LiveWireUtils.generated.h"
 
 class UWorld;
+
+// Shapes used to visually match batteries with their corresponding laser guns.
+UENUM(BlueprintType)
+enum class ELiveWireShape : uint8
+{
+	Circle		UMETA(DisplayName = "Circle"),
+	Square		UMETA(DisplayName = "Square"),
+	Triangle	UMETA(DisplayName = "Triangle"),
+	Star		UMETA(DisplayName = "Star")
+};
 
 namespace LiveWireUtils
 {

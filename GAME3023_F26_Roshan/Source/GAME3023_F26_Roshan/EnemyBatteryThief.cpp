@@ -560,7 +560,7 @@ bool AEnemyBatteryThief::DoesLaserHaveWorkingBattery(const ARedPowerCylinder* Cy
 	return Cylinder->bHasBattery &&
 		Cylinder->bIsPowered &&
 		IsValid(Cylinder->InsertedBattery) &&
-		(Cylinder->InsertedBattery->BatteryID == Cylinder->CellID);
+		(Cylinder->InsertedBattery->BatteryShape == Cylinder->RequiredShape);
 }
 
 // FindNearestWorkingBatteryLaser: manages battery attachment and state
@@ -1124,7 +1124,6 @@ void AEnemyBatteryThief::CompleteBatteryRemoval()
 		return;
 	}
 
-	const int32 SabotagedID = TargetLaserCylinder->CellID;
 	ABatteryCapsule* ExtractedBattery = TargetLaserCylinder->RemoveBattery();
 
 	if (IsValid(ExtractedBattery))
@@ -1147,19 +1146,6 @@ void AEnemyBatteryThief::CompleteBatteryRemoval()
 		TargetDropSpotActor = FindClosestBatteryDropSpot();
 		const FVector DropSpotDestination = IsValid(TargetDropSpotActor) ? TargetDropSpotActor->GetActorLocation() : PatrolOrigin;
 		BuildPathToWorldLocation(DropSpotDestination);
-
-		if (GEngine)
-		{
-			const FString SpotName = IsValid(TargetDropSpotActor) ? TargetDropSpotActor->GetActorNameOrLabel() : TEXT("Fallback Origin");
-			GEngine->AddOnScreenDebugMessage(
-				3105,
-				4.5f,
-				FColor::Red,
-				FString::Printf(TEXT("[BATTERY SABOTAGED!] Battery Thief removed Battery (ID: %d) and is carrying it to closest Drop Spot (%s)!"), SabotagedID, *SpotName),
-				true,
-				FVector2D(1.35f, 1.35f)
-			);
-		}
 	}
 	else
 	{
@@ -1175,7 +1161,6 @@ void AEnemyBatteryThief::DepositStolenBatteryAtDropOff()
 {
 	if (IsValid(StolenBattery))
 	{
-		const int32 DroppedID = StolenBattery->BatteryID;
 		const FVector RawDropLocation = IsValid(TargetDropSpotActor)
 			? TargetDropSpotActor->GetActorLocation()
 			: GetActorLocation();
@@ -1184,19 +1169,6 @@ void AEnemyBatteryThief::DepositStolenBatteryAtDropOff()
 
 		StolenBattery->OnDropped(FinalDropLocation);
 		StolenBattery = nullptr;
-
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(
-				3106,
-				4.0f,
-				FColor::Yellow,
-				FString::Printf(TEXT("[BATTERY DROPPED] Battery Thief dropped Battery (ID: %d) at Drop Spot (X=%.0f, Y=%.0f, Z=%.0f)!"),
-					DroppedID, FinalDropLocation.X, FinalDropLocation.Y, FinalDropLocation.Z),
-				true,
-				FVector2D(1.3f, 1.3f)
-			);
-		}
 	}
 
 	TargetDropSpotActor = nullptr;
